@@ -106,6 +106,12 @@ export default function Home() {
         </div>
       )}
 
+      {selectedTeam && !loading && fixtures.length === 0 && !error && (
+        <p style={{ marginTop: 20, color: "#999" }}>
+          No se encontraron partidos jugados para este equipo en las ligas disponibles.
+        </p>
+      )}
+
       {selectedTeam && fixtures.length > 0 && (
         <div style={{ marginTop: 30 }}>
           <h3>Últimos {fixtures.length} partidos de {selectedTeam.name}</h3>
