@@ -13,9 +13,14 @@ export default async function handler(req, res) {
       }
     );
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return res.status(200).json({ error: `La API respondió con estado ${response.status} (probablemente límite de peticiones alcanzado)` });
+    }
 
-    if (data.errorCode) {
+    if (data.errorCode || data.message) {
       return res.status(200).json({ error: data.message || "Error de football-data.org" });
     }
 
