@@ -1,39 +1,30 @@
 export default async function handler(req, res) {
-  const { teamId, season } = req.query;
+  const { teamId } = req.query;
 
   if (!teamId) {
     return res.status(400).json({ error: "Falta el ID del equipo" });
   }
 
-  // El plan gratis no permite el parámetro "last", así que pedimos por temporada
-  // y nosotros mismos recortamos los últimos 10 partidos ya jugados.
-const temporada = season || 2024;
-
   try {
     const response = await fetch(
-      `https://v3.football.api-sports.io/fixtures?team=${teamId}&season=${temporada}`,
+      `https://api.football-data.org/v4/teams/${teamId}/matches?status=FINISHED&limit=10`,
       {
-        headers: {
-          "x-apisports-key": process.env.API_FOOTBALL_KEY,
-        },
+        headers: { "X-Auth-Token": process.env.FOOTBALL_DATA_KEY },
       }
     );
 
     const data = await response.json();
 
-    if (data.errors && Object.keys(data.errors).length > 0) {
-      return res.status(200).json({ error: JSON.stringify(data.errors), raw: data });
+    if (data.errorCode) {
+      return res.status(200).json({ error: data.message || "Error de football-data.org" });
     }
 
-    const partidos = data.response || [];
+    // Ordenamos del partido más reciente al más viejo
+    const partidos = (data.matches || []).sort(
+      (a, b) => new Date(b.utcDate) - new Date(a.utcDate)
+    );
 
-    // Solo partidos ya jugados (con resultado final), ordenados del más reciente al más viejo
-    const jugados = partidos
-      .filter((f) => f.fixture.status.short === "FT")
-      .sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date))
-      .slice(0, 10);
-
-    res.status(200).json(jugados);
+    res.status(200).json(partidos);
   } catch (error) {
     res.status(500).json({ error: "No se pudo traer los partidos del equipo" });
   }
