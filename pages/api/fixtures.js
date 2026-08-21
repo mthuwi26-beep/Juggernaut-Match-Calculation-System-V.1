@@ -16,6 +16,12 @@ export default async function handler(req, res) {
     );
 
     const data = await response.json();
+
+    // Si la API devuelve errores (ej: límite de temporada en plan gratis), los mostramos
+    if (data.errors && Object.keys(data.errors).length > 0) {
+      return res.status(200).json({ error: JSON.stringify(data.errors), raw: data });
+    }
+
     res.status(200).json(data.response || []);
   } catch (error) {
     res.status(500).json({ error: "No se pudo traer los partidos del equipo" });
