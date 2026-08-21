@@ -7,7 +7,7 @@ export default async function handler(req, res) {
 
   // El plan gratis no permite el parámetro "last", así que pedimos por temporada
   // y nosotros mismos recortamos los últimos 10 partidos ya jugados.
-  const temporada = season || new Date().getFullYear(2024);
+  const temporada = season || new Date().getFullYear(2022);
 
   try {
     const response = await fetch(
