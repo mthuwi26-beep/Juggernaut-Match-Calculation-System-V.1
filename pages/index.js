@@ -128,6 +128,160 @@ function calcularEstadisticasPuntuales(fixtures, teamId, statsMap) {
   };
 }
 
+// Versión numérica (no formateada) de córners/tarjetas/faltas, con el conteo de partidos
+// que realmente aportaron dato — la usa el motor de pesos para saber el N de cada fuente.
+function calcularPuntualesNumerico(fixtures, teamId, statsMap) {
+  if (!fixtures || fixtures.length === 0) {
+    return {
+      corners: { valor: null, n: 0 },
+      amarillas: { valor: null, n: 0 },
+      faltas: { valor: null, n: 0 },
+    };
+  }
+
+  let corners = 0, cornersN = 0;
+  let amarillas = 0, amarillasN = 0;
+  let faltas = 0, faltasN = 0;
+
+  fixtures.forEach((f) => {
+    const datos = statsMap[f.fixture.id];
+    if (!datos) return;
+    const esLocal = f.teams.home.id === teamId;
+
+    const c = esLocal ? datos.corners.home : datos.corners.away;
+    const a = esLocal ? datos.amarillas.home : datos.amarillas.away;
+    const ft = esLocal ? datos.faltas.home : datos.faltas.away;
+
+    if (c !== null) { corners += c; cornersN++; }
+    if (a !== null) { amarillas += a; amarillasN++; }
+    if (ft !== null) { faltas += ft; faltasN++; }
+  });
+
+  return {
+    corners: { valor: cornersN ? corners / cornersN : null, n: cornersN },
+    amarillas: { valor: amarillasN ? amarillas / amarillasN : null, n: amarillasN },
+    faltas: { valor: faltasN ? faltas / faltasN : null, n: faltasN },
+  };
+}
+
+// Arma las 6 "fuentes" (local, visitante, liga, no liga, temporada, forma reciente)
+// para UN equipo, con valor y N de cada estadística (goles, córners, amarillas, faltas)
+function construirFuentesEquipo(fixturesCompletos, teamId, statsMap) {
+  const subsets = {
+    local: fixturesCompletos.filter((f) => f.teams.home.id === teamId),
+    visitante: fixturesCompletos.filter((f) => f.teams.away.id === teamId),
+    liga: fixturesCompletos.filter((f) => esLiga(f)),
+    noLiga: fixturesCompletos.filter((f) => !esLiga(f)),
+    temporada: fixturesCompletos,
+    forma: fixturesCompletos.slice(0, 5),
+  };
+
+  const resultado = {};
+  Object.entries(subsets).forEach(([clave, subset]) => {
+    const goles = calcularEstadisticasGoles(subset, teamId);
+    const puntual = calcularPuntualesNumerico(subset, teamId, statsMap);
+    resultado[clave] = {
+      goles: { valor: goles ? parseFloat(goles.promedioGolesFavor) : null, n: goles ? goles.total : 0 },
+      corners: puntual.corners,
+      amarillas: puntual.amarillas,
+      faltas: puntual.faltas,
+    };
+  });
+
+  return resultado;
+}
+
+// El motor de pesos dinámicos: recibe las 7 fuentes de UNA estadística y devuelve
+// el valor esperado ya ponderado y normalizado, según la metodología del documento.
+function calcularValorEsperado(fuentesStat, esPartidoLiga) {
+  const conf = (n, ref) => Math.min(1, n / ref);
+
+  const pesos = {};
+  pesos.actual = 35 * conf(fuentesStat.actual.n, 10);
+  pesos.contraria = 5 * conf(fuentesStat.contraria.n, 10);
+
+  if (esPartidoLiga) {
+    pesos.liga = 20 * conf(fuentesStat.liga.n, 10);
+    pesos.noLiga = 0;
+  } else {
+    pesos.liga = 7.5 * conf(fuentesStat.liga.n, 10);
+    pesos.noLiga = 20 * conf(fuentesStat.noLiga.n, 10);
+  }
+
+  pesos.temporada = 20 * conf(fuentesStat.temporada.n, 15);
+  pesos.h2h = Math.min(15, 3 * fuentesStat.h2h.n);
+  pesos.forma = 5 * conf(fuentesStat.forma.n, 5);
+
+  const baseTotal = esPartidoLiga ? 35 + 5 + 20 + 20 + 15 + 5 : 35 + 5 + 7.5 + 20 + 20 + 15 + 5;
+  const efectivoTotal = Object.values(pesos).reduce((a, b) => a + b, 0);
+  const sobrante = Math.max(0, baseTotal - efectivoTotal);
+
+  const targetPrincipal = esPartidoLiga ? "liga" : "noLiga";
+  pesos[targetPrincipal] += sobrante * 0.2;
+  pesos.temporada += sobrante * 0.5;
+  pesos.actual += sobrante * 0.3;
+
+  const entradas = [
+    [fuentesStat.actual.valor, pesos.actual],
+    [fuentesStat.contraria.valor, pesos.contraria],
+    [fuentesStat.liga.valor, pesos.liga],
+    [fuentesStat.noLiga.valor, pesos.noLiga],
+    [fuentesStat.temporada.valor, pesos.temporada],
+    [fuentesStat.h2h.valor, pesos.h2h],
+    [fuentesStat.forma.valor, pesos.forma],
+  ];
+
+  let sumaPeso = 0, sumaValorPeso = 0;
+  entradas.forEach(([valor, peso]) => {
+    if (peso > 0 && valor !== null && !isNaN(valor)) {
+      sumaPeso += peso;
+      sumaValorPeso += valor * peso;
+    }
+  });
+
+  return sumaPeso > 0 ? sumaValorPeso / sumaPeso : null;
+}
+
+// --- Distribución de Poisson: convierte un valor esperado (lambda) en probabilidades ---
+function factorial(n) {
+  let r = 1;
+  for (let i = 2; i <= n; i++) r *= i;
+  return r;
+}
+
+function poissonProb(lambda, k) {
+  return (Math.exp(-lambda) * Math.pow(lambda, k)) / factorial(k);
+}
+
+function probabilidadOver(lambda, linea) {
+  if (lambda === null || lambda === undefined) return null;
+  const kMax = Math.floor(linea);
+  let acumulada = 0;
+  for (let k = 0; k <= kMax; k++) acumulada += poissonProb(lambda, k);
+  return Math.max(0, Math.min(1, 1 - acumulada));
+}
+
+function probabilidadBTTS(lambdaLocal, lambdaVisitante) {
+  if (lambdaLocal === null || lambdaVisitante === null) return null;
+  const pLocalAnota = 1 - Math.exp(-lambdaLocal);
+  const pVisitanteAnota = 1 - Math.exp(-lambdaVisitante);
+  return pLocalAnota * pVisitanteAnota;
+}
+
+function colorSemaforo(probabilidad) {
+  if (probabilidad === null) return { color: "#999", etiqueta: "Sin datos" };
+  if (probabilidad >= 0.7) return { color: "#22c55e", etiqueta: "Verde" };
+  if (probabilidad >= 0.5) return { color: "#eab308", etiqueta: "Amarillo" };
+  return { color: "#ef4444", etiqueta: "Rojo" };
+}
+
+const LINEAS_MERCADOS = {
+  goles: [0.5, 1.5, 2.5, 3.5, 4.5],
+  corners: [7.5, 8.5, 9.5, 10.5, 11.5, 12.5],
+  amarillas: [1.5, 2.5, 3.5, 4.5, 5.5],
+  faltas: [18.5, 21.5, 24.5, 27.5],
+};
+
 function calcularHeadToHead(fixturesLocal, fixturesVisitante, idLocal, idVisitante) {
   const todos = [...(fixturesLocal || []), ...(fixturesVisitante || [])];
   const vistos = new Set();
@@ -534,6 +688,134 @@ function PanelHeadToHead({ h2h, nombreLocal, nombreVisitante, tema, statsMap, da
   );
 }
 
+function calcularGolesNumerico(fixtures, teamId) {
+  if (!fixtures || fixtures.length === 0) return { valor: null, n: 0 };
+  let suma = 0;
+  fixtures.forEach((f) => {
+    const esLocal = f.teams.home.id === teamId;
+    suma += esLocal ? f.goals.home : f.goals.away;
+  });
+  return { valor: suma / fixtures.length, n: fixtures.length };
+}
+
+function FilaMercado({ nombre, lineas, lambda, tema }) {
+  if (lambda === null || lambda === undefined) return null;
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <h4 style={{ marginBottom: 8, fontSize: 14 }}>
+        {nombre} <span style={{ fontWeight: "normal", color: tema.textoSuave }}>— esperado: {lambda.toFixed(2)}</span>
+      </h4>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {lineas.map((linea) => {
+          const p = probabilidadOver(lambda, linea);
+          const { color } = colorSemaforo(p);
+          return (
+            <div
+              key={linea}
+              style={{
+                padding: "8px 14px", borderRadius: 6, background: color, color: "#fff",
+                fontSize: 13, fontWeight: "bold", minWidth: 90, textAlign: "center",
+              }}
+            >
+              Over {linea}<br />{Math.round(p * 100)}%
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema }) {
+  if (!equipoLocal?.team || !equipoVisitante?.team) return null;
+
+  const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
+  const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap);
+
+  const partidosH2H = h2h?.partidos || [];
+  const h2hGolesLocal = calcularGolesNumerico(partidosH2H, equipoLocal.team.id);
+  const h2hGolesVisitante = calcularGolesNumerico(partidosH2H, equipoVisitante.team.id);
+  const h2hPuntualesLocal = calcularPuntualesNumerico(partidosH2H, equipoLocal.team.id, statsMap);
+  const h2hPuntualesVisitante = calcularPuntualesNumerico(partidosH2H, equipoVisitante.team.id, statsMap);
+
+  function armarMotor(fuentesEq, actualClave, contrariaClave, h2hGoles, h2hPuntuales) {
+    return {
+      goles: { actual: fuentesEq[actualClave].goles, contraria: fuentesEq[contrariaClave].goles, liga: fuentesEq.liga.goles, noLiga: fuentesEq.noLiga.goles, temporada: fuentesEq.temporada.goles, forma: fuentesEq.forma.goles, h2h: h2hGoles },
+      corners: { actual: fuentesEq[actualClave].corners, contraria: fuentesEq[contrariaClave].corners, liga: fuentesEq.liga.corners, noLiga: fuentesEq.noLiga.corners, temporada: fuentesEq.temporada.corners, forma: fuentesEq.forma.corners, h2h: h2hPuntuales.corners },
+      amarillas: { actual: fuentesEq[actualClave].amarillas, contraria: fuentesEq[contrariaClave].amarillas, liga: fuentesEq.liga.amarillas, noLiga: fuentesEq.noLiga.amarillas, temporada: fuentesEq.temporada.amarillas, forma: fuentesEq.forma.amarillas, h2h: h2hPuntuales.amarillas },
+      faltas: { actual: fuentesEq[actualClave].faltas, contraria: fuentesEq[contrariaClave].faltas, liga: fuentesEq.liga.faltas, noLiga: fuentesEq.noLiga.faltas, temporada: fuentesEq.temporada.faltas, forma: fuentesEq.forma.faltas, h2h: h2hPuntuales.faltas },
+    };
+  }
+
+  const motorLocal = armarMotor(fuentesEqLocal, "local", "visitante", h2hGolesLocal, h2hPuntualesLocal);
+  const motorVisitante = armarMotor(fuentesEqVisitante, "visitante", "local", h2hGolesVisitante, h2hPuntualesVisitante);
+
+  const lambdaGolesLocal = calcularValorEsperado(motorLocal.goles, esPartidoLiga);
+  const lambdaGolesVisitante = calcularValorEsperado(motorVisitante.goles, esPartidoLiga);
+  const lambdaGolesTotal = lambdaGolesLocal !== null && lambdaGolesVisitante !== null ? lambdaGolesLocal + lambdaGolesVisitante : null;
+
+  const lambdaCornersLocal = calcularValorEsperado(motorLocal.corners, esPartidoLiga);
+  const lambdaCornersVisitante = calcularValorEsperado(motorVisitante.corners, esPartidoLiga);
+  const lambdaCornersTotal = lambdaCornersLocal !== null && lambdaCornersVisitante !== null ? lambdaCornersLocal + lambdaCornersVisitante : null;
+
+  const lambdaAmarillasLocal = calcularValorEsperado(motorLocal.amarillas, esPartidoLiga);
+  const lambdaAmarillasVisitante = calcularValorEsperado(motorVisitante.amarillas, esPartidoLiga);
+  const lambdaAmarillasTotal = lambdaAmarillasLocal !== null && lambdaAmarillasVisitante !== null ? lambdaAmarillasLocal + lambdaAmarillasVisitante : null;
+
+  const lambdaFaltasLocal = calcularValorEsperado(motorLocal.faltas, esPartidoLiga);
+  const lambdaFaltasVisitante = calcularValorEsperado(motorVisitante.faltas, esPartidoLiga);
+  const lambdaFaltasTotal = lambdaFaltasLocal !== null && lambdaFaltasVisitante !== null ? lambdaFaltasLocal + lambdaFaltasVisitante : null;
+
+  const probBTTS = probabilidadBTTS(lambdaGolesLocal, lambdaGolesVisitante);
+
+  return (
+    <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
+      <h3 style={{ marginTop: 0 }}>🚦 Pronóstico y semáforo</h3>
+
+      <div style={{ marginBottom: 20, fontSize: 13, display: "flex", gap: 16 }}>
+        <label style={{ cursor: "pointer" }}>
+          <input type="radio" checked={esPartidoLiga} onChange={() => setEsPartidoLiga(true)} /> Partido de Liga
+        </label>
+        <label style={{ cursor: "pointer" }}>
+          <input type="radio" checked={!esPartidoLiga} onChange={() => setEsPartidoLiga(false)} /> Partido de Copa/otro torneo
+        </label>
+      </div>
+
+      <FilaMercado nombre="Goles totales del partido" lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} tema={tema} />
+
+      {probBTTS !== null && (
+        <div style={{ marginBottom: 18 }}>
+          <h4 style={{ marginBottom: 8, fontSize: 14 }}>Ambos anotan (BTTS)</h4>
+          {(() => {
+            const { color } = colorSemaforo(probBTTS);
+            return (
+              <div style={{ display: "inline-block", padding: "8px 16px", borderRadius: 6, background: color, color: "#fff", fontWeight: "bold", fontSize: 13 }}>
+                {Math.round(probBTTS * 100)}%
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {datosPuntualesListos ? (
+        <>
+          <FilaMercado nombre="Córners totales del partido" lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} tema={tema} />
+          <FilaMercado nombre="Tarjetas amarillas totales" lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} tema={tema} />
+          <FilaMercado nombre="Faltas totales del partido" lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} tema={tema} />
+        </>
+      ) : (
+        <p style={{ color: tema.textoSuave, fontSize: 13 }}>
+          Carga los "datos puntuales" arriba para ver el semáforo de córners, tarjetas y faltas.
+        </p>
+      )}
+
+      <p style={{ fontSize: 11, color: tema.textoSuave, marginTop: 16 }}>
+        Esto es un modelo estadístico de tendencias, no una certeza. No contempla lesiones, sanciones, clima ni decisiones arbitrales puntuales.
+      </p>
+    </div>
+  );
+}
+
 export default function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
@@ -544,6 +826,7 @@ export default function Home() {
   const [cargandoPuntuales, setCargandoPuntuales] = useState(false);
   const [progreso, setProgreso] = useState("");
   const [datosPuntualesListos, setDatosPuntualesListos] = useState(false);
+  const [esPartidoLiga, setEsPartidoLiga] = useState(true);
 
   const tema = modoOscuro ? TEMAS.oscuro : TEMAS.claro;
 
@@ -706,6 +989,19 @@ export default function Home() {
             tema={tema}
           />
         )}
+
+        <PanelSemaforo
+          equipoLocal={equipoLocal}
+          equipoVisitante={equipoVisitante}
+          fixturesLocal={fixturesLocal}
+          fixturesVisitante={fixturesVisitante}
+          h2h={h2h}
+          statsMap={statsMap}
+          datosPuntualesListos={datosPuntualesListos}
+          esPartidoLiga={esPartidoLiga}
+          setEsPartidoLiga={setEsPartidoLiga}
+          tema={tema}
+        />
       </div>
     </div>
   );
