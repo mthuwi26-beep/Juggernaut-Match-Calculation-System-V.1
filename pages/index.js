@@ -218,6 +218,12 @@ function MiniTabla({ fixtures, tema }) {
   );
 }
 
+function esLiga(fixture) {
+  const palabrasNoLiga = ["cup", "copa", "champions", "europa", "conference", "supercopa", "shield", "trophy", "playoff", "friendlies", "amistoso"];
+  const nombre = fixture.league.name.toLowerCase();
+  return !palabrasNoLiga.some((p) => nombre.includes(p));
+}
+
 function SubPanel({ titulo, fixtures, teamId, statsMap, tema }) {
   const statsGoles = calcularEstadisticasGoles(fixtures, teamId);
   const statsPuntuales = calcularEstadisticasPuntuales(fixtures, teamId, statsMap);
@@ -306,8 +312,11 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap }) {
     setLoading(false);
   }
 
-  const fixturesLocal = fixtures.filter((f) => selectedTeam && f.teams.home.id === selectedTeam.team.id);
-  const fixturesVisitante = fixtures.filter((f) => selectedTeam && f.teams.away.id === selectedTeam.team.id);
+  const fixturesLocalVenue = fixtures.filter((f) => selectedTeam && f.teams.home.id === selectedTeam.team.id);
+  const fixturesVisitanteVenue = fixtures.filter((f) => selectedTeam && f.teams.away.id === selectedTeam.team.id);
+  const fixturesLigaActual = fixtures.filter((f) => esLiga(f));
+  const fixturesNoLiga = fixtures.filter((f) => !esLiga(f));
+  const fixturesFormaReciente = fixtures.slice(0, 5); // ya vienen ordenados del más reciente al más viejo
 
   return (
     <div style={{ flex: 1, minWidth: 340 }}>
@@ -366,8 +375,11 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap }) {
           </div>
 
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <SubPanel titulo="Como Local" fixtures={fixturesLocal} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
-            <SubPanel titulo="Como Visitante" fixtures={fixturesVisitante} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
+            <SubPanel titulo="Como Local" fixtures={fixturesLocalVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
+            <SubPanel titulo="Como Visitante" fixtures={fixturesVisitanteVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
+            <SubPanel titulo="Liga actual" fixtures={fixturesLigaActual} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
+            <SubPanel titulo="No liga (copas)" fixtures={fixturesNoLiga} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
+            <SubPanel titulo="Forma reciente (5)" fixtures={fixturesFormaReciente} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
           </div>
         </div>
       )}
@@ -641,7 +653,7 @@ export default function Home() {
           />
         </div>
 
-        {equipoLocal?.team && equipoVisitante?.team && (
+        {equipoLocal?.team && equipoVisitante?.team && !datosPuntualesListos && (
           <button
             onClick={cargarDatosPuntuales}
             disabled={cargandoPuntuales}
@@ -653,10 +665,14 @@ export default function Home() {
           >
             {cargandoPuntuales
               ? progreso
-              : datosPuntualesListos
-              ? "✅ Datos puntuales cargados — Cargar de nuevo"
               : `📊 Cargar datos puntuales (córners, tarjetas, faltas) — ${equipoLocal.team.name} y ${equipoVisitante.team.name}`}
           </button>
+        )}
+
+        {datosPuntualesListos && (
+          <p style={{ textAlign: "center", marginTop: 20, color: "#2e9e4f", fontWeight: "bold" }}>
+            ✅ Datos puntuales cargados para este encuentro
+          </p>
         )}
 
         <PanelHeadToHead
