@@ -1,5 +1,75 @@
 import { useState } from "react";
 
+function calcularEstadisticas(fixtures, teamId) {
+  if (!fixtures || fixtures.length === 0) return null;
+
+  let golesFavor = 0;
+  let golesContra = 0;
+  let victorias = 0;
+  let empates = 0;
+  let derrotas = 0;
+  let partidosOver25 = 0;
+  let partidosBTTS = 0;
+
+  fixtures.forEach((f) => {
+    const esLocal = f.teams.home.id === teamId;
+    const gf = esLocal ? f.goals.home : f.goals.away;
+    const gc = esLocal ? f.goals.away : f.goals.home;
+
+    golesFavor += gf;
+    golesContra += gc;
+
+    if (gf > gc) victorias++;
+    else if (gf === gc) empates++;
+    else derrotas++;
+
+    if (gf + gc > 2.5) partidosOver25++;
+    if (gf > 0 && gc > 0) partidosBTTS++;
+  });
+
+  const total = fixtures.length;
+
+  return {
+    total,
+    promedioGolesFavor: (golesFavor / total).toFixed(2),
+    promedioGolesContra: (golesContra / total).toFixed(2),
+    victorias,
+    empates,
+    derrotas,
+    over25Pct: Math.round((partidosOver25 / total) * 100),
+    bttsPct: Math.round((partidosBTTS / total) * 100),
+  };
+}
+
+function PanelEstadisticas({ stats }) {
+  if (!stats) return null;
+
+  return (
+    <div style={{ marginTop: 16, padding: 12, background: "#f7f7f7", borderRadius: 6, fontSize: 13 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+        <span>Récord (V-E-D)</span>
+        <strong>{stats.victorias}-{stats.empates}-{stats.derrotas}</strong>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+        <span>Promedio goles a favor</span>
+        <strong>{stats.promedioGolesFavor}</strong>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+        <span>Promedio goles en contra</span>
+        <strong>{stats.promedioGolesContra}</strong>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+        <span>% Partidos Over 2.5 goles</span>
+        <strong>{stats.over25Pct}%</strong>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <span>% Ambos anotan (BTTS)</span>
+        <strong>{stats.bttsPct}%</strong>
+      </div>
+    </div>
+  );
+}
+
 function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
   const [query, setQuery] = useState("");
   const [teams, setTeams] = useState([]);
@@ -57,6 +127,8 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
     setLoading(false);
   }
 
+  const stats = selectedTeam ? calcularEstadisticas(fixtures, selectedTeam.team.id) : null;
+
   return (
     <div style={{ flex: 1, minWidth: 320 }}>
       <h3 style={{ marginBottom: 8 }}>{etiqueta}</h3>
@@ -108,8 +180,10 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
             <strong>{selectedTeam.team.name}</strong>
           </div>
 
+          <PanelEstadisticas stats={stats} />
+
           {fixtures.length > 0 ? (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 12 }}>
               <thead>
                 <tr style={{ background: "#f0f0f0", textAlign: "left" }}>
                   <th style={{ padding: 6 }}>Fecha</th>
@@ -145,8 +219,8 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
 }
 
 export default function Home() {
-  const [equipoA, setEquipoA] = useState(null);
-  const [equipoB, setEquipoB] = useState(null);
+  const [equipoLocal, setEquipoLocal] = useState(null);
+  const [equipoVisitante, setEquipoVisitante] = useState(null);
 
   return (
     <div style={{ maxWidth: 1100, margin: "40px auto", padding: 20, fontFamily: "Arial, sans-serif" }}>
@@ -158,20 +232,20 @@ export default function Home() {
         Modo prueba: mostrando temporada 2024 (plan gratis de API-Football)
       </p>
 
-      {equipoA?.team && equipoB?.team && (
+      {equipoLocal?.team && equipoVisitante?.team && (
         <div style={{ textAlign: "center", margin: "20px 0", fontSize: 18, fontWeight: "bold" }}>
-          {equipoA.team.name} vs {equipoB.team.name}
+          {equipoLocal.team.name} vs {equipoVisitante.team.name}
         </div>
       )}
 
       <div style={{ display: "flex", gap: 30, marginTop: 30, flexWrap: "wrap" }}>
         <BuscadorEquipo
-          etiqueta="Equipo A"
-          onEquipoCargado={(team) => setEquipoA(team)}
+          etiqueta="Local"
+          onEquipoCargado={(team) => setEquipoLocal(team)}
         />
         <BuscadorEquipo
-          etiqueta="Equipo B"
-          onEquipoCargado={(team) => setEquipoB(team)}
+          etiqueta="Visitante"
+          onEquipoCargado={(team) => setEquipoVisitante(team)}
         />
       </div>
     </div>
