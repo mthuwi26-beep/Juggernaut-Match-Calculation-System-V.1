@@ -42,7 +42,7 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/fixtures?teamId=${team.id}`);
+      const res = await fetch(`/api/fixtures?teamId=${team.team.id}`);
       const data = await res.json();
       if (data.error) {
         setError(data.error);
@@ -61,6 +61,9 @@ export default function Home() {
       <p style={{ textAlign: "center", color: "#666" }}>
         Juggernaut Match Calculation System — Fase 1: búsqueda de equipos
       </p>
+      <p style={{ textAlign: "center", color: "#c00", fontSize: 13 }}>
+        Modo prueba: mostrando temporada 2024 (plan gratis de API-Football)
+      </p>
 
       <form onSubmit={buscarEquipos} style={{ display: "flex", gap: 8, marginTop: 30 }}>
         <input
@@ -75,10 +78,6 @@ export default function Home() {
         </button>
       </form>
 
-      <p style={{ marginTop: 10, fontSize: 13, color: "#999" }}>
-        Ligas disponibles: La Liga, Premier League, Champions League, Serie A, Bundesliga, Ligue 1
-      </p>
-
       {loading && <p style={{ marginTop: 20 }}>Cargando...</p>}
       {error && <p style={{ marginTop: 20, color: "red" }}>{error}</p>}
 
@@ -87,7 +86,7 @@ export default function Home() {
           <h3>Selecciona el equipo correcto:</h3>
           {teams.map((t) => (
             <div
-              key={t.id}
+              key={t.team.id}
               onClick={() => verPartidos(t)}
               style={{
                 padding: 10,
@@ -99,8 +98,8 @@ export default function Home() {
                 gap: 10,
               }}
             >
-              <img src={t.crest} alt={t.name} width={30} height={30} />
-              <span>{t.name} — {t.area?.name}</span>
+              <img src={t.team.logo} alt={t.team.name} width={30} height={30} />
+              <span>{t.team.name} — {t.team.country}</span>
             </div>
           ))}
         </div>
@@ -108,13 +107,13 @@ export default function Home() {
 
       {selectedTeam && !loading && fixtures.length === 0 && !error && (
         <p style={{ marginTop: 20, color: "#999" }}>
-          No se encontraron partidos jugados para este equipo en las ligas disponibles.
+          No se encontraron partidos jugados para este equipo en la temporada 2024.
         </p>
       )}
 
       {selectedTeam && fixtures.length > 0 && (
         <div style={{ marginTop: 30 }}>
-          <h3>Últimos {fixtures.length} partidos de {selectedTeam.name}</h3>
+          <h3>Últimos {fixtures.length} partidos de {selectedTeam.team.name}</h3>
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10 }}>
             <thead>
               <tr style={{ background: "#f0f0f0", textAlign: "left" }}>
@@ -126,16 +125,16 @@ export default function Home() {
             </thead>
             <tbody>
               {fixtures.map((f) => (
-                <tr key={f.id} style={{ borderBottom: "1px solid #eee" }}>
+                <tr key={f.fixture.id} style={{ borderBottom: "1px solid #eee" }}>
                   <td style={{ padding: 8 }}>
-                    {new Date(f.utcDate).toLocaleDateString("es-ES")}
+                    {new Date(f.fixture.date).toLocaleDateString("es-ES")}
                   </td>
-                  <td style={{ padding: 8 }}>{f.competition.name}</td>
+                  <td style={{ padding: 8 }}>{f.league.name}</td>
                   <td style={{ padding: 8 }}>
-                    {f.homeTeam.name} vs {f.awayTeam.name}
+                    {f.teams.home.name} vs {f.teams.away.name}
                   </td>
                   <td style={{ padding: 8 }}>
-                    {f.score.fullTime.home} - {f.score.fullTime.away}
+                    {f.goals.home} - {f.goals.away}
                   </td>
                 </tr>
               ))}
