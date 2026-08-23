@@ -1,5 +1,26 @@
 import { useState } from "react";
 
+const TEMAS = {
+  claro: {
+    fondo: "#ffffff",
+    texto: "#111111",
+    textoSuave: "#666666",
+    panel: "#f7f7f7",
+    borde: "#dddddd",
+    encabezadoTabla: "#f0f0f0",
+    filaBorde: "#eeeeee",
+  },
+  oscuro: {
+    fondo: "#121212",
+    texto: "#f0f0f0",
+    textoSuave: "#aaaaaa",
+    panel: "#1e1e1e",
+    borde: "#333333",
+    encabezadoTabla: "#2a2a2a",
+    filaBorde: "#2a2a2a",
+  },
+};
+
 function calcularEstadisticas(fixtures, teamId) {
   if (!fixtures || fixtures.length === 0) return null;
 
@@ -41,11 +62,72 @@ function calcularEstadisticas(fixtures, teamId) {
   };
 }
 
-function PanelEstadisticas({ stats }) {
+// Busca partidos donde se enfrentaron directamente estos dos equipos,
+// combinando los partidos que ya trajimos de ambos buscadores (sin pedir más a la API)
+function calcularHeadToHead(fixturesLocal, fixturesVisitante, idLocal, idVisitante) {
+  const todos = [...(fixturesLocal || []), ...(fixturesVisitante || [])];
+  const vistos = new Set();
+  const enfrentamientos = [];
+
+  todos.forEach((f) => {
+    const ids = [f.teams.home.id, f.teams.away.id].sort().join("-");
+    const idsBuscados = [idLocal, idVisitante].sort().join("-");
+    if (ids === idsBuscados && !vistos.has(f.fixture.id)) {
+      vistos.add(f.fixture.id);
+      enfrentamientos.push(f);
+    }
+  });
+
+  enfrentamientos.sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+
+  if (enfrentamientos.length === 0) {
+    return { partidos: [], mensaje: "No hay enfrentamientos directos dentro de los últimos 10 partidos de cada equipo." };
+  }
+
+  let golesLocalTotal = 0;
+  let golesVisitanteTotal = 0;
+  let victoriasLocal = 0;
+  let victoriasVisitante = 0;
+  let empates = 0;
+  let partidosOver25 = 0;
+  let partidosBTTS = 0;
+
+  enfrentamientos.forEach((f) => {
+    const localEsHome = f.teams.home.id === idLocal;
+    const golesLocal = localEsHome ? f.goals.home : f.goals.away;
+    const golesVisitante = localEsHome ? f.goals.away : f.goals.home;
+
+    golesLocalTotal += golesLocal;
+    golesVisitanteTotal += golesVisitante;
+
+    if (golesLocal > golesVisitante) victoriasLocal++;
+    else if (golesVisitante > golesLocal) victoriasVisitante++;
+    else empates++;
+
+    if (golesLocal + golesVisitante > 2.5) partidosOver25++;
+    if (golesLocal > 0 && golesVisitante > 0) partidosBTTS++;
+  });
+
+  const total = enfrentamientos.length;
+
+  return {
+    partidos: enfrentamientos,
+    total,
+    promedioGolesLocal: (golesLocalTotal / total).toFixed(2),
+    promedioGolesVisitante: (golesVisitanteTotal / total).toFixed(2),
+    victoriasLocal,
+    victoriasVisitante,
+    empates,
+    over25Pct: Math.round((partidosOver25 / total) * 100),
+    bttsPct: Math.round((partidosBTTS / total) * 100),
+  };
+}
+
+function PanelEstadisticas({ stats, tema }) {
   if (!stats) return null;
 
   return (
-    <div style={{ marginTop: 16, padding: 12, background: "#f7f7f7", borderRadius: 6, fontSize: 13 }}>
+    <div style={{ marginTop: 16, padding: 12, background: tema.panel, borderRadius: 6, fontSize: 13 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
         <span>Récord (V-E-D)</span>
         <strong>{stats.victorias}-{stats.empates}-{stats.derrotas}</strong>
@@ -70,7 +152,7 @@ function PanelEstadisticas({ stats }) {
   );
 }
 
-function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
+function BuscadorEquipo({ etiqueta, onEquipoCargado, tema }) {
   const [query, setQuery] = useState("");
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -139,15 +221,34 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Escribe un equipo (ej: Barcelona)"
-          style={{ flex: 1, padding: 10, fontSize: 15 }}
+          style={{
+            flex: 1,
+            padding: 10,
+            fontSize: 15,
+            background: tema.panel,
+            color: tema.texto,
+            border: `1px solid ${tema.borde}`,
+            borderRadius: 4,
+          }}
         />
-        <button type="submit" style={{ padding: "10px 16px", fontSize: 15 }}>
+        <button
+          type="submit"
+          style={{
+            padding: "10px 16px",
+            fontSize: 15,
+            background: tema.panel,
+            color: tema.texto,
+            border: `1px solid ${tema.borde}`,
+            borderRadius: 4,
+            cursor: "pointer",
+          }}
+        >
           Buscar
         </button>
       </form>
 
       {loading && <p style={{ marginTop: 12 }}>Cargando...</p>}
-      {error && <p style={{ marginTop: 12, color: "red", fontSize: 14 }}>{error}</p>}
+      {error && <p style={{ marginTop: 12, color: "#e05555", fontSize: 14 }}>{error}</p>}
 
       {teams.length > 0 && !selectedTeam && (
         <div style={{ marginTop: 12, maxHeight: 250, overflowY: "auto" }}>
@@ -157,7 +258,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
               onClick={() => verPartidos(t)}
               style={{
                 padding: 8,
-                border: "1px solid #ddd",
+                border: `1px solid ${tema.borde}`,
                 marginBottom: 6,
                 cursor: "pointer",
                 display: "flex",
@@ -180,12 +281,12 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
             <strong>{selectedTeam.team.name}</strong>
           </div>
 
-          <PanelEstadisticas stats={stats} />
+          <PanelEstadisticas stats={stats} tema={tema} />
 
           {fixtures.length > 0 ? (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 12 }}>
               <thead>
-                <tr style={{ background: "#f0f0f0", textAlign: "left" }}>
+                <tr style={{ background: tema.encabezadoTabla, textAlign: "left" }}>
                   <th style={{ padding: 6 }}>Fecha</th>
                   <th style={{ padding: 6 }}>Torneo</th>
                   <th style={{ padding: 6 }}>Partido</th>
@@ -194,7 +295,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
               </thead>
               <tbody>
                 {fixtures.map((f) => (
-                  <tr key={f.fixture.id} style={{ borderBottom: "1px solid #eee" }}>
+                  <tr key={f.fixture.id} style={{ borderBottom: `1px solid ${tema.filaBorde}` }}>
                     <td style={{ padding: 6 }}>
                       {new Date(f.fixture.date).toLocaleDateString("es-ES")}
                     </td>
@@ -210,7 +311,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
               </tbody>
             </table>
           ) : (
-            !loading && <p style={{ color: "#999" }}>Sin partidos en la temporada 2024.</p>
+            !loading && <p style={{ color: tema.textoSuave }}>Sin partidos en la temporada 2024.</p>
           )}
         </div>
       )}
@@ -218,34 +319,131 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado }) {
   );
 }
 
-export default function Home() {
-  const [equipoLocal, setEquipoLocal] = useState(null);
-  const [equipoVisitante, setEquipoVisitante] = useState(null);
+function PanelHeadToHead({ h2h, nombreLocal, nombreVisitante, tema }) {
+  if (!h2h) return null;
+
+  if (h2h.partidos.length === 0) {
+    return (
+      <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
+        <h3 style={{ marginTop: 0 }}>Enfrentamientos directos</h3>
+        <p style={{ color: tema.textoSuave }}>{h2h.mensaje}</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: 1100, margin: "40px auto", padding: 20, fontFamily: "Arial, sans-serif" }}>
-      <h1 style={{ textAlign: "center" }}>JMCS</h1>
-      <p style={{ textAlign: "center", color: "#666" }}>
-        Juggernaut Match Calculation System — Selecciona los dos equipos del estudio
-      </p>
-      <p style={{ textAlign: "center", color: "#c00", fontSize: 13 }}>
-        Modo prueba: mostrando temporada 2024 (plan gratis de API-Football)
-      </p>
+    <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
+      <h3 style={{ marginTop: 0 }}>
+        Enfrentamientos directos ({h2h.total} partido{h2h.total !== 1 ? "s" : ""})
+      </h3>
 
-      {equipoLocal?.team && equipoVisitante?.team && (
-        <div style={{ textAlign: "center", margin: "20px 0", fontSize: 18, fontWeight: "bold" }}>
-          {equipoLocal.team.name} vs {equipoVisitante.team.name}
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13, marginBottom: 16 }}>
+        <div>Victorias {nombreLocal}: <strong>{h2h.victoriasLocal}</strong></div>
+        <div>Empates: <strong>{h2h.empates}</strong></div>
+        <div>Victorias {nombreVisitante}: <strong>{h2h.victoriasVisitante}</strong></div>
+        <div>Promedio goles {nombreLocal}: <strong>{h2h.promedioGolesLocal}</strong></div>
+        <div>Promedio goles {nombreVisitante}: <strong>{h2h.promedioGolesVisitante}</strong></div>
+        <div>% Over 2.5: <strong>{h2h.over25Pct}%</strong></div>
+        <div>% BTTS: <strong>{h2h.bttsPct}%</strong></div>
+      </div>
+
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: tema.encabezadoTabla, textAlign: "left" }}>
+            <th style={{ padding: 6 }}>Fecha</th>
+            <th style={{ padding: 6 }}>Torneo</th>
+            <th style={{ padding: 6 }}>Partido</th>
+            <th style={{ padding: 6 }}>Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {h2h.partidos.map((f) => (
+            <tr key={f.fixture.id} style={{ borderBottom: `1px solid ${tema.filaBorde}` }}>
+              <td style={{ padding: 6 }}>{new Date(f.fixture.date).toLocaleDateString("es-ES")}</td>
+              <td style={{ padding: 6 }}>{f.league.name}</td>
+              <td style={{ padding: 6 }}>{f.teams.home.name} vs {f.teams.away.name}</td>
+              <td style={{ padding: 6 }}>{f.goals.home} - {f.goals.away}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function Home() {
+  const [equipoLocal, setEquipoLocal] = useState(null);
+  const [fixturesLocal, setFixturesLocal] = useState([]);
+  const [equipoVisitante, setEquipoVisitante] = useState(null);
+  const [fixturesVisitante, setFixturesVisitante] = useState([]);
+  const [modoOscuro, setModoOscuro] = useState(false);
+
+  const tema = modoOscuro ? TEMAS.oscuro : TEMAS.claro;
+
+  const h2h =
+    equipoLocal?.team && equipoVisitante?.team
+      ? calcularHeadToHead(fixturesLocal, fixturesVisitante, equipoLocal.team.id, equipoVisitante.team.id)
+      : null;
+
+  return (
+    <div style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: 20, fontFamily: "Arial, sans-serif", position: "relative" }}>
+        <button
+          onClick={() => setModoOscuro(!modoOscuro)}
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 20,
+            padding: "8px 14px",
+            fontSize: 13,
+            background: tema.panel,
+            color: tema.texto,
+            border: `1px solid ${tema.borde}`,
+            borderRadius: 20,
+            cursor: "pointer",
+          }}
+        >
+          {modoOscuro ? "☀️ Modo claro" : "🌙 Modo oscuro"}
+        </button>
+
+        <h1 style={{ textAlign: "center", paddingTop: 10 }}>JMCS</h1>
+        <p style={{ textAlign: "center", color: tema.textoSuave }}>
+          Juggernaut Match Calculation System — Selecciona los dos equipos del estudio
+        </p>
+        <p style={{ textAlign: "center", color: "#c00", fontSize: 13 }}>
+          Modo prueba: mostrando temporada 2024 (plan gratis de API-Football)
+        </p>
+
+        {equipoLocal?.team && equipoVisitante?.team && (
+          <div style={{ textAlign: "center", margin: "20px 0", fontSize: 18, fontWeight: "bold" }}>
+            {equipoLocal.team.name} vs {equipoVisitante.team.name}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 30, marginTop: 30, flexWrap: "wrap" }}>
+          <BuscadorEquipo
+            etiqueta="Local"
+            tema={tema}
+            onEquipoCargado={(team, fixtures) => {
+              setEquipoLocal(team);
+              setFixturesLocal(fixtures || []);
+            }}
+          />
+          <BuscadorEquipo
+            etiqueta="Visitante"
+            tema={tema}
+            onEquipoCargado={(team, fixtures) => {
+              setEquipoVisitante(team);
+              setFixturesVisitante(fixtures || []);
+            }}
+          />
         </div>
-      )}
 
-      <div style={{ display: "flex", gap: 30, marginTop: 30, flexWrap: "wrap" }}>
-        <BuscadorEquipo
-          etiqueta="Local"
-          onEquipoCargado={(team) => setEquipoLocal(team)}
-        />
-        <BuscadorEquipo
-          etiqueta="Visitante"
-          onEquipoCargado={(team) => setEquipoVisitante(team)}
+        <PanelHeadToHead
+          h2h={h2h}
+          nombreLocal={equipoLocal?.team?.name}
+          nombreVisitante={equipoVisitante?.team?.name}
+          tema={tema}
         />
       </div>
     </div>
