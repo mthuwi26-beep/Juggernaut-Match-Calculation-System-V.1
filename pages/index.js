@@ -851,8 +851,6 @@ function PanelCalendario({ tema, onSeleccionarPartido }) {
     setLoading(false);
   }
 
-  const esErrorDeTemporada = error && error.toLowerCase().includes("season");
-
   return (
     <div style={{ width: 300, flexShrink: 0 }}>
       <h3 style={{ fontSize: 15, marginBottom: 10 }}>📅 Calendario de partidos</h3>
@@ -878,12 +876,7 @@ function PanelCalendario({ tema, onSeleccionarPartido }) {
         {loading ? "Buscando..." : "Ver partidos de este día"}
       </button>
 
-      {esErrorDeTemporada && (
-        <p style={{ fontSize: 12, color: tema.textoSuave, lineHeight: 1.4 }}>
-          ⏳ Aún no disponible: esta fecha requiere el plan pagado de API-Football (temporada actual). Cuando actives el plan, esto se llenará automáticamente, sin tocar más código.
-        </p>
-      )}
-      {error && !esErrorDeTemporada && (
+      {error && (
         <p style={{ fontSize: 12, color: "#e05555" }}>{error}</p>
       )}
       {buscado && !loading && !error && partidos.length === 0 && (
