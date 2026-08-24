@@ -735,7 +735,7 @@ function FilaMercado({ nombre, lineas, lambda, tema }) {
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento }) {
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
   const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
@@ -783,10 +783,10 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
       <div style={{ marginBottom: 20, fontSize: 13, display: "flex", gap: 16 }}>
         <label style={{ cursor: "pointer" }}>
-          <input type="radio" checked={esPartidoLiga} onChange={() => setEsPartidoLiga(true)} /> Partido de Liga
+          <input type="radio" checked={esPartidoLiga} onChange={() => setEsPartidoLiga(true)} style={{ accentColor: acento }} /> Partido de Liga
         </label>
         <label style={{ cursor: "pointer" }}>
-          <input type="radio" checked={!esPartidoLiga} onChange={() => setEsPartidoLiga(false)} /> Partido de Copa/otro torneo
+          <input type="radio" checked={!esPartidoLiga} onChange={() => setEsPartidoLiga(false)} style={{ accentColor: acento }} /> Partido de Copa/otro torneo
         </label>
       </div>
 
@@ -902,6 +902,123 @@ function PanelCalendario({ tema, onSeleccionarPartido }) {
   );
 }
 
+function armarContextoParaIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga }) {
+  let contexto = `Partido: ${equipoLocal.team.name} (Local) vs ${equipoVisitante.team.name} (Visitante)\n`;
+  contexto += `Tipo de partido: ${esPartidoLiga ? "Liga" : "Copa/otro torneo"}\n\n`;
+
+  if (statsGoLocal) {
+    contexto += `${equipoLocal.team.name} (últimos ${statsGoLocal.total} partidos, temporada 2024): Récord ${statsGoLocal.victorias}V-${statsGoLocal.empates}E-${statsGoLocal.derrotas}D, promedio goles a favor ${statsGoLocal.promedioGolesFavor}, en contra ${statsGoLocal.promedioGolesContra}, % Over 2.5: ${statsGoLocal.over25Pct}%, % BTTS: ${statsGoLocal.bttsPct}%\n`;
+  }
+  if (statsGoVisitante) {
+    contexto += `${equipoVisitante.team.name} (últimos ${statsGoVisitante.total} partidos, temporada 2024): Récord ${statsGoVisitante.victorias}V-${statsGoVisitante.empates}E-${statsGoVisitante.derrotas}D, promedio goles a favor ${statsGoVisitante.promedioGolesFavor}, en contra ${statsGoVisitante.promedioGolesContra}, % Over 2.5: ${statsGoVisitante.over25Pct}%, % BTTS: ${statsGoVisitante.bttsPct}%\n`;
+  }
+
+  if (h2h && h2h.partidos && h2h.partidos.length > 0) {
+    contexto += `\nEnfrentamientos directos (${h2h.total} partido${h2h.total !== 1 ? "s" : ""}): Victorias ${equipoLocal.team.name}: ${h2h.victoriasLocal}, Empates: ${h2h.empates}, Victorias ${equipoVisitante.team.name}: ${h2h.victoriasVisitante}. Promedio goles ${equipoLocal.team.name}: ${h2h.promedioGolesLocal}, ${equipoVisitante.team.name}: ${h2h.promedioGolesVisitante}. % Over 2.5: ${h2h.over25Pct}%, % BTTS: ${h2h.bttsPct}%\n`;
+  } else {
+    contexto += `\nNo hay enfrentamientos directos recientes registrados.\n`;
+  }
+
+  return contexto;
+}
+
+function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga, tema, acento }) {
+  const [pregunta, setPregunta] = useState("");
+  const [mensajes, setMensajes] = useState([]);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!equipoLocal?.team || !equipoVisitante?.team) return null;
+
+  async function enviarPregunta(e) {
+    e.preventDefault();
+    if (!pregunta.trim()) return;
+
+    const preguntaActual = pregunta;
+    setMensajes((prev) => [...prev, { rol: "usuario", texto: preguntaActual }]);
+    setPregunta("");
+    setError("");
+    setCargando(true);
+
+    const contexto = armarContextoParaIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga });
+
+    try {
+      const res = await fetch("/api/analisis-ia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contexto, pregunta: preguntaActual }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setMensajes((prev) => [...prev, { rol: "ia", texto: data.respuesta }]);
+      }
+    } catch (err) {
+      setError("No se pudo conectar con la IA");
+    }
+    setCargando(false);
+  }
+
+  return (
+    <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
+      <h3 style={{ marginTop: 0 }}>💬 Pregúntale a la IA sobre este partido</h3>
+
+      <div style={{ maxHeight: 400, overflowY: "auto", marginBottom: 14 }}>
+        {mensajes.length === 0 && (
+          <p style={{ color: tema.textoSuave, fontSize: 13 }}>
+            Ej: "¿Qué opinas de este partido?", "¿Ves valor en el over de goles?", "¿Qué equipo ves más sólido?"
+          </p>
+        )}
+        {mensajes.map((m, i) => (
+          <div
+            key={i}
+            style={{
+              marginBottom: 10, padding: 10, borderRadius: 6, fontSize: 13, lineHeight: 1.5,
+              background: m.rol === "usuario" ? acento : tema.fondo,
+              color: m.rol === "usuario" ? "#fff" : tema.texto,
+              maxWidth: "85%",
+              marginLeft: m.rol === "usuario" ? "auto" : 0,
+            }}
+          >
+            {m.texto}
+          </div>
+        ))}
+        {cargando && <p style={{ fontSize: 13, color: tema.textoSuave }}>Pensando...</p>}
+      </div>
+
+      {error && <p style={{ color: "#e05555", fontSize: 13, marginBottom: 10 }}>{error}</p>}
+
+      <form onSubmit={enviarPregunta} style={{ display: "flex", gap: 8 }}>
+        <input
+          type="text"
+          value={pregunta}
+          onChange={(e) => setPregunta(e.target.value)}
+          placeholder="Escribe tu pregunta sobre el partido..."
+          style={{
+            flex: 1, padding: 10, fontSize: 14,
+            background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4,
+          }}
+        />
+        <button
+          type="submit"
+          disabled={cargando}
+          style={{
+            padding: "10px 18px", fontSize: 14, background: acento, color: "#fff",
+            border: "none", borderRadius: 4, cursor: cargando ? "default" : "pointer",
+          }}
+        >
+          Enviar
+        </button>
+      </form>
+
+      <p style={{ fontSize: 11, color: tema.textoSuave, marginTop: 10 }}>
+        Powered by Gemini. La IA solo interpreta los datos ya calculados arriba, no tiene información externa del partido.
+      </p>
+    </div>
+  );
+}
+
 export default function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
@@ -934,6 +1051,19 @@ export default function Home() {
 
   const statsGoLocal = equipoLocal?.team ? calcularEstadisticasGoles(fixturesLocal, equipoLocal.team.id) : null;
   const statsGoVisitante = equipoVisitante?.team ? calcularEstadisticasGoles(fixturesVisitante, equipoVisitante.team.id) : null;
+
+  const esFemenino =
+    (equipoLocal?.team?.name && /\sW$/.test(equipoLocal.team.name)) ||
+    (equipoVisitante?.team?.name && /\sW$/.test(equipoVisitante.team.name)) ||
+    fixturesLocal.some((f) => f.league.name.toLowerCase().includes("women")) ||
+    fixturesVisitante.some((f) => f.league.name.toLowerCase().includes("women"));
+
+  const acento = esFemenino ? "#ec4899" : "#2563eb";
+
+  const mensajeEstudio =
+    equipoLocal?.team && equipoVisitante?.team
+      ? `Estudio: ${equipoLocal.team.name} vs ${equipoVisitante.team.name} — historial de temporada 2024 (plan gratis de API-Football)`
+      : "Modo prueba: historial de temporada 2024 (plan gratis de API-Football). El calendario de la izquierda sí trae partidos reales.";
 
   async function cargarDatosPuntuales() {
     if (!equipoLocal?.team || !equipoVisitante?.team) return;
@@ -999,7 +1129,7 @@ export default function Home() {
           Juggernaut Match Calculation System — Selecciona los dos equipos del estudio
         </p>
         <p style={{ textAlign: "center", color: "#c00", fontSize: 13 }}>
-          Modo prueba: mostrando temporada 2024 (plan gratis de API-Football)
+          {mensajeEstudio}
         </p>
 
         <div style={{ display: "flex", gap: 30, marginTop: 20, alignItems: "flex-start" }}>
@@ -1046,7 +1176,7 @@ export default function Home() {
             disabled={cargandoPuntuales}
             style={{
               width: "100%", marginTop: 24, padding: "14px", fontSize: 15, fontWeight: "bold",
-              background: cargandoPuntuales ? tema.panel : "#2563eb", color: cargandoPuntuales ? tema.texto : "#fff",
+              background: cargandoPuntuales ? tema.panel : acento, color: cargandoPuntuales ? tema.texto : "#fff",
               border: "none", borderRadius: 8, cursor: cargandoPuntuales ? "default" : "pointer",
             }}
           >
@@ -1105,6 +1235,18 @@ export default function Home() {
           esPartidoLiga={esPartidoLiga}
           setEsPartidoLiga={setEsPartidoLiga}
           tema={tema}
+          acento={acento}
+        />
+
+        <ChatIA
+          equipoLocal={equipoLocal}
+          equipoVisitante={equipoVisitante}
+          statsGoLocal={statsGoLocal}
+          statsGoVisitante={statsGoVisitante}
+          h2h={h2h}
+          esPartidoLiga={esPartidoLiga}
+          tema={tema}
+          acento={acento}
         />
           </div>
         </div>
