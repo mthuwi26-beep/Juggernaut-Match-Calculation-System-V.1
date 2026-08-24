@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const TEMAS = {
   claro: {
@@ -409,7 +409,7 @@ function SubPanel({ titulo, fixtures, teamId, statsMap, tema }) {
   );
 }
 
-function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap }) {
+function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado }) {
   const [query, setQuery] = useState("");
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -465,6 +465,15 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap }) {
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (equipoForzado) {
+      setQuery(equipoForzado.team.name);
+      setTeams([]);
+      verPartidos(equipoForzado);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [equipoForzado?.team?.id]);
 
   const fixturesLocalVenue = fixtures.filter((f) => selectedTeam && f.teams.home.id === selectedTeam.team.id);
   const fixturesVisitanteVenue = fixtures.filter((f) => selectedTeam && f.teams.away.id === selectedTeam.team.id);
@@ -816,6 +825,90 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   );
 }
 
+function PanelCalendario({ tema, onSeleccionarPartido }) {
+  const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
+  const [partidos, setPartidos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [buscado, setBuscado] = useState(false);
+
+  async function buscarPartidos() {
+    setLoading(true);
+    setError("");
+    setPartidos([]);
+    setBuscado(true);
+    try {
+      const res = await fetch(`/api/partidos-por-fecha?date=${fecha}`);
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setPartidos(data);
+      }
+    } catch (err) {
+      setError("Error al buscar partidos");
+    }
+    setLoading(false);
+  }
+
+  const esErrorDeTemporada = error && error.toLowerCase().includes("season");
+
+  return (
+    <div style={{ width: 300, flexShrink: 0 }}>
+      <h3 style={{ fontSize: 15, marginBottom: 10 }}>📅 Calendario de partidos</h3>
+
+      <input
+        type="date"
+        value={fecha}
+        onChange={(e) => setFecha(e.target.value)}
+        style={{
+          width: "100%", padding: 8, marginBottom: 8, fontSize: 13,
+          background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4,
+        }}
+      />
+      <button
+        onClick={buscarPartidos}
+        disabled={loading}
+        style={{
+          width: "100%", padding: 8, marginBottom: 14, fontSize: 13,
+          background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`,
+          borderRadius: 4, cursor: "pointer",
+        }}
+      >
+        {loading ? "Buscando..." : "Ver partidos de este día"}
+      </button>
+
+      {esErrorDeTemporada && (
+        <p style={{ fontSize: 12, color: tema.textoSuave, lineHeight: 1.4 }}>
+          ⏳ Aún no disponible: esta fecha requiere el plan pagado de API-Football (temporada actual). Cuando actives el plan, esto se llenará automáticamente, sin tocar más código.
+        </p>
+      )}
+      {error && !esErrorDeTemporada && (
+        <p style={{ fontSize: 12, color: "#e05555" }}>{error}</p>
+      )}
+      {buscado && !loading && !error && partidos.length === 0 && (
+        <p style={{ fontSize: 12, color: tema.textoSuave }}>No hay partidos para esta fecha.</p>
+      )}
+
+      <div style={{ maxHeight: 550, overflowY: "auto" }}>
+        {partidos.map((p) => (
+          <div
+            key={p.fixture.id}
+            onClick={() => onSeleccionarPartido(p)}
+            style={{
+              padding: 8, border: `1px solid ${tema.borde}`, marginBottom: 6,
+              cursor: "pointer", fontSize: 12,
+            }}
+          >
+            <div style={{ color: tema.textoSuave, marginBottom: 4, fontSize: 11 }}>{p.league.name}</div>
+            <div>{p.teams.home.name} vs {p.teams.away.name}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
@@ -827,6 +920,17 @@ export default function Home() {
   const [progreso, setProgreso] = useState("");
   const [datosPuntualesListos, setDatosPuntualesListos] = useState(false);
   const [esPartidoLiga, setEsPartidoLiga] = useState(true);
+  const [equipoForzadoLocal, setEquipoForzadoLocal] = useState(null);
+  const [equipoForzadoVisitante, setEquipoForzadoVisitante] = useState(null);
+
+  function seleccionarPartidoDelCalendario(p) {
+    setEquipoForzadoLocal({
+      team: { id: p.teams.home.id, name: p.teams.home.name, logo: p.teams.home.logo, country: p.league.country },
+    });
+    setEquipoForzadoVisitante({
+      team: { id: p.teams.away.id, name: p.teams.away.name, logo: p.teams.away.logo, country: p.league.country },
+    });
+  }
 
   const tema = modoOscuro ? TEMAS.oscuro : TEMAS.claro;
 
@@ -882,7 +986,7 @@ export default function Home() {
           background: ${tema.fondo};
         }
       `}</style>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: 20, fontFamily: "Arial, sans-serif", position: "relative" }}>
+      <div style={{ maxWidth: 1500, margin: "0 auto", padding: 20, fontFamily: "Arial, sans-serif", position: "relative" }}>
         <button
           onClick={() => setModoOscuro(!modoOscuro)}
           style={{
@@ -905,6 +1009,11 @@ export default function Home() {
           Modo prueba: mostrando temporada 2024 (plan gratis de API-Football)
         </p>
 
+        <div style={{ display: "flex", gap: 30, marginTop: 20, alignItems: "flex-start" }}>
+          <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} />
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+
         {equipoLocal?.team && equipoVisitante?.team && (
           <div style={{ textAlign: "center", margin: "20px 0", fontSize: 18, fontWeight: "bold" }}>
             {equipoLocal.team.name} vs {equipoVisitante.team.name}
@@ -916,6 +1025,7 @@ export default function Home() {
             etiqueta="Local"
             tema={tema}
             statsMap={statsMap}
+            equipoForzado={equipoForzadoLocal}
             onEquipoCargado={(team, fixtures) => {
               setEquipoLocal(team);
               setFixturesLocal(fixtures || []);
@@ -927,6 +1037,7 @@ export default function Home() {
             etiqueta="Visitante"
             tema={tema}
             statsMap={statsMap}
+            equipoForzado={equipoForzadoVisitante}
             onEquipoCargado={(team, fixtures) => {
               setEquipoVisitante(team);
               setFixturesVisitante(fixtures || []);
@@ -1002,6 +1113,8 @@ export default function Home() {
           setEsPartidoLiga={setEsPartidoLiga}
           tema={tema}
         />
+          </div>
+        </div>
       </div>
     </div>
   );
