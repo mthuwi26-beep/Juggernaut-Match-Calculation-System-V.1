@@ -2,23 +2,32 @@ import { useState, useEffect } from "react";
 
 const TEMAS = {
   claro: {
-    fondo: "#ffffff",
-    texto: "#111111",
-    textoSuave: "#666666",
-    panel: "#f7f7f7",
-    borde: "#dddddd",
-    encabezadoTabla: "#f0f0f0",
-    filaBorde: "#eeeeee",
+    fondo: "#F5F7F3",
+    texto: "#10241A",
+    textoSuave: "#5B7267",
+    panel: "#FFFFFF",
+    borde: "#DCE6DE",
+    encabezadoTabla: "#EEF3EC",
+    filaBorde: "#E7EEE6",
   },
   oscuro: {
-    fondo: "#121212",
-    texto: "#f0f0f0",
-    textoSuave: "#aaaaaa",
-    panel: "#1e1e1e",
-    borde: "#333333",
-    encabezadoTabla: "#2a2a2a",
-    filaBorde: "#2a2a2a",
+    fondo: "#0E2A1B",
+    texto: "#EAF3EC",
+    textoSuave: "#8FC9A8",
+    panel: "#153823",
+    borde: "#2A5A3A",
+    encabezadoTabla: "#1B4229",
+    filaBorde: "#1F4A2F",
   },
+};
+
+const DORADO = "#D8A93B";
+const ACENTOS_CATEGORIA = {
+  local: "#D8A93B",
+  visitante: "#C1694F",
+  liga: "#3FA79A",
+  noLiga: "#8B6FD8",
+  forma: "#C1548B",
 };
 
 function esperar(ms) {
@@ -53,7 +62,29 @@ function procesarEstadisticasPartido(respuestaApi, homeTeamId) {
       home: extraerStat(statsHome, "Fouls"),
       away: extraerStat(statsAway, "Fouls"),
     },
+    posesion: {
+      home: extraerStat(statsHome, "Ball Possession"),
+      away: extraerStat(statsAway, "Ball Possession"),
+    },
   };
+}
+
+// Promedio de posesión de balón para un equipo (viene como texto "55%" en la API)
+function calcularPosesionPromedio(fixtures, teamId, statsMap) {
+  if (!fixtures || fixtures.length === 0) return null;
+  let suma = 0, contador = 0;
+
+  fixtures.forEach((f) => {
+    const datos = statsMap[f.fixture.id];
+    if (!datos || !datos.posesion) return;
+    const esLocal = f.teams.home.id === teamId;
+    const valorTexto = esLocal ? datos.posesion.home : datos.posesion.away;
+    if (valorTexto === null || valorTexto === undefined) return;
+    const numero = parseInt(String(valorTexto).replace("%", ""), 10);
+    if (!isNaN(numero)) { suma += numero; contador++; }
+  });
+
+  return contador ? Math.round(suma / contador) : null;
 }
 
 function calcularEstadisticasGoles(fixtures, teamId) {
@@ -378,15 +409,15 @@ function esLiga(fixture) {
   return !palabrasNoLiga.some((p) => nombre.includes(p));
 }
 
-function SubPanel({ titulo, fixtures, teamId, statsMap, tema }) {
+function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento }) {
   const statsGoles = calcularEstadisticasGoles(fixtures, teamId);
   const statsPuntuales = calcularEstadisticasPuntuales(fixtures, teamId, statsMap);
 
   return (
     <div style={{ flex: 1, minWidth: 200 }}>
-      <h4 style={{ marginBottom: 6, fontSize: 14 }}>{titulo}</h4>
+      <h4 style={{ marginBottom: 6, fontSize: 12, color: acento }}>{titulo}</h4>
       {statsGoles ? (
-        <div style={{ padding: 10, background: tema.panel, borderRadius: 6, fontSize: 12 }}>
+        <div style={{ padding: 10, paddingTop: 8, background: tema.panel, borderRadius: 4, borderTop: `3px solid ${acento}`, fontSize: 12 }}>
           <FilaStat etiqueta="Récord (V-E-D)" valor={`${statsGoles.victorias}-${statsGoles.empates}-${statsGoles.derrotas}`} />
           <FilaStat etiqueta="Goles a favor (prom.)" valor={statsGoles.promedioGolesFavor} />
           <FilaStat etiqueta="Goles en contra (prom.)" valor={statsGoles.promedioGolesContra} />
@@ -538,11 +569,11 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
           </div>
 
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <SubPanel titulo="Como Local" fixtures={fixturesLocalVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
-            <SubPanel titulo="Como Visitante" fixtures={fixturesVisitanteVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
-            <SubPanel titulo="Liga actual" fixtures={fixturesLigaActual} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
-            <SubPanel titulo="No liga (copas)" fixtures={fixturesNoLiga} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
-            <SubPanel titulo="Forma reciente (5)" fixtures={fixturesFormaReciente} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} />
+            <SubPanel titulo="Como Local" fixtures={fixturesLocalVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
+            <SubPanel titulo="Como Visitante" fixtures={fixturesVisitanteVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
+            <SubPanel titulo="Liga actual" fixtures={fixturesLigaActual} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
+            <SubPanel titulo="No liga (copas)" fixtures={fixturesNoLiga} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
+            <SubPanel titulo="Forma reciente (5)" fixtures={fixturesFormaReciente} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
           </div>
         </div>
       )}
@@ -831,11 +862,13 @@ function PanelCalendario({ tema, onSeleccionarPartido }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [buscado, setBuscado] = useState(false);
+  const [seleccionado, setSeleccionado] = useState(null);
 
   async function buscarPartidos() {
     setLoading(true);
     setError("");
     setPartidos([]);
+    setSeleccionado(null);
     setBuscado(true);
     try {
       const res = await fetch(`/api/partidos-por-fecha?date=${fecha}`);
@@ -851,52 +884,72 @@ function PanelCalendario({ tema, onSeleccionarPartido }) {
     setLoading(false);
   }
 
+  function elegir(p) {
+    setSeleccionado(p.fixture.id);
+    onSeleccionarPartido(p);
+  }
+
   return (
-    <div style={{ width: 300, flexShrink: 0 }}>
-      <h3 style={{ fontSize: 15, marginBottom: 10 }}>📅 Calendario de partidos</h3>
+    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${DORADO}`, padding: 16 }}>
+      <h3 style={{ fontSize: 13, marginTop: 0, marginBottom: 14, color: DORADO }}>📅 Calendario de partidos</h3>
 
       <input
         type="date"
         value={fecha}
         onChange={(e) => setFecha(e.target.value)}
         style={{
-          width: "100%", padding: 8, marginBottom: 8, fontSize: 13,
-          background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4,
+          width: "100%", padding: 9, marginBottom: 8, fontSize: 13,
+          background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4,
         }}
       />
       <button
         onClick={buscarPartidos}
         disabled={loading}
         style={{
-          width: "100%", padding: 8, marginBottom: 14, fontSize: 13,
-          background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`,
-          borderRadius: 4, cursor: "pointer",
+          width: "100%", padding: 9, marginBottom: 14, fontSize: 12,
+          background: DORADO, color: "#1B1200", border: "none",
+          borderRadius: 4, cursor: "pointer", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
         }}
       >
-        {loading ? "Buscando..." : "Ver partidos de este día"}
+        {loading ? "Buscando..." : "Ver partidos"}
       </button>
 
       {error && (
-        <p style={{ fontSize: 12, color: "#e05555" }}>{error}</p>
+        <p style={{ fontSize: 11, color: "#e08a8a", lineHeight: 1.4 }}>{error}</p>
       )}
       {buscado && !loading && !error && partidos.length === 0 && (
         <p style={{ fontSize: 12, color: tema.textoSuave }}>No hay partidos para esta fecha.</p>
       )}
 
-      <div style={{ maxHeight: 550, overflowY: "auto" }}>
-        {partidos.map((p) => (
-          <div
-            key={p.fixture.id}
-            onClick={() => onSeleccionarPartido(p)}
-            style={{
-              padding: 8, border: `1px solid ${tema.borde}`, marginBottom: 6,
-              cursor: "pointer", fontSize: 12,
-            }}
-          >
-            <div style={{ color: tema.textoSuave, marginBottom: 4, fontSize: 11 }}>{p.league.name}</div>
-            <div>{p.teams.home.name} vs {p.teams.away.name}</div>
-          </div>
-        ))}
+      <div style={{ maxHeight: 600, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+        {partidos.map((p) => {
+          const activo = seleccionado === p.fixture.id;
+          return (
+            <div
+              key={p.fixture.id}
+              onClick={() => elegir(p)}
+              style={{
+                padding: "8px 10px", borderRadius: 4, cursor: "pointer", fontSize: 12,
+                background: activo ? DORADO : tema.fondo,
+                color: activo ? "#1B1200" : tema.texto,
+                border: `1px solid ${activo ? DORADO : tema.borde}`,
+                transition: "background 0.15s",
+              }}
+            >
+              <div style={{ color: activo ? "#1B1200" : tema.textoSuave, marginBottom: 5, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                {p.league.name}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                <img src={p.teams.home.logo} alt="" width={16} height={16} />
+                <span>{p.teams.home.name}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <img src={p.teams.away.logo} alt="" width={16} height={16} />
+                <span>{p.teams.away.name}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1019,6 +1072,35 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   );
 }
 
+function PanelEquipoLateral({ equipo, stats, posesion, acento, tema, alineacion }) {
+  if (!equipo?.team) return null;
+
+  return (
+    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acento}`, padding: 16, textAlign: "center" }}>
+      <img src={equipo.team.logo} alt={equipo.team.name} style={{ width: "100%", maxWidth: 130, height: "auto", margin: "0 auto 10px" }} />
+      <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento }}>{equipo.team.name}</h4>
+
+      {stats ? (
+        <div style={{ fontSize: 12, textAlign: "left" }}>
+          <FilaStat etiqueta="Récord" valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
+          <FilaStat etiqueta="Goles favor" valor={stats.promedioGolesFavor} />
+          <FilaStat etiqueta="Goles contra" valor={stats.promedioGolesContra} />
+          <FilaStat etiqueta="% Over 2.5" valor={`${stats.over25Pct}%`} />
+          <FilaStat etiqueta="% BTTS" valor={`${stats.bttsPct}%`} />
+          {posesion !== null && posesion !== undefined && (
+            <>
+              <div style={{ borderTop: `1px solid ${tema.borde}`, margin: "6px 0" }} />
+              <FilaStat etiqueta="Posesión (prom.)" valor={`${posesion}%`} />
+            </>
+          )}
+        </div>
+      ) : (
+        <p style={{ color: tema.textoSuave, fontSize: 11 }}>Sin datos aún.</p>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
@@ -1100,155 +1182,260 @@ export default function Home() {
     setProgreso("");
   }
 
+  const posesionLocal = equipoLocal?.team ? calcularPosesionPromedio(fixturesLocal, equipoLocal.team.id, statsMap) : null;
+  const posesionVisitante = equipoVisitante?.team ? calcularPosesionPromedio(fixturesVisitante, equipoVisitante.team.id, statsMap) : null;
+
   return (
     <div style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}>
       <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+        * { box-sizing: border-box; }
+
         html, body {
           margin: 0;
           padding: 0;
           background: ${tema.fondo};
+          font-family: 'IBM Plex Sans', Arial, sans-serif;
+        }
+
+        h1, h3, h4 {
+          font-family: 'Barlow Condensed', Arial, sans-serif;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+        }
+
+        h3, h4 {
+          text-transform: uppercase;
+          font-size: 0.95em;
+          letter-spacing: 0.08em;
+        }
+
+        table {
+          font-variant-numeric: tabular-nums;
+          width: 100%;
+        }
+
+        table td, table th {
+          font-family: 'IBM Plex Mono', monospace;
+        }
+
+        table th {
+          font-family: 'IBM Plex Sans', Arial, sans-serif;
+          text-transform: uppercase;
+          font-size: 0.75em;
+          letter-spacing: 0.06em;
+        }
+
+        button {
+          font-family: 'IBM Plex Sans', Arial, sans-serif;
+          font-weight: 600;
+          letter-spacing: 0.03em;
+        }
+
+        input[type="date"], input[type="text"] {
+          font-family: 'IBM Plex Sans', Arial, sans-serif;
+        }
+
+        .jmcs-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "calendario"
+            "centro"
+            "ala-local"
+            "ala-visitante";
+          gap: 16px;
+          padding: 12px;
+          max-width: 100%;
+        }
+
+        .jmcs-calendario { grid-area: calendario; }
+        .jmcs-centro { grid-area: centro; min-width: 0; }
+        .jmcs-ala-local { grid-area: ala-local; }
+        .jmcs-ala-visitante { grid-area: ala-visitante; }
+
+        @media (min-width: 768px) {
+          .jmcs-grid {
+            grid-template-columns: 260px 1fr;
+            grid-template-areas:
+              "calendario centro"
+              "calendario ala-local"
+              "calendario ala-visitante";
+            padding: 20px;
+            gap: 20px;
+          }
+        }
+
+        @media (min-width: 1280px) {
+          .jmcs-grid {
+            grid-template-columns: 260px 200px 1fr 200px;
+            grid-template-areas: "calendario ala-local centro ala-visitante";
+            align-items: start;
+          }
         }
       `}</style>
-      <div style={{ maxWidth: 1500, margin: "0 auto", padding: 20, fontFamily: "Arial, sans-serif", position: "relative" }}>
-        <button
-          onClick={() => setModoOscuro(!modoOscuro)}
+
+      <div style={{ padding: "12px 12px 0", maxWidth: 1800, margin: "0 auto" }}>
+        <div
           style={{
-            position: "absolute", top: 20, right: 20, padding: "8px 14px", fontSize: 13,
-            background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`,
-            borderRadius: 20, cursor: "pointer",
+            display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10,
+            padding: "14px 20px", background: tema.panel, borderRadius: 6,
+            borderBottom: `3px solid ${DORADO}`, marginBottom: 6,
           }}
         >
-          {modoOscuro ? "☀️ Modo claro" : "🌙 Modo oscuro"}
-        </button>
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 10 }}>
-          <img src="/logo.png" alt="JMCS" width={70} height={70} style={{ marginBottom: 8 }} />
-          <h1 style={{ margin: 0 }}>JMCS</h1>
-        </div>
-        <p style={{ textAlign: "center", color: tema.textoSuave }}>
-          Juggernaut Match Calculation System — Selecciona los dos equipos del estudio
-        </p>
-        <p style={{ textAlign: "center", color: "#c00", fontSize: 13 }}>
-          {mensajeEstudio}
-        </p>
-
-        <div style={{ display: "flex", gap: 30, marginTop: 20, alignItems: "flex-start" }}>
-          <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} />
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-
-        {equipoLocal?.team && equipoVisitante?.team && (
-          <div style={{ textAlign: "center", margin: "20px 0", fontSize: 18, fontWeight: "bold" }}>
-            {equipoLocal.team.name} vs {equipoVisitante.team.name}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <img src="/logo.png" alt="JMCS" width={44} height={44} />
+            <div>
+              <h1 style={{ margin: 0, fontSize: 26, lineHeight: 1 }}>JMCS</h1>
+              <p style={{ margin: "2px 0 0", fontSize: 10, color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Juggernaut Match Calculation System
+              </p>
+            </div>
           </div>
-        )}
 
-        <div style={{ display: "flex", gap: 30, marginTop: 30, flexWrap: "wrap" }}>
-          <BuscadorEquipo
-            etiqueta="Local"
-            tema={tema}
-            statsMap={statsMap}
-            equipoForzado={equipoForzadoLocal}
-            onEquipoCargado={(team, fixtures) => {
-              setEquipoLocal(team);
-              setFixturesLocal(fixtures || []);
-              setDatosPuntualesListos(false);
-              setStatsMap({});
-            }}
-          />
-          <BuscadorEquipo
-            etiqueta="Visitante"
-            tema={tema}
-            statsMap={statsMap}
-            equipoForzado={equipoForzadoVisitante}
-            onEquipoCargado={(team, fixtures) => {
-              setEquipoVisitante(team);
-              setFixturesVisitante(fixtures || []);
-              setDatosPuntualesListos(false);
-              setStatsMap({});
-            }}
-          />
-        </div>
-
-        {equipoLocal?.team && equipoVisitante?.team && !datosPuntualesListos && (
           <button
-            onClick={cargarDatosPuntuales}
-            disabled={cargandoPuntuales}
+            onClick={() => setModoOscuro(!modoOscuro)}
             style={{
-              width: "100%", marginTop: 24, padding: "14px", fontSize: 15, fontWeight: "bold",
-              background: cargandoPuntuales ? tema.panel : acento, color: cargandoPuntuales ? tema.texto : "#fff",
-              border: "none", borderRadius: 8, cursor: cargandoPuntuales ? "default" : "pointer",
+              padding: "8px 14px", fontSize: 13,
+              background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`,
+              borderRadius: 20, cursor: "pointer",
             }}
           >
-            {cargandoPuntuales
-              ? progreso
-              : `📊 Cargar datos puntuales (córners, tarjetas, faltas) — ${equipoLocal.team.name} y ${equipoVisitante.team.name}`}
+            {modoOscuro ? "☀️ Modo claro" : "🌙 Modo oscuro"}
           </button>
-        )}
+        </div>
 
-        {datosPuntualesListos && (
-          <p style={{ textAlign: "center", marginTop: 20, color: "#2e9e4f", fontWeight: "bold" }}>
-            ✅ Datos puntuales cargados para este encuentro
-          </p>
-        )}
+        <p style={{ textAlign: "center", color: DORADO, fontSize: 12, margin: "10px 0 0", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          {mensajeEstudio}
+        </p>
+      </div>
 
-        <PanelHeadToHead
-          h2h={h2h}
-          nombreLocal={equipoLocal?.team?.name}
-          nombreVisitante={equipoVisitante?.team?.name}
-          tema={tema}
-          statsMap={statsMap}
-          datosPuntualesListos={datosPuntualesListos}
-        />
+      <div className="jmcs-grid" style={{ maxWidth: 1800, margin: "0 auto" }}>
+        <div className="jmcs-calendario">
+          <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} />
+        </div>
 
-        {equipoLocal?.team && equipoVisitante?.team && (
-          <TablaComparativa
-            nombreLocal={equipoLocal.team.name}
-            nombreVisitante={equipoVisitante.team.name}
-            statsLocal={statsGoLocal}
-            statsVisitante={statsGoVisitante}
+        <div className="jmcs-ala-local">
+          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} acento={ACENTOS_CATEGORIA.local} tema={tema} />
+        </div>
+
+        <div className="jmcs-centro">
+          {equipoLocal?.team && equipoVisitante?.team && (
+            <div style={{ textAlign: "center", margin: "0 0 20px", fontSize: 18, fontWeight: "bold" }}>
+              {equipoLocal.team.name} vs {equipoVisitante.team.name}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 30, flexWrap: "wrap" }}>
+            <BuscadorEquipo
+              etiqueta="Local"
+              tema={tema}
+              statsMap={statsMap}
+              equipoForzado={equipoForzadoLocal}
+              onEquipoCargado={(team, fixtures) => {
+                setEquipoLocal(team);
+                setFixturesLocal(fixtures || []);
+                setDatosPuntualesListos(false);
+                setStatsMap({});
+              }}
+            />
+            <BuscadorEquipo
+              etiqueta="Visitante"
+              tema={tema}
+              statsMap={statsMap}
+              equipoForzado={equipoForzadoVisitante}
+              onEquipoCargado={(team, fixtures) => {
+                setEquipoVisitante(team);
+                setFixturesVisitante(fixtures || []);
+                setDatosPuntualesListos(false);
+                setStatsMap({});
+              }}
+            />
+          </div>
+
+          {equipoLocal?.team && equipoVisitante?.team && !datosPuntualesListos && (
+            <button
+              onClick={cargarDatosPuntuales}
+              disabled={cargandoPuntuales}
+              style={{
+                width: "100%", marginTop: 24, padding: "14px", fontSize: 15, fontWeight: "bold",
+                background: cargandoPuntuales ? tema.panel : acento, color: cargandoPuntuales ? tema.texto : "#fff",
+                border: "none", borderRadius: 8, cursor: cargandoPuntuales ? "default" : "pointer",
+              }}
+            >
+              {cargandoPuntuales
+                ? progreso
+                : `📊 Cargar datos puntuales (córners, tarjetas, faltas) — ${equipoLocal.team.name} y ${equipoVisitante.team.name}`}
+            </button>
+          )}
+
+          {datosPuntualesListos && (
+            <p style={{ textAlign: "center", marginTop: 20, color: "#2e9e4f", fontWeight: "bold" }}>
+              ✅ Datos puntuales cargados para este encuentro
+            </p>
+          )}
+
+          <PanelHeadToHead
+            h2h={h2h}
+            nombreLocal={equipoLocal?.team?.name}
+            nombreVisitante={equipoVisitante?.team?.name}
             tema={tema}
+            statsMap={statsMap}
+            datosPuntualesListos={datosPuntualesListos}
           />
-        )}
 
-        {datosPuntualesListos && equipoLocal?.team && equipoVisitante?.team && (
-          <TablaComparativaPuntual
-            nombreLocal={equipoLocal.team.name}
-            nombreVisitante={equipoVisitante.team.name}
+          {equipoLocal?.team && equipoVisitante?.team && (
+            <TablaComparativa
+              nombreLocal={equipoLocal.team.name}
+              nombreVisitante={equipoVisitante.team.name}
+              statsLocal={statsGoLocal}
+              statsVisitante={statsGoVisitante}
+              tema={tema}
+            />
+          )}
+
+          {datosPuntualesListos && equipoLocal?.team && equipoVisitante?.team && (
+            <TablaComparativaPuntual
+              nombreLocal={equipoLocal.team.name}
+              nombreVisitante={equipoVisitante.team.name}
+              fixturesLocal={fixturesLocal}
+              fixturesVisitante={fixturesVisitante}
+              idLocal={equipoLocal.team.id}
+              idVisitante={equipoVisitante.team.id}
+              statsMap={statsMap}
+              tema={tema}
+            />
+          )}
+
+          <PanelSemaforo
+            equipoLocal={equipoLocal}
+            equipoVisitante={equipoVisitante}
             fixturesLocal={fixturesLocal}
             fixturesVisitante={fixturesVisitante}
-            idLocal={equipoLocal.team.id}
-            idVisitante={equipoVisitante.team.id}
+            h2h={h2h}
             statsMap={statsMap}
+            datosPuntualesListos={datosPuntualesListos}
+            esPartidoLiga={esPartidoLiga}
+            setEsPartidoLiga={setEsPartidoLiga}
             tema={tema}
+            acento={acento}
           />
-        )}
 
-        <PanelSemaforo
-          equipoLocal={equipoLocal}
-          equipoVisitante={equipoVisitante}
-          fixturesLocal={fixturesLocal}
-          fixturesVisitante={fixturesVisitante}
-          h2h={h2h}
-          statsMap={statsMap}
-          datosPuntualesListos={datosPuntualesListos}
-          esPartidoLiga={esPartidoLiga}
-          setEsPartidoLiga={setEsPartidoLiga}
-          tema={tema}
-          acento={acento}
-        />
+          <ChatIA
+            equipoLocal={equipoLocal}
+            equipoVisitante={equipoVisitante}
+            statsGoLocal={statsGoLocal}
+            statsGoVisitante={statsGoVisitante}
+            h2h={h2h}
+            esPartidoLiga={esPartidoLiga}
+            tema={tema}
+            acento={acento}
+          />
+        </div>
 
-        <ChatIA
-          equipoLocal={equipoLocal}
-          equipoVisitante={equipoVisitante}
-          statsGoLocal={statsGoLocal}
-          statsGoVisitante={statsGoVisitante}
-          h2h={h2h}
-          esPartidoLiga={esPartidoLiga}
-          tema={tema}
-          acento={acento}
-        />
-          </div>
+        <div className="jmcs-ala-visitante">
+          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} acento={ACENTOS_CATEGORIA.visitante} tema={tema} />
         </div>
       </div>
     </div>
