@@ -976,7 +976,7 @@ function armarContextoParaIA({ equipoLocal, equipoVisitante, statsGoLocal, stats
   return contexto;
 }
 
-function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga, tema, acento }) {
+function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga, tema, acento, onCerrar }) {
   const [pregunta, setPregunta] = useState("");
   const [mensajes, setMensajes] = useState([]);
   const [cargando, setCargando] = useState(false);
@@ -1015,10 +1015,17 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   }
 
   return (
-    <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
-      <h3 style={{ marginTop: 0 }}>💬 Pregúntale a la IA sobre este partido</h3>
+    <div style={{ padding: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <h3 style={{ margin: 0, fontSize: 13 }}>💬 IA sobre este partido</h3>
+        {onCerrar && (
+          <button onClick={onCerrar} style={{ background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}>
+            ✕
+          </button>
+        )}
+      </div>
 
-      <div style={{ maxHeight: 400, overflowY: "auto", marginBottom: 14 }}>
+      <div style={{ maxHeight: 350, overflowY: "auto", marginBottom: 14, marginTop: 10 }}>
         {mensajes.length === 0 && (
           <p style={{ color: tema.textoSuave, fontSize: 13 }}>
             Ej: "¿Qué opinas de este partido?", "¿Ves valor en el over de goles?", "¿Qué equipo ves más sólido?"
@@ -1073,8 +1080,10 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   );
 }
 
-function PanelEquipoLateral({ equipo, stats, posesion, acento, tema, alineacion }) {
+function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento }) {
   if (!equipo?.team) return null;
+
+  const ultimos5 = (fixtures || []).slice(0, 5);
 
   return (
     <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acento}`, padding: 16, textAlign: "center" }}>
@@ -1082,19 +1091,50 @@ function PanelEquipoLateral({ equipo, stats, posesion, acento, tema, alineacion 
       <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento }}>{equipo.team.name}</h4>
 
       {stats ? (
-        <div style={{ fontSize: 12, textAlign: "left" }}>
-          <FilaStat etiqueta="Récord" valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
-          <FilaStat etiqueta="Goles favor" valor={stats.promedioGolesFavor} />
-          <FilaStat etiqueta="Goles contra" valor={stats.promedioGolesContra} />
-          <FilaStat etiqueta="% Over 2.5" valor={`${stats.over25Pct}%`} />
-          <FilaStat etiqueta="% BTTS" valor={`${stats.bttsPct}%`} />
-          {posesion !== null && posesion !== undefined && (
-            <>
-              <div style={{ borderTop: `1px solid ${tema.borde}`, margin: "6px 0" }} />
-              <FilaStat etiqueta="Posesión (prom.)" valor={`${posesion}%`} />
-            </>
+        <>
+          <div style={{ fontSize: 12, textAlign: "left" }}>
+            <FilaStat etiqueta="Récord" valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
+            <FilaStat etiqueta="Goles favor" valor={stats.promedioGolesFavor} />
+            <FilaStat etiqueta="Goles contra" valor={stats.promedioGolesContra} />
+            <FilaStat etiqueta="% Over 2.5" valor={`${stats.over25Pct}%`} />
+            <FilaStat etiqueta="% BTTS" valor={`${stats.bttsPct}%`} />
+            {posesion !== null && posesion !== undefined && (
+              <>
+                <div style={{ borderTop: `1px solid ${tema.borde}`, margin: "6px 0" }} />
+                <FilaStat etiqueta="Posesión (prom.)" valor={`${posesion}%`} />
+              </>
+            )}
+          </div>
+
+          {ultimos5.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: tema.textoSuave, marginBottom: 6, textAlign: "left" }}>
+                Últimos 5
+              </p>
+              <div style={{ display: "flex", gap: 4 }}>
+                {ultimos5.map((f) => {
+                  const esLocal = f.teams.home.id === equipo.team.id;
+                  const gf = esLocal ? f.goals.home : f.goals.away;
+                  const gc = esLocal ? f.goals.away : f.goals.home;
+                  const letra = gf > gc ? "V" : gf === gc ? "E" : "D";
+                  const color = gf > gc ? "#2e9e4f" : gf === gc ? "#c9a227" : "#c94c4c";
+                  return (
+                    <div
+                      key={f.fixture.id}
+                      title={`${f.teams.home.name} ${f.goals.home}-${f.goals.away} ${f.teams.away.name}`}
+                      style={{
+                        width: 22, height: 22, borderRadius: "50%", background: color, color: "#fff",
+                        fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                      }}
+                    >
+                      {letra}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
-        </div>
+        </>
       ) : (
         <p style={{ color: tema.textoSuave, fontSize: 11 }}>Sin datos aún.</p>
       )}
@@ -1117,6 +1157,8 @@ export default function Home() {
   const [idiomaAbierto, setIdiomaAbierto] = useState(false);
   const [idioma, setIdioma] = useState("es");
   const [notaProximamente, setNotaProximamente] = useState(false);
+  const [tarjetaActivaMovil, setTarjetaActivaMovil] = useState("local");
+  const [chatAbierto, setChatAbierto] = useState(false);
 
   function mostrarProximamente() {
     setNotaProximamente(true);
@@ -1254,9 +1296,7 @@ export default function Home() {
           grid-template-columns: 1fr;
           grid-template-areas:
             "calendario"
-            "centro"
-            "ala-local"
-            "ala-visitante";
+            "centro";
           gap: 16px;
           padding: 12px;
           max-width: 100%;
@@ -1264,16 +1304,12 @@ export default function Home() {
 
         .jmcs-calendario { grid-area: calendario; }
         .jmcs-centro { grid-area: centro; min-width: 0; }
-        .jmcs-ala-local { grid-area: ala-local; }
-        .jmcs-ala-visitante { grid-area: ala-visitante; }
+        .jmcs-ala-local, .jmcs-ala-visitante { display: none; }
 
         @media (min-width: 768px) {
           .jmcs-grid {
             grid-template-columns: 260px 1fr;
-            grid-template-areas:
-              "calendario centro"
-              "calendario ala-local"
-              "calendario ala-visitante";
+            grid-template-areas: "calendario centro";
             padding: 20px;
             gap: 20px;
           }
@@ -1281,10 +1317,51 @@ export default function Home() {
 
         @media (min-width: 1280px) {
           .jmcs-grid {
-            grid-template-columns: 260px 200px 1fr 200px;
+            grid-template-columns: 260px 260px 1fr 260px;
             grid-template-areas: "calendario ala-local centro ala-visitante";
             align-items: start;
           }
+          .jmcs-ala-local, .jmcs-ala-visitante {
+            display: block;
+            position: sticky;
+            top: 20px;
+          }
+        }
+
+        /* Carrusel de equipos: solo se activa como carrusel en pantallas angostas */
+        .jmcs-carrusel-nav { display: none; }
+        @media (max-width: 767px) {
+          .jmcs-carrusel-item[data-activo="false"] { display: none; }
+          .jmcs-carrusel-nav { display: flex; }
+        }
+
+        /* Burbuja de chat flotante */
+        .jmcs-chat-burbuja {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+          z-index: 50;
+          border: none;
+          padding: 0;
+          overflow: hidden;
+        }
+
+        .jmcs-chat-panel {
+          position: fixed;
+          bottom: 92px;
+          right: 20px;
+          width: 360px;
+          max-width: calc(100vw - 32px);
+          max-height: 70vh;
+          z-index: 50;
+          overflow-y: auto;
+          border-radius: 10px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         }
       `}</style>
 
@@ -1416,7 +1493,7 @@ export default function Home() {
         </div>
 
         <div className="jmcs-ala-local">
-          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} acento={ACENTOS_CATEGORIA.local} tema={tema} />
+          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={ACENTOS_CATEGORIA.local} tema={tema} />
         </div>
 
         <div className="jmcs-centro">
@@ -1427,30 +1504,59 @@ export default function Home() {
           )}
 
           <div style={{ display: "flex", gap: 30, flexWrap: "wrap" }}>
-            <BuscadorEquipo
-              etiqueta="Local"
-              tema={tema}
-              statsMap={statsMap}
-              equipoForzado={equipoForzadoLocal}
-              onEquipoCargado={(team, fixtures) => {
-                setEquipoLocal(team);
-                setFixturesLocal(fixtures || []);
-                setDatosPuntualesListos(false);
-                setStatsMap({});
+            <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "local" ? "true" : "false"} style={{ flex: 1, minWidth: 320 }}>
+              <BuscadorEquipo
+                etiqueta="Local"
+                tema={tema}
+                statsMap={statsMap}
+                equipoForzado={equipoForzadoLocal}
+                onEquipoCargado={(team, fixtures) => {
+                  setEquipoLocal(team);
+                  setFixturesLocal(fixtures || []);
+                  setDatosPuntualesListos(false);
+                  setStatsMap({});
+                }}
+              />
+            </div>
+            <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "visitante" ? "true" : "false"} style={{ flex: 1, minWidth: 320 }}>
+              <BuscadorEquipo
+                etiqueta="Visitante"
+                tema={tema}
+                statsMap={statsMap}
+                equipoForzado={equipoForzadoVisitante}
+                onEquipoCargado={(team, fixtures) => {
+                  setEquipoVisitante(team);
+                  setFixturesVisitante(fixtures || []);
+                  setDatosPuntualesListos(false);
+                  setStatsMap({});
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="jmcs-carrusel-nav" style={{ justifyContent: "center", alignItems: "center", gap: 14, marginTop: 12 }}>
+            <button
+              onClick={() => setTarjetaActivaMovil("local")}
+              style={{
+                padding: "6px 14px", fontSize: 12, borderRadius: 20, cursor: "pointer",
+                background: tarjetaActivaMovil === "local" ? acento : "transparent",
+                color: tarjetaActivaMovil === "local" ? "#fff" : tema.texto,
+                border: `1px solid ${tema.borde}`,
               }}
-            />
-            <BuscadorEquipo
-              etiqueta="Visitante"
-              tema={tema}
-              statsMap={statsMap}
-              equipoForzado={equipoForzadoVisitante}
-              onEquipoCargado={(team, fixtures) => {
-                setEquipoVisitante(team);
-                setFixturesVisitante(fixtures || []);
-                setDatosPuntualesListos(false);
-                setStatsMap({});
+            >
+              ◀ Local
+            </button>
+            <button
+              onClick={() => setTarjetaActivaMovil("visitante")}
+              style={{
+                padding: "6px 14px", fontSize: 12, borderRadius: 20, cursor: "pointer",
+                background: tarjetaActivaMovil === "visitante" ? acento : "transparent",
+                color: tarjetaActivaMovil === "visitante" ? "#fff" : tema.texto,
+                border: `1px solid ${tema.borde}`,
               }}
-            />
+            >
+              Visitante ▶
+            </button>
           </div>
 
           {equipoLocal?.team && equipoVisitante?.team && !datosPuntualesListos && (
@@ -1520,23 +1626,36 @@ export default function Home() {
             tema={tema}
             acento={acento}
           />
-
-          <ChatIA
-            equipoLocal={equipoLocal}
-            equipoVisitante={equipoVisitante}
-            statsGoLocal={statsGoLocal}
-            statsGoVisitante={statsGoVisitante}
-            h2h={h2h}
-            esPartidoLiga={esPartidoLiga}
-            tema={tema}
-            acento={acento}
-          />
         </div>
 
         <div className="jmcs-ala-visitante">
-          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} acento={ACENTOS_CATEGORIA.visitante} tema={tema} />
+          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={ACENTOS_CATEGORIA.visitante} tema={tema} />
         </div>
       </div>
+
+      {equipoLocal?.team && equipoVisitante?.team && (
+        <>
+          {chatAbierto && (
+            <div className="jmcs-chat-panel" style={{ background: tema.panel }}>
+              <ChatIA
+                equipoLocal={equipoLocal}
+                equipoVisitante={equipoVisitante}
+                statsGoLocal={statsGoLocal}
+                statsGoVisitante={statsGoVisitante}
+                h2h={h2h}
+                esPartidoLiga={esPartidoLiga}
+                tema={tema}
+                acento={acento}
+                onCerrar={() => setChatAbierto(false)}
+              />
+            </div>
+          )}
+
+          <button className="jmcs-chat-burbuja" onClick={() => setChatAbierto(!chatAbierto)} aria-label="Chat IA">
+            <img src="/chat-icon.png" alt="Chat" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </button>
+        </>
+      )}
     </div>
   );
 }
