@@ -2,13 +2,13 @@ import { useState, useEffect } from "react";
 
 const TEMAS = {
   claro: {
-    fondo: "#F5F7F3",
-    texto: "#10241A",
-    textoSuave: "#5B7267",
-    panel: "#FFFFFF",
-    borde: "#DCE6DE",
-    encabezadoTabla: "#EEF3EC",
-    filaBorde: "#E7EEE6",
+    fondo: "#FFFFFF",
+    texto: "#14251C",
+    textoSuave: "#5C7268",
+    panel: "#F6F8F6",
+    borde: "#DDE4DF",
+    encabezadoTabla: "#EFF3EF",
+    filaBorde: "#ECF0EC",
   },
   oscuro: {
     fondo: "#0E2A1B",
@@ -22,6 +22,7 @@ const TEMAS = {
 };
 
 const DORADO = "#D8A93B";
+const VERDE_MARCA = "#1E5631";
 const ACENTOS_CATEGORIA = {
   local: "#D8A93B",
   visitante: "#C1694F",
@@ -856,7 +857,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   );
 }
 
-function PanelCalendario({ tema, onSeleccionarPartido }) {
+function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca }) {
   const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
   const [partidos, setPartidos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -890,8 +891,8 @@ function PanelCalendario({ tema, onSeleccionarPartido }) {
   }
 
   return (
-    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${DORADO}`, padding: 16 }}>
-      <h3 style={{ fontSize: 13, marginTop: 0, marginBottom: 14, color: DORADO }}>📅 Calendario de partidos</h3>
+    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 16 }}>
+      <h3 style={{ fontSize: 13, marginTop: 0, marginBottom: 14, color: acentoMarca }}>📅 Calendario de partidos</h3>
 
       <input
         type="date"
@@ -907,7 +908,7 @@ function PanelCalendario({ tema, onSeleccionarPartido }) {
         disabled={loading}
         style={{
           width: "100%", padding: 9, marginBottom: 14, fontSize: 12,
-          background: DORADO, color: "#1B1200", border: "none",
+          background: acentoMarca, color: "#1B1200", border: "none",
           borderRadius: 4, cursor: "pointer", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
         }}
       >
@@ -930,9 +931,9 @@ function PanelCalendario({ tema, onSeleccionarPartido }) {
               onClick={() => elegir(p)}
               style={{
                 padding: "8px 10px", borderRadius: 4, cursor: "pointer", fontSize: 12,
-                background: activo ? DORADO : tema.fondo,
+                background: activo ? acentoMarca : tema.fondo,
                 color: activo ? "#1B1200" : tema.texto,
-                border: `1px solid ${activo ? DORADO : tema.borde}`,
+                border: `1px solid ${activo ? acentoMarca : tema.borde}`,
                 transition: "background 0.15s",
               }}
             >
@@ -1112,6 +1113,16 @@ export default function Home() {
   const [progreso, setProgreso] = useState("");
   const [datosPuntualesListos, setDatosPuntualesListos] = useState(false);
   const [esPartidoLiga, setEsPartidoLiga] = useState(true);
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [idiomaAbierto, setIdiomaAbierto] = useState(false);
+  const [idioma, setIdioma] = useState("es");
+  const [notaProximamente, setNotaProximamente] = useState(false);
+
+  function mostrarProximamente() {
+    setNotaProximamente(true);
+    setMenuAbierto(false);
+    setTimeout(() => setNotaProximamente(false), 2500);
+  }
   const [equipoForzadoLocal, setEquipoForzadoLocal] = useState(null);
   const [equipoForzadoVisitante, setEquipoForzadoVisitante] = useState(null);
 
@@ -1184,6 +1195,7 @@ export default function Home() {
 
   const posesionLocal = equipoLocal?.team ? calcularPosesionPromedio(fixturesLocal, equipoLocal.team.id, statsMap) : null;
   const posesionVisitante = equipoVisitante?.team ? calcularPosesionPromedio(fixturesVisitante, equipoVisitante.team.id, statsMap) : null;
+  const acentoMarca = modoOscuro ? DORADO : "#1F7A46";
 
   return (
     <div style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}>
@@ -1280,40 +1292,127 @@ export default function Home() {
         <div
           style={{
             display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10,
-            padding: "14px 20px", background: tema.panel, borderRadius: 6,
-            borderBottom: `3px solid ${DORADO}`, marginBottom: 6,
+            padding: "12px 20px", background: tema.panel, borderRadius: 6,
+            borderBottom: `3px solid ${acentoMarca}`, marginBottom: 6,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <img src="/logo.png" alt="JMCS" width={44} height={44} />
+          {/* Zona izquierda: menú hamburguesa + registro/login */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
+            <button
+              onClick={() => { setMenuAbierto(!menuAbierto); setIdiomaAbierto(false); }}
+              aria-label="Menú"
+              style={{
+                fontSize: 20, background: "transparent", border: `1px solid ${tema.borde}`,
+                borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: tema.texto,
+              }}
+            >
+              ☰
+            </button>
+
+            <button
+              onClick={mostrarProximamente}
+              style={{
+                padding: "8px 12px", fontSize: 12, background: "transparent",
+                color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6, cursor: "pointer",
+              }}
+            >
+              Registrarse
+            </button>
+            <button
+              onClick={mostrarProximamente}
+              style={{
+                padding: "8px 12px", fontSize: 12, background: acentoMarca,
+                color: modoOscuro ? "#1B1200" : "#fff", border: "none", borderRadius: 6, cursor: "pointer",
+              }}
+            >
+              Iniciar sesión
+            </button>
+
+            {menuAbierto && (
+              <div
+                style={{
+                  position: "absolute", top: "115%", left: 0, background: tema.panel,
+                  border: `1px solid ${tema.borde}`, borderRadius: 6, minWidth: 200, zIndex: 20,
+                  boxShadow: "0 6px 16px rgba(0,0,0,0.25)", overflow: "hidden",
+                }}
+              >
+                {["Inicio", "Mis estudios (próximamente)", "Favoritos (próximamente)", "Historial de aciertos (próximamente)", "Ajustes (próximamente)"].map((item) => (
+                  <div
+                    key={item}
+                    onClick={mostrarProximamente}
+                    style={{ padding: "10px 14px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Zona centro: logo + título */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <img src="/logo.png" alt="JMCS" width={40} height={40} />
             <div>
-              <h1 style={{ margin: 0, fontSize: 26, lineHeight: 1 }}>JMCS</h1>
-              <p style={{ margin: "2px 0 0", fontSize: 10, color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1 }}>JMCS</h1>
+              <p style={{ margin: "2px 0 0", fontSize: 9, color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 Juggernaut Match Calculation System
               </p>
             </div>
           </div>
 
-          <button
-            onClick={() => setModoOscuro(!modoOscuro)}
-            style={{
-              padding: "8px 14px", fontSize: 13,
-              background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`,
-              borderRadius: 20, cursor: "pointer",
-            }}
-          >
-            {modoOscuro ? "☀️ Modo claro" : "🌙 Modo oscuro"}
-          </button>
+          {/* Zona derecha: idioma (bandera) + modo oscuro */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }}>
+            <button
+              onClick={() => { setIdiomaAbierto(!idiomaAbierto); setMenuAbierto(false); }}
+              aria-label="Idioma"
+              style={{
+                fontSize: 18, background: "transparent", border: `1px solid ${tema.borde}`,
+                borderRadius: 6, padding: "5px 9px", cursor: "pointer",
+              }}
+            >
+              {idioma === "es" ? "🇪🇸" : "🇺🇸"}
+            </button>
+
+            {idiomaAbierto && (
+              <div
+                style={{
+                  position: "absolute", top: "115%", right: 0, background: tema.panel,
+                  border: `1px solid ${tema.borde}`, borderRadius: 6, zIndex: 20,
+                  boxShadow: "0 6px 16px rgba(0,0,0,0.25)", overflow: "hidden",
+                }}
+              >
+                <div onClick={() => { setIdioma("es"); setIdiomaAbierto(false); }} style={{ padding: "8px 14px", fontSize: 18, cursor: "pointer" }}>🇪🇸</div>
+                <div onClick={mostrarProximamente} style={{ padding: "8px 14px", fontSize: 18, cursor: "pointer" }}>🇺🇸</div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setModoOscuro(!modoOscuro)}
+              style={{
+                padding: "8px 14px", fontSize: 13,
+                background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`,
+                borderRadius: 20, cursor: "pointer",
+              }}
+            >
+              {modoOscuro ? "☀️" : "🌙"}
+            </button>
+          </div>
         </div>
 
-        <p style={{ textAlign: "center", color: DORADO, fontSize: 12, margin: "10px 0 0", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        {notaProximamente && (
+          <p style={{ textAlign: "center", color: acentoMarca, fontSize: 12, margin: "4px 0 0" }}>
+            🔒 Esta función estará disponible pronto.
+          </p>
+        )}
+
+        <p style={{ textAlign: "center", color: acentoMarca, fontSize: 12, margin: "10px 0 0", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           {mensajeEstudio}
         </p>
       </div>
 
       <div className="jmcs-grid" style={{ maxWidth: 1800, margin: "0 auto" }}>
         <div className="jmcs-calendario">
-          <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} />
+          <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} acentoMarca={acentoMarca} />
         </div>
 
         <div className="jmcs-ala-local">
