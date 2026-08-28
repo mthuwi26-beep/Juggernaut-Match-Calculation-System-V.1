@@ -569,7 +569,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
             <strong>{selectedTeam.team.name}</strong>
           </div>
 
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <div className="jmcs-subpaneles-individual" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <SubPanel titulo="Como Local" fixtures={fixturesLocalVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
             <SubPanel titulo="Como Visitante" fixtures={fixturesVisitanteVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
             <SubPanel titulo="Liga actual" fixtures={fixturesLigaActual} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
@@ -739,7 +739,7 @@ function calcularGolesNumerico(fixtures, teamId) {
   return { valor: suma / fixtures.length, n: fixtures.length };
 }
 
-function FilaMercado({ nombre, lineas, lambda, tema }) {
+function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema }) {
   if (lambda === null || lambda === undefined) return null;
   return (
     <div style={{ marginBottom: 18 }}>
@@ -763,11 +763,36 @@ function FilaMercado({ nombre, lineas, lambda, tema }) {
           );
         })}
       </div>
+
+      {lambdaAjustado !== null && lambdaAjustado !== undefined && (
+        <div style={{ marginTop: 8 }}>
+          <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>
+            🌦️ Con estimación de clima — esperado: {lambdaAjustado.toFixed(2)}
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {lineas.map((linea) => {
+              const p = probabilidadOver(lambdaAjustado, linea);
+              const { color } = colorSemaforo(p);
+              return (
+                <div
+                  key={linea}
+                  style={{
+                    padding: "6px 12px", borderRadius: 6, background: color, color: "#fff",
+                    fontSize: 12, fontWeight: "bold", minWidth: 80, textAlign: "center", opacity: 0.85,
+                  }}
+                >
+                  Over {linea}<br />{Math.round(p * 100)}%
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste }) {
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
   const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
@@ -794,6 +819,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   const lambdaGolesLocal = calcularValorEsperado(motorLocal.goles, esPartidoLiga);
   const lambdaGolesVisitante = calcularValorEsperado(motorVisitante.goles, esPartidoLiga);
   const lambdaGolesTotal = lambdaGolesLocal !== null && lambdaGolesVisitante !== null ? lambdaGolesLocal + lambdaGolesVisitante : null;
+  const lambdaGolesTotalAjustado = climaAjuste?.activo && lambdaGolesTotal !== null ? lambdaGolesTotal * climaAjuste.factor : null;
 
   const lambdaCornersLocal = calcularValorEsperado(motorLocal.corners, esPartidoLiga);
   const lambdaCornersVisitante = calcularValorEsperado(motorVisitante.corners, esPartidoLiga);
@@ -822,7 +848,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </label>
       </div>
 
-      <FilaMercado nombre="Goles totales del partido" lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} tema={tema} />
+      <FilaMercado nombre="Goles totales del partido" lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
 
       {probBTTS !== null && (
         <div style={{ marginBottom: 18 }}>
@@ -1142,6 +1168,175 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento })
   );
 }
 
+// Extrae el color dominante de un escudo (logo) de equipo, con respaldo si falla
+function useColorDeEscudo(logoUrl, colorRespaldo) {
+  const [color, setColor] = useState(colorRespaldo);
+
+  useEffect(() => {
+    if (!logoUrl) {
+      setColor(colorRespaldo);
+      return;
+    }
+
+    let cancelado = false;
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const tam = 40;
+        canvas.width = tam;
+        canvas.height = tam;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, tam, tam);
+        const datos = ctx.getImageData(0, 0, tam, tam).data;
+
+        let sumaR = 0, sumaG = 0, sumaB = 0, contador = 0;
+        for (let i = 0; i < datos.length; i += 4) {
+          const [r, g, b, a] = [datos[i], datos[i + 1], datos[i + 2], datos[i + 3]];
+          if (a < 100) continue; // píxel transparente
+          const max = Math.max(r, g, b), min = Math.min(r, g, b);
+          const saturacion = max === 0 ? 0 : (max - min) / max;
+          const brillo = (r + g + b) / 3;
+          // Ignoramos blancos/grises/negros casi puros (poco útiles como "color de marca")
+          if (saturacion < 0.25 || brillo > 235 || brillo < 25) continue;
+          sumaR += r; sumaG += g; sumaB += b; contador++;
+        }
+
+        if (cancelado) return;
+
+        if (contador < 5) {
+          setColor(colorRespaldo);
+          return;
+        }
+
+        const r = Math.round(sumaR / contador);
+        const g = Math.round(sumaG / contador);
+        const b = Math.round(sumaB / contador);
+        const hex = "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+        setColor(hex);
+      } catch (err) {
+        // Canvas "tainted" por CORS u otro error: usamos el color de respaldo
+        if (!cancelado) setColor(colorRespaldo);
+      }
+    };
+
+    img.onerror = () => {
+      if (!cancelado) setColor(colorRespaldo);
+    };
+
+    img.src = logoUrl;
+
+    return () => { cancelado = true; };
+  }, [logoUrl, colorRespaldo]);
+
+  return color;
+}
+
+function dividirPorCategorias(fixtures, teamId) {
+  return {
+    local: fixtures.filter((f) => f.teams.home.id === teamId),
+    visitante: fixtures.filter((f) => f.teams.away.id === teamId),
+    liga: fixtures.filter((f) => esLiga(f)),
+    noLiga: fixtures.filter((f) => !esLiga(f)),
+    forma: fixtures.slice(0, 5),
+  };
+}
+
+function FilaEspejo({ etiqueta, valorLocal, valorVisitante, tema }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${tema.filaBorde}` }}>
+      <div style={{ textAlign: "right", fontSize: 13 }}>{valorLocal}</div>
+      <div style={{ fontSize: 10, color: tema.textoSuave, textAlign: "center", minWidth: 90 }}>{etiqueta}</div>
+      <div style={{ textAlign: "left", fontSize: 13 }}>{valorVisitante}</div>
+    </div>
+  );
+}
+
+function CategoriaEspejo({ titulo, fixturesLocal, fixturesVisitante, idLocal, idVisitante, statsMap, tema, acento }) {
+  const statsL = calcularEstadisticasGoles(fixturesLocal, idLocal);
+  const statsV = calcularEstadisticasGoles(fixturesVisitante, idVisitante);
+  const puntualesL = calcularEstadisticasPuntuales(fixturesLocal, idLocal, statsMap);
+  const puntualesV = calcularEstadisticasPuntuales(fixturesVisitante, idVisitante, statsMap);
+
+  if (!statsL && !statsV) return null;
+
+  return (
+    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acento}`, padding: "12px 16px", marginBottom: 14 }}>
+      <h4 style={{ textAlign: "center", margin: "0 0 8px", fontSize: 12, color: acento }}>{titulo}</h4>
+      <FilaEspejo etiqueta="Récord" valorLocal={statsL ? `${statsL.victorias}-${statsL.empates}-${statsL.derrotas}` : "—"} valorVisitante={statsV ? `${statsV.victorias}-${statsV.empates}-${statsV.derrotas}` : "—"} tema={tema} />
+      <FilaEspejo etiqueta="Goles a favor" valorLocal={statsL?.promedioGolesFavor ?? "—"} valorVisitante={statsV?.promedioGolesFavor ?? "—"} tema={tema} />
+      <FilaEspejo etiqueta="Goles en contra" valorLocal={statsL?.promedioGolesContra ?? "—"} valorVisitante={statsV?.promedioGolesContra ?? "—"} tema={tema} />
+      <FilaEspejo etiqueta="% Over 2.5" valorLocal={statsL ? `${statsL.over25Pct}%` : "—"} valorVisitante={statsV ? `${statsV.over25Pct}%` : "—"} tema={tema} />
+      <FilaEspejo etiqueta="% BTTS" valorLocal={statsL ? `${statsL.bttsPct}%` : "—"} valorVisitante={statsV ? `${statsV.bttsPct}%` : "—"} tema={tema} />
+      {(puntualesL || puntualesV) && (
+        <>
+          <FilaEspejo etiqueta="Córners" valorLocal={puntualesL?.promedioCorners ?? "—"} valorVisitante={puntualesV?.promedioCorners ?? "—"} tema={tema} />
+          <FilaEspejo etiqueta="Tarjetas am." valorLocal={puntualesL?.promedioAmarillas ?? "—"} valorVisitante={puntualesV?.promedioAmarillas ?? "—"} tema={tema} />
+          <FilaEspejo etiqueta="Faltas" valorLocal={puntualesL?.promedioFaltas ?? "—"} valorVisitante={puntualesV?.promedioFaltas ?? "—"} tema={tema} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function SeccionEspejo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, statsMap, tema }) {
+  if (!equipoLocal?.team || !equipoVisitante?.team) return null;
+
+  const catLocal = dividirPorCategorias(fixturesLocal, equipoLocal.team.id);
+  const catVisitante = dividirPorCategorias(fixturesVisitante, equipoVisitante.team.id);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 13, fontWeight: "bold" }}>
+        <span>{equipoLocal.team.name}</span>
+        <span>{equipoVisitante.team.name}</span>
+      </div>
+
+      <CategoriaEspejo titulo="Como Local / Como Visitante" fixturesLocal={catLocal.local} fixturesVisitante={catVisitante.visitante} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
+      <CategoriaEspejo titulo="Liga actual" fixturesLocal={catLocal.liga} fixturesVisitante={catVisitante.liga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
+      <CategoriaEspejo titulo="No liga (copas)" fixturesLocal={catLocal.noLiga} fixturesVisitante={catVisitante.noLiga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
+      <CategoriaEspejo titulo="Forma reciente (5)" fixturesLocal={catLocal.forma} fixturesVisitante={catVisitante.forma} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
+    </div>
+  );
+}
+
+function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, estimarClima, setEstimarClima, tema, acentoMarca }) {
+  if (!partidoCalendario) return null;
+
+  const arbitro = partidoCalendario.fixture?.referee;
+  const venue = partidoCalendario.fixture?.venue;
+
+  if (!arbitro && !venue && !climaData && !cargandoClima) return null;
+
+  return (
+    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 14, marginBottom: 18, fontSize: 12 }}>
+      <h4 style={{ margin: "0 0 8px", fontSize: 11, color: acentoMarca }}>📋 Datos generales del encuentro</h4>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+        {venue?.name && <div>🏟️ {venue.name}{venue.city ? `, ${venue.city}` : ""}</div>}
+        {arbitro && <div>🧑‍⚖️ Árbitro: {arbitro}</div>}
+        {cargandoClima && <div style={{ color: tema.textoSuave }}>Cargando clima...</div>}
+        {climaData && (
+          <>
+            <div>🌡️ {climaData.temperaturaMin}° – {climaData.temperaturaMax}°C</div>
+            <div>🌧️ {climaData.precipitacionMm} mm lluvia</div>
+            <div>💨 Viento máx. {climaData.vientoMaxKmh} km/h</div>
+          </>
+        )}
+      </div>
+
+      {climaData && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, cursor: "pointer", fontSize: 12 }}>
+          <input type="checkbox" checked={estimarClima} onChange={(e) => setEstimarClima(e.target.checked)} style={{ accentColor: acentoMarca }} />
+          Incluir estimación de impacto del clima en el semáforo (experimental)
+        </label>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
@@ -1158,6 +1353,7 @@ export default function Home() {
   const [idioma, setIdioma] = useState("es");
   const [notaProximamente, setNotaProximamente] = useState(false);
   const [tarjetaActivaMovil, setTarjetaActivaMovil] = useState("local");
+  const [toqueInicioX, setToqueInicioX] = useState(null);
   const [chatAbierto, setChatAbierto] = useState(false);
 
   function mostrarProximamente() {
@@ -1167,6 +1363,10 @@ export default function Home() {
   }
   const [equipoForzadoLocal, setEquipoForzadoLocal] = useState(null);
   const [equipoForzadoVisitante, setEquipoForzadoVisitante] = useState(null);
+  const [partidoCalendario, setPartidoCalendario] = useState(null);
+  const [climaData, setClimaData] = useState(null);
+  const [cargandoClima, setCargandoClima] = useState(false);
+  const [estimarClima, setEstimarClima] = useState(false);
 
   function seleccionarPartidoDelCalendario(p) {
     setEquipoForzadoLocal({
@@ -1175,7 +1375,24 @@ export default function Home() {
     setEquipoForzadoVisitante({
       team: { id: p.teams.away.id, name: p.teams.away.name, logo: p.teams.away.logo, country: p.league.country },
     });
+    setPartidoCalendario(p);
   }
+
+  useEffect(() => {
+    if (!partidoCalendario?.fixture?.venue?.city || !partidoCalendario?.fixture?.date) {
+      setClimaData(null);
+      return;
+    }
+    const ciudad = partidoCalendario.fixture.venue.city;
+    const fecha = partidoCalendario.fixture.date.split("T")[0];
+
+    setCargandoClima(true);
+    fetch(`/api/clima?ciudad=${encodeURIComponent(ciudad)}&fecha=${fecha}`)
+      .then((r) => r.json())
+      .then((data) => setClimaData(data.error ? null : data))
+      .catch(() => setClimaData(null))
+      .finally(() => setCargandoClima(false));
+  }, [partidoCalendario]);
 
   const tema = modoOscuro ? TEMAS.oscuro : TEMAS.claro;
 
@@ -1237,6 +1454,18 @@ export default function Home() {
 
   const posesionLocal = equipoLocal?.team ? calcularPosesionPromedio(fixturesLocal, equipoLocal.team.id, statsMap) : null;
   const posesionVisitante = equipoVisitante?.team ? calcularPosesionPromedio(fixturesVisitante, equipoVisitante.team.id, statsMap) : null;
+
+  const colorMarcaLocal = useColorDeEscudo(equipoLocal?.team?.logo, ACENTOS_CATEGORIA.local);
+  const colorMarcaVisitante = useColorDeEscudo(equipoVisitante?.team?.logo, ACENTOS_CATEGORIA.visitante);
+
+  // Ajuste experimental por clima: modesto, basado en tendencias generales, no en un estudio exacto de este partido
+  let factorClima = 1;
+  if (climaData) {
+    if (climaData.precipitacionMm > 5) factorClima *= 0.93;
+    if (climaData.vientoMaxKmh > 35) factorClima *= 0.95;
+    if (climaData.temperaturaMax > 32) factorClima *= 0.97;
+  }
+  const climaAjuste = estimarClima && climaData ? { activo: true, factor: factorClima } : { activo: false, factor: 1 };
   const acentoMarca = modoOscuro ? DORADO : "#1F7A46";
 
   return (
@@ -1334,26 +1563,45 @@ export default function Home() {
           .jmcs-carrusel-item[data-activo="false"] { display: none; }
           .jmcs-carrusel-nav { display: flex; }
         }
+        .jmcs-carrusel-contenedor {
+          transition: opacity 0.2s ease;
+          touch-action: pan-y;
+        }
 
-        /* Burbuja de chat flotante */
+        /* Burbuja de chat flotante: sin recorte, silueta natural del PNG */
+        @keyframes jmcsPulso {
+          0% { transform: scale(1); }
+          4% { transform: scale(1.18); }
+          8% { transform: scale(0.96); }
+          12% { transform: scale(1.06); }
+          16% { transform: scale(1); }
+          100% { transform: scale(1); }
+        }
+
         .jmcs-chat-burbuja {
           position: fixed;
           bottom: 20px;
           right: 20px;
-          width: 60px;
-          height: 60px;
-          border-radius: 50%;
+          width: 78px;
+          height: auto;
+          background: transparent;
           cursor: pointer;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.35);
           z-index: 50;
           border: none;
           padding: 0;
-          overflow: hidden;
+          filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
+          animation: jmcsPulso 10s ease-in-out infinite;
+        }
+
+        .jmcs-chat-burbuja img {
+          width: 100%;
+          height: auto;
+          display: block;
         }
 
         .jmcs-chat-panel {
           position: fixed;
-          bottom: 92px;
+          bottom: 100px;
           right: 20px;
           width: 360px;
           max-width: calc(100vw - 32px);
@@ -1362,6 +1610,14 @@ export default function Home() {
           overflow-y: auto;
           border-radius: 10px;
           box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        /* Modo espejo: solo visible en pantallas amplias */
+        .jmcs-espejo-desktop { display: none; }
+        .jmcs-subpaneles-individual { display: block; }
+        @media (min-width: 1024px) {
+          .jmcs-espejo-desktop { display: block; }
+          .jmcs-subpaneles-individual { display: none; }
         }
       `}</style>
 
@@ -1493,17 +1749,44 @@ export default function Home() {
         </div>
 
         <div className="jmcs-ala-local">
-          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={ACENTOS_CATEGORIA.local} tema={tema} />
+          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} />
         </div>
 
         <div className="jmcs-centro">
+          <DatosGeneralesEncuentro
+            partidoCalendario={partidoCalendario}
+            climaData={climaData}
+            cargandoClima={cargandoClima}
+            estimarClima={estimarClima}
+            setEstimarClima={setEstimarClima}
+            tema={tema}
+            acentoMarca={acentoMarca}
+          />
+
           {equipoLocal?.team && equipoVisitante?.team && (
             <div style={{ textAlign: "center", margin: "0 0 20px", fontSize: 18, fontWeight: "bold" }}>
-              {equipoLocal.team.name} vs {equipoVisitante.team.name}
+              <span style={{ color: colorMarcaLocal }}>{equipoLocal.team.name}</span>
+              {" vs "}
+              <span style={{ color: colorMarcaVisitante }}>{equipoVisitante.team.name}</span>
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 30, flexWrap: "wrap" }}>
+          <div
+            className="jmcs-carrusel-contenedor"
+            style={{ display: "flex", gap: 30, flexWrap: "wrap" }}
+            onTouchStart={(e) => setToqueInicioX(e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              if (toqueInicioX === null) return;
+              const deltaX = e.changedTouches[0].clientX - toqueInicioX;
+              const UMBRAL = 45;
+              if (deltaX < -UMBRAL && tarjetaActivaMovil === "local") {
+                setTarjetaActivaMovil("visitante");
+              } else if (deltaX > UMBRAL && tarjetaActivaMovil === "visitante") {
+                setTarjetaActivaMovil("local");
+              }
+              setToqueInicioX(null);
+            }}
+          >
             <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "local" ? "true" : "false"} style={{ flex: 1, minWidth: 320 }}>
               <BuscadorEquipo
                 etiqueta="Local"
@@ -1534,29 +1817,35 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="jmcs-carrusel-nav" style={{ justifyContent: "center", alignItems: "center", gap: 14, marginTop: 12 }}>
-            <button
+          <div className="jmcs-carrusel-nav" style={{ justifyContent: "center", alignItems: "center", gap: 8, marginTop: 12 }}>
+            <div
               onClick={() => setTarjetaActivaMovil("local")}
               style={{
-                padding: "6px 14px", fontSize: 12, borderRadius: 20, cursor: "pointer",
-                background: tarjetaActivaMovil === "local" ? acento : "transparent",
-                color: tarjetaActivaMovil === "local" ? "#fff" : tema.texto,
-                border: `1px solid ${tema.borde}`,
+                width: 9, height: 9, borderRadius: "50%", cursor: "pointer",
+                background: tarjetaActivaMovil === "local" ? acento : tema.borde,
               }}
-            >
-              ◀ Local
-            </button>
-            <button
+            />
+            <div
               onClick={() => setTarjetaActivaMovil("visitante")}
               style={{
-                padding: "6px 14px", fontSize: 12, borderRadius: 20, cursor: "pointer",
-                background: tarjetaActivaMovil === "visitante" ? acento : "transparent",
-                color: tarjetaActivaMovil === "visitante" ? "#fff" : tema.texto,
-                border: `1px solid ${tema.borde}`,
+                width: 9, height: 9, borderRadius: "50%", cursor: "pointer",
+                background: tarjetaActivaMovil === "visitante" ? acento : tema.borde,
               }}
-            >
-              Visitante ▶
-            </button>
+            />
+          </div>
+          <p className="jmcs-carrusel-nav" style={{ justifyContent: "center", fontSize: 11, color: tema.textoSuave, marginTop: 4 }}>
+            👉 Desliza para ver {tarjetaActivaMovil === "local" ? "el Visitante" : "el Local"}
+          </p>
+
+          <div className="jmcs-espejo-desktop" style={{ marginTop: 20 }}>
+            <SeccionEspejo
+              equipoLocal={equipoLocal}
+              equipoVisitante={equipoVisitante}
+              fixturesLocal={fixturesLocal}
+              fixturesVisitante={fixturesVisitante}
+              statsMap={statsMap}
+              tema={tema}
+            />
           </div>
 
           {equipoLocal?.team && equipoVisitante?.team && !datosPuntualesListos && (
@@ -1629,7 +1918,7 @@ export default function Home() {
         </div>
 
         <div className="jmcs-ala-visitante">
-          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={ACENTOS_CATEGORIA.visitante} tema={tema} />
+          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} />
         </div>
       </div>
 
@@ -1652,7 +1941,7 @@ export default function Home() {
           )}
 
           <button className="jmcs-chat-burbuja" onClick={() => setChatAbierto(!chatAbierto)} aria-label="Chat IA">
-            <img src="/chat-icon.png" alt="Chat" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src="/chat-icon.png" alt="Chat" />
           </button>
         </>
       )}
