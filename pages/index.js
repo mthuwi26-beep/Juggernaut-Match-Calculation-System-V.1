@@ -1316,7 +1316,7 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
         {venue?.name && <div>🏟️ {venue.name}{venue.city ? `, ${venue.city}` : ""}</div>}
-        {arbitro && <div>🧑‍⚖️ Árbitro: {arbitro}</div>}
+        <div>🧑‍⚖️ Árbitro: {arbitro || "Sin datos"}</div>
         {cargandoClima && <div style={{ color: tema.textoSuave }}>Cargando clima...</div>}
         {climaData && (
           <>
@@ -1347,6 +1347,7 @@ export default function Home() {
   const [cargandoPuntuales, setCargandoPuntuales] = useState(false);
   const [progreso, setProgreso] = useState("");
   const [datosPuntualesListos, setDatosPuntualesListos] = useState(false);
+  const [resumenCarga, setResumenCarga] = useState("");
   const [esPartidoLiga, setEsPartidoLiga] = useState(true);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [idiomaAbierto, setIdiomaAbierto] = useState(false);
@@ -1429,6 +1430,7 @@ export default function Home() {
     setCargandoPuntuales(true);
     setDatosPuntualesListos(false);
     const nuevoMapa = {};
+    let exitos = 0;
 
     for (let i = 0; i < entradas.length; i++) {
       const [fixtureId, homeTeamId] = entradas[i];
@@ -1438,7 +1440,10 @@ export default function Home() {
         const data = await res.json();
         if (!data.error) {
           const procesado = procesarEstadisticasPartido(data, homeTeamId);
-          if (procesado) nuevoMapa[fixtureId] = procesado;
+          if (procesado) {
+            nuevoMapa[fixtureId] = procesado;
+            exitos++;
+          }
         }
       } catch (err) {
         // seguimos con el resto aunque uno falle
@@ -1449,6 +1454,7 @@ export default function Home() {
     setStatsMap(nuevoMapa);
     setCargandoPuntuales(false);
     setDatosPuntualesListos(true);
+    setResumenCarga(`${exitos}/${entradas.length} partidos con datos de córners/tarjetas/faltas`);
     setProgreso("");
   }
 
@@ -1597,6 +1603,12 @@ export default function Home() {
           width: 100%;
           height: auto;
           display: block;
+        }
+
+        .jmcs-datos-sticky {
+          position: sticky;
+          top: 8px;
+          z-index: 10;
         }
 
         .jmcs-chat-panel {
@@ -1753,15 +1765,17 @@ export default function Home() {
         </div>
 
         <div className="jmcs-centro">
-          <DatosGeneralesEncuentro
-            partidoCalendario={partidoCalendario}
-            climaData={climaData}
-            cargandoClima={cargandoClima}
-            estimarClima={estimarClima}
-            setEstimarClima={setEstimarClima}
-            tema={tema}
-            acentoMarca={acentoMarca}
-          />
+          <div className="jmcs-datos-sticky">
+            <DatosGeneralesEncuentro
+              partidoCalendario={partidoCalendario}
+              climaData={climaData}
+              cargandoClima={cargandoClima}
+              estimarClima={estimarClima}
+              setEstimarClima={setEstimarClima}
+              tema={tema}
+              acentoMarca={acentoMarca}
+            />
+          </div>
 
           {equipoLocal?.team && equipoVisitante?.team && (
             <div style={{ textAlign: "center", margin: "0 0 20px", fontSize: 18, fontWeight: "bold" }}>
@@ -1867,6 +1881,11 @@ export default function Home() {
           {datosPuntualesListos && (
             <p style={{ textAlign: "center", marginTop: 20, color: "#2e9e4f", fontWeight: "bold" }}>
               ✅ Datos puntuales cargados para este encuentro
+              {resumenCarga && (
+                <span style={{ display: "block", fontWeight: "normal", fontSize: 12, color: tema.textoSuave, marginTop: 4 }}>
+                  ({resumenCarga})
+                </span>
+              )}
             </p>
           )}
 
@@ -1924,21 +1943,19 @@ export default function Home() {
 
       {equipoLocal?.team && equipoVisitante?.team && (
         <>
-          {chatAbierto && (
-            <div className="jmcs-chat-panel" style={{ background: tema.panel }}>
-              <ChatIA
-                equipoLocal={equipoLocal}
-                equipoVisitante={equipoVisitante}
-                statsGoLocal={statsGoLocal}
-                statsGoVisitante={statsGoVisitante}
-                h2h={h2h}
-                esPartidoLiga={esPartidoLiga}
-                tema={tema}
-                acento={acento}
-                onCerrar={() => setChatAbierto(false)}
-              />
-            </div>
-          )}
+          <div className="jmcs-chat-panel" style={{ background: tema.panel, display: chatAbierto ? "block" : "none" }}>
+            <ChatIA
+              equipoLocal={equipoLocal}
+              equipoVisitante={equipoVisitante}
+              statsGoLocal={statsGoLocal}
+              statsGoVisitante={statsGoVisitante}
+              h2h={h2h}
+              esPartidoLiga={esPartidoLiga}
+              tema={tema}
+              acento={acento}
+              onCerrar={() => setChatAbierto(false)}
+            />
+          </div>
 
           <button className="jmcs-chat-burbuja" onClick={() => setChatAbierto(!chatAbierto)} aria-label="Chat IA">
             <img src="/chat-icon.png" alt="Chat" />
