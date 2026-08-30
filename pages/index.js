@@ -31,6 +31,24 @@ const ACENTOS_CATEGORIA = {
   forma: "#C1548B",
 };
 
+// Convierte un color (rgb(...) o #hex) en una versión tenue para usar de fondo, sin tapar el texto
+function colorTenue(color, alpha = 0.16) {
+  if (!color) return "transparent";
+  if (color.startsWith("rgb")) {
+    const nums = color.match(/\d+/g);
+    if (!nums || nums.length < 3) return "transparent";
+    return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${alpha})`;
+  }
+  if (color.startsWith("#")) {
+    const hex = color.replace("#", "");
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return "transparent";
+}
+
 function esperar(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -307,6 +325,22 @@ function colorSemaforo(probabilidad) {
   return { color: "#ef4444", etiqueta: "Rojo" };
 }
 
+function probabilidad1X2(lambdaLocal, lambdaVisitante) {
+  if (lambdaLocal === null || lambdaVisitante === null) return null;
+  let pLocal = 0, pEmpate = 0, pVisitante = 0;
+  const MAX_GOLES = 10;
+
+  for (let i = 0; i <= MAX_GOLES; i++) {
+    for (let j = 0; j <= MAX_GOLES; j++) {
+      const p = poissonProb(lambdaLocal, i) * poissonProb(lambdaVisitante, j);
+      if (i > j) pLocal += p;
+      else if (i === j) pEmpate += p;
+      else pVisitante += p;
+    }
+  }
+  return { pLocal, pEmpate, pVisitante };
+}
+
 const LINEAS_MERCADOS = {
   goles: [0.5, 1.5, 2.5, 3.5, 4.5],
   corners: [7.5, 8.5, 9.5, 10.5, 11.5, 12.5],
@@ -441,7 +475,7 @@ function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento }) {
   );
 }
 
-function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado }) {
+function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca }) {
   const [query, setQuery] = useState("");
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -477,7 +511,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
     setLoading(false);
   }
 
-  async function verPartidos(team) {
+  async function verPartidos(team, esDelCalendario) {
     setSelectedTeam(team);
     setFixtures([]);
     setError("");
@@ -490,7 +524,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
         setError(data.error);
       } else {
         setFixtures(data);
-        onEquipoCargado && onEquipoCargado(team, data);
+        onEquipoCargado && onEquipoCargado(team, data, !!esDelCalendario);
       }
     } catch (err) {
       setError("Error al traer los partidos");
@@ -502,7 +536,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
     if (equipoForzado) {
       setQuery(equipoForzado.team.name);
       setTeams([]);
-      verPartidos(equipoForzado);
+      verPartidos(equipoForzado, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [equipoForzado?.team?.id]);
@@ -563,10 +597,10 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
       )}
 
       {selectedTeam && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, background: colorTenue(colorMarca), borderRadius: 8, padding: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <img src={selectedTeam.team.logo} alt={selectedTeam.team.name} width={26} height={26} />
-            <strong>{selectedTeam.team.name}</strong>
+            <strong style={{ color: colorMarca || tema.texto }}>{selectedTeam.team.name}</strong>
           </div>
 
           <div className="jmcs-subpaneles-individual" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -739,15 +773,37 @@ function calcularGolesNumerico(fixtures, teamId) {
   return { valor: suma / fixtures.length, n: fixtures.length };
 }
 
-function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema }) {
-  if (lambda === null || lambda === undefined) return null;
+function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertenciaMuestra }) {
+  const sinDatos = lambda === null || lambda === undefined;
+
   return (
     <div style={{ marginBottom: 18 }}>
       <h4 style={{ marginBottom: 8, fontSize: 14 }}>
-        {nombre} <span style={{ fontWeight: "normal", color: tema.textoSuave }}>— esperado: {lambda.toFixed(2)}</span>
+        {nombre}{" "}
+        <span style={{ fontWeight: "normal", color: tema.textoSuave }}>
+          {sinDatos ? "— sin datos suficientes" : `— esperado: ${lambda.toFixed(2)}`}
+        </span>
       </h4>
+
+      {advertenciaMuestra && !sinDatos && (
+        <p style={{ fontSize: 11, color: "#c9a227", margin: "0 0 6px" }}>⚠️ {advertenciaMuestra}</p>
+      )}
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {lineas.map((linea) => {
+          if (sinDatos) {
+            return (
+              <div
+                key={linea}
+                style={{
+                  padding: "8px 14px", borderRadius: 6, background: "#ef4444", color: "#fff",
+                  fontSize: 13, fontWeight: "bold", minWidth: 90, textAlign: "center", opacity: 0.85,
+                }}
+              >
+                Over {linea}<br />S/D
+              </div>
+            );
+          }
           const p = probabilidadOver(lambda, linea);
           const { color } = colorSemaforo(p);
           return (
@@ -792,7 +848,7 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema }) {
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales }) {
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
   const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
@@ -834,6 +890,15 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   const lambdaFaltasTotal = lambdaFaltasLocal !== null && lambdaFaltasVisitante !== null ? lambdaFaltasLocal + lambdaFaltasVisitante : null;
 
   const probBTTS = probabilidadBTTS(lambdaGolesLocal, lambdaGolesVisitante);
+  const prob1X2 = probabilidad1X2(lambdaGolesLocal, lambdaGolesVisitante);
+
+  let advertenciaMuestra = null;
+  if (coberturaPuntuales && coberturaPuntuales.total > 0) {
+    const proporcion = coberturaPuntuales.exitos / coberturaPuntuales.total;
+    if (coberturaPuntuales.exitos < 5 || proporcion < 0.5) {
+      advertenciaMuestra = `Muestra insuficiente (${coberturaPuntuales.exitos}/${coberturaPuntuales.total} partidos con dato real) — tómalo con cautela.`;
+    }
+  }
 
   return (
     <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
@@ -847,6 +912,35 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
           <input type="radio" checked={!esPartidoLiga} onChange={() => setEsPartidoLiga(false)} style={{ accentColor: acento }} /> Partido de Copa/otro torneo
         </label>
       </div>
+
+      {prob1X2 && (
+        <div style={{ marginBottom: 18 }}>
+          <h4 style={{ marginBottom: 8, fontSize: 14 }}>Ganador del partido</h4>
+          <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
+            Aproximación estándar basada en el mismo modelo de goles esperados — no es un modelo profesional de casa de apuestas.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {[
+              { etiqueta: equipoLocal.team.name, prob: prob1X2.pLocal },
+              { etiqueta: "Empate", prob: prob1X2.pEmpate },
+              { etiqueta: equipoVisitante.team.name, prob: prob1X2.pVisitante },
+            ].map((item) => {
+              const { color } = colorSemaforo(item.prob);
+              return (
+                <div
+                  key={item.etiqueta}
+                  style={{
+                    padding: "8px 14px", borderRadius: 6, background: color, color: "#fff",
+                    fontSize: 13, fontWeight: "bold", minWidth: 110, textAlign: "center",
+                  }}
+                >
+                  {item.etiqueta}<br />{Math.round(item.prob * 100)}%
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <FilaMercado nombre="Goles totales del partido" lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
 
@@ -864,15 +958,13 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </div>
       )}
 
-      {datosPuntualesListos ? (
-        <>
-          <FilaMercado nombre="Córners totales del partido" lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} tema={tema} />
-          <FilaMercado nombre="Tarjetas amarillas totales" lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} tema={tema} />
-          <FilaMercado nombre="Faltas totales del partido" lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} tema={tema} />
-        </>
-      ) : (
-        <p style={{ color: tema.textoSuave, fontSize: 13 }}>
-          Carga los "datos puntuales" arriba para ver el semáforo de córners, tarjetas y faltas.
+      <FilaMercado nombre="Córners totales del partido" lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+      <FilaMercado nombre="Tarjetas amarillas totales" lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+      <FilaMercado nombre="Faltas totales del partido" lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+
+      {!datosPuntualesListos && (
+        <p style={{ color: tema.textoSuave, fontSize: 12, marginTop: -8, marginBottom: 18 }}>
+          ℹ️ Carga los "datos puntuales" arriba para completar córners, tarjetas y faltas con datos reales.
         </p>
       )}
 
@@ -1112,7 +1204,7 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento })
   const ultimos5 = (fixtures || []).slice(0, 5);
 
   return (
-    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acento}`, padding: 16, textAlign: "center" }}>
+    <div style={{ background: colorTenue(acento), borderTop: `3px solid ${acento}`, borderRadius: 6, padding: 16, textAlign: "center" }}>
       <img src={equipo.team.logo} alt={equipo.team.name} style={{ width: "100%", maxWidth: 130, height: "auto", margin: "0 auto 10px" }} />
       <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento }}>{equipo.team.name}</h4>
 
@@ -1315,14 +1407,14 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
       <h4 style={{ margin: "0 0 8px", fontSize: 11, color: acentoMarca }}>📋 Datos generales del encuentro</h4>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-        {venue?.name && <div>🏟️ {venue.name}{venue.city ? `, ${venue.city}` : ""}</div>}
-        <div>🧑‍⚖️ Árbitro: {arbitro || "Sin datos"}</div>
+        {venue?.name && <div style={{ minWidth: 0, wordBreak: "break-word" }}>🏟️ {venue.name}{venue.city ? `, ${venue.city}` : ""}</div>}
+        <div style={{ minWidth: 0, wordBreak: "break-word" }}>🧑‍⚖️ Árbitro: {arbitro || "Sin datos"}</div>
         {cargandoClima && <div style={{ color: tema.textoSuave }}>Cargando clima...</div>}
         {climaData && (
           <>
-            <div>🌡️ {climaData.temperaturaMin}° – {climaData.temperaturaMax}°C</div>
-            <div>🌧️ {climaData.precipitacionMm} mm lluvia</div>
-            <div>💨 Viento máx. {climaData.vientoMaxKmh} km/h</div>
+            <div style={{ minWidth: 0 }}>🌡️ {climaData.temperaturaMin}° – {climaData.temperaturaMax}°C</div>
+            <div style={{ minWidth: 0 }}>🌧️ {climaData.precipitacionMm} mm lluvia</div>
+            <div style={{ minWidth: 0 }}>💨 Viento máx. {climaData.vientoMaxKmh} km/h</div>
           </>
         )}
       </div>
@@ -1348,6 +1440,7 @@ export default function Home() {
   const [progreso, setProgreso] = useState("");
   const [datosPuntualesListos, setDatosPuntualesListos] = useState(false);
   const [resumenCarga, setResumenCarga] = useState("");
+  const [coberturaPuntuales, setCoberturaPuntuales] = useState(null);
   const [esPartidoLiga, setEsPartidoLiga] = useState(true);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [idiomaAbierto, setIdiomaAbierto] = useState(false);
@@ -1395,6 +1488,26 @@ export default function Home() {
       .finally(() => setCargandoClima(false));
   }, [partidoCalendario]);
 
+  // Si el usuario eligió ambos equipos a mano (no desde el calendario), buscamos
+  // el enfrentamiento real más cercano en fecha entre ellos, para poder mostrar
+  // árbitro/clima igual que si lo hubiera elegido del calendario.
+  useEffect(() => {
+    if (partidoCalendario) return; // ya hay uno (del calendario o ya detectado)
+    if (!equipoLocal?.team?.id || !equipoVisitante?.team?.id) return;
+
+    let cancelado = false;
+    fetch(`/api/enfrentamiento-cercano?team1=${equipoLocal.team.id}&team2=${equipoVisitante.team.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelado && data.partido) {
+          setPartidoCalendario(data.partido);
+        }
+      })
+      .catch(() => {});
+
+    return () => { cancelado = true; };
+  }, [equipoLocal?.team?.id, equipoVisitante?.team?.id, partidoCalendario]);
+
   const tema = modoOscuro ? TEMAS.oscuro : TEMAS.claro;
 
   const h2h =
@@ -1429,6 +1542,7 @@ export default function Home() {
     const entradas = Array.from(idsUnicos.entries());
     setCargandoPuntuales(true);
     setDatosPuntualesListos(false);
+    setCoberturaPuntuales(null);
     const nuevoMapa = {};
     let exitos = 0;
 
@@ -1455,6 +1569,7 @@ export default function Home() {
     setCargandoPuntuales(false);
     setDatosPuntualesListos(true);
     setResumenCarga(`${exitos}/${entradas.length} partidos con datos de córners/tarjetas/faltas`);
+    setCoberturaPuntuales({ exitos, total: entradas.length });
     setProgreso("");
   }
 
@@ -1486,7 +1601,11 @@ export default function Home() {
           padding: 0;
           background: ${tema.fondo};
           font-family: 'IBM Plex Sans', Arial, sans-serif;
+          overflow-x: hidden;
+          max-width: 100vw;
         }
+
+        img { max-width: 100%; }
 
         h1, h3, h4 {
           font-family: 'Barlow Condensed', Arial, sans-serif;
@@ -1633,7 +1752,7 @@ export default function Home() {
         }
       `}</style>
 
-      <div style={{ padding: "12px 12px 0", maxWidth: 1800, margin: "0 auto" }}>
+      <div style={{ padding: "12px 12px 0", maxWidth: 2400, margin: "0 auto" }}>
         <div
           style={{
             display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10,
@@ -1755,7 +1874,7 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="jmcs-grid" style={{ maxWidth: 1800, margin: "0 auto" }}>
+      <div className="jmcs-grid" style={{ maxWidth: 2400, margin: "0 auto" }}>
         <div className="jmcs-calendario">
           <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} acentoMarca={acentoMarca} />
         </div>
@@ -1807,11 +1926,13 @@ export default function Home() {
                 tema={tema}
                 statsMap={statsMap}
                 equipoForzado={equipoForzadoLocal}
-                onEquipoCargado={(team, fixtures) => {
+                colorMarca={colorMarcaLocal}
+                onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoLocal(team);
                   setFixturesLocal(fixtures || []);
                   setDatosPuntualesListos(false);
                   setStatsMap({});
+                  if (!esDelCalendario) setPartidoCalendario(null);
                 }}
               />
             </div>
@@ -1821,11 +1942,13 @@ export default function Home() {
                 tema={tema}
                 statsMap={statsMap}
                 equipoForzado={equipoForzadoVisitante}
-                onEquipoCargado={(team, fixtures) => {
+                colorMarca={colorMarcaVisitante}
+                onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoVisitante(team);
                   setFixturesVisitante(fixtures || []);
                   setDatosPuntualesListos(false);
                   setStatsMap({});
+                  if (!esDelCalendario) setPartidoCalendario(null);
                 }}
               />
             </div>
@@ -1933,6 +2056,8 @@ export default function Home() {
             setEsPartidoLiga={setEsPartidoLiga}
             tema={tema}
             acento={acento}
+            climaAjuste={climaAjuste}
+            coberturaPuntuales={coberturaPuntuales}
           />
         </div>
 
