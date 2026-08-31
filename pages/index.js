@@ -1601,8 +1601,6 @@ export default function Home() {
           padding: 0;
           background: ${tema.fondo};
           font-family: 'IBM Plex Sans', Arial, sans-serif;
-          overflow-x: hidden;
-          max-width: 100vw;
         }
 
         img { max-width: 100%; }
