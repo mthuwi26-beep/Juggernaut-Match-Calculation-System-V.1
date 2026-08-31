@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 const TEMAS = {
   claro: {
@@ -1429,6 +1430,133 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
   );
 }
 
+function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
+  const [modo, setModo] = useState(modoInicial || "login"); // "login" | "registro" | "magico"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [cargando, setCargando] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [error, setError] = useState("");
+
+  async function manejarSubmit(e) {
+    e.preventDefault();
+    setError("");
+    setMensaje("");
+    setCargando(true);
+
+    try {
+      if (modo === "registro") {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        setMensaje("Cuenta creada. Revisa tu correo para confirmar tu cuenta.");
+      } else if (modo === "login") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        onCerrar();
+      } else if (modo === "magico") {
+        const { error } = await supabase.auth.signInWithOtp({ email });
+        if (error) throw error;
+        setMensaje("Te enviamos un enlace mágico a tu correo. Ábrelo desde este mismo dispositivo.");
+      }
+    } catch (err) {
+      setError(err.message || "Ocurrió un error");
+    }
+    setCargando(false);
+  }
+
+  return (
+    <div
+      onClick={onCerrar}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: tema.panel, borderRadius: 10, padding: 24, width: 360, maxWidth: "100%", position: "relative" }}
+      >
+        <button
+          onClick={onCerrar}
+          style={{ position: "absolute", top: 12, right: 12, background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}
+        >
+          ✕
+        </button>
+
+        <h3 style={{ marginTop: 0, fontSize: 16 }}>
+          {modo === "registro" ? "Crear cuenta" : modo === "magico" ? "Enlace mágico" : "Iniciar sesión"}
+        </h3>
+
+        <form onSubmit={manejarSubmit}>
+          <input
+            type="email"
+            placeholder="Correo electrónico"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={{ width: "100%", padding: 10, marginBottom: 10, fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+          />
+
+          {modo !== "magico" && (
+            <input
+              type="password"
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              style={{ width: "100%", padding: 10, marginBottom: 10, fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+            />
+          )}
+
+          {error && <p style={{ color: "#e05555", fontSize: 12, marginBottom: 10 }}>{error}</p>}
+          {mensaje && <p style={{ color: "#2e9e4f", fontSize: 12, marginBottom: 10 }}>{mensaje}</p>}
+
+          <button
+            type="submit"
+            disabled={cargando}
+            style={{ width: "100%", padding: 10, fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: "bold" }}
+          >
+            {cargando ? "Cargando..." : modo === "registro" ? "Crear cuenta" : modo === "magico" ? "Enviar enlace" : "Entrar"}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 14, fontSize: 12, textAlign: "center", color: tema.textoSuave }}>
+          {modo === "login" && (
+            <>
+              <div style={{ marginBottom: 6 }}>
+                ¿No tienes cuenta?{" "}
+                <span onClick={() => { setModo("registro"); setError(""); setMensaje(""); }} style={{ color: acentoMarca, cursor: "pointer", fontWeight: "bold" }}>
+                  Regístrate
+                </span>
+              </div>
+              <div>
+                <span onClick={() => { setModo("magico"); setError(""); setMensaje(""); }} style={{ color: acentoMarca, cursor: "pointer" }}>
+                  O entra con un enlace mágico (sin contraseña)
+                </span>
+              </div>
+            </>
+          )}
+          {modo === "registro" && (
+            <span onClick={() => { setModo("login"); setError(""); setMensaje(""); }} style={{ color: acentoMarca, cursor: "pointer" }}>
+              ¿Ya tienes cuenta? Inicia sesión
+            </span>
+          )}
+          {modo === "magico" && (
+            <span onClick={() => { setModo("login"); setError(""); setMensaje(""); }} style={{ color: acentoMarca, cursor: "pointer" }}>
+              Volver a entrar con contraseña
+            </span>
+          )}
+        </div>
+
+        <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 14, textAlign: "center" }}>
+          Inicio de sesión con Google llegará pronto.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
@@ -1449,11 +1577,55 @@ export default function Home() {
   const [tarjetaActivaMovil, setTarjetaActivaMovil] = useState("local");
   const [toqueInicioX, setToqueInicioX] = useState(null);
   const [chatAbierto, setChatAbierto] = useState(false);
+  const [sesion, setSesion] = useState(null);
+  const [cargandoSesion, setCargandoSesion] = useState(true);
+  const [authModalAbierto, setAuthModalAbierto] = useState(false);
+  const [authModalModo, setAuthModalModo] = useState("login");
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSesion(data.session);
+      setCargandoSesion(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nuevaSesion) => {
+      setSesion(nuevaSesion);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  function abrirLogin() {
+    setAuthModalModo("login");
+    setAuthModalAbierto(true);
+  }
+
+  function abrirRegistro() {
+    setAuthModalModo("registro");
+    setAuthModalAbierto(true);
+  }
+
+  async function cerrarSesion() {
+    await supabase.auth.signOut();
+    setMenuAbierto(false);
+  }
 
   function mostrarProximamente() {
     setNotaProximamente(true);
     setMenuAbierto(false);
     setTimeout(() => setNotaProximamente(false), 2500);
+  }
+
+  // Los accesos del menú piden cuenta si no hay sesión; si ya hay sesión,
+  // por ahora siguen siendo "próximamente" porque la función en sí (favoritos,
+  // historial de aciertos, etc.) todavía no está construida.
+  function accederOPedirCuenta() {
+    if (!sesion) {
+      setMenuAbierto(false);
+      abrirLogin();
+    } else {
+      mostrarProximamente();
+    }
   }
   const [equipoForzadoLocal, setEquipoForzadoLocal] = useState(null);
   const [equipoForzadoVisitante, setEquipoForzadoVisitante] = useState(null);
@@ -1771,24 +1943,43 @@ export default function Home() {
               ☰
             </button>
 
-            <button
-              onClick={mostrarProximamente}
-              style={{
-                padding: "8px 12px", fontSize: 12, background: "transparent",
-                color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6, cursor: "pointer",
-              }}
-            >
-              Registrarse
-            </button>
-            <button
-              onClick={mostrarProximamente}
-              style={{
-                padding: "8px 12px", fontSize: 12, background: acentoMarca,
-                color: modoOscuro ? "#1B1200" : "#fff", border: "none", borderRadius: 6, cursor: "pointer",
-              }}
-            >
-              Iniciar sesión
-            </button>
+            {sesion ? (
+              <>
+                <span style={{ fontSize: 12, color: tema.textoSuave, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {sesion.user.email}
+                </span>
+                <button
+                  onClick={cerrarSesion}
+                  style={{
+                    padding: "8px 12px", fontSize: 12, background: "transparent",
+                    color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6, cursor: "pointer",
+                  }}
+                >
+                  Cerrar sesión
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={abrirRegistro}
+                  style={{
+                    padding: "8px 12px", fontSize: 12, background: "transparent",
+                    color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6, cursor: "pointer",
+                  }}
+                >
+                  Registrarse
+                </button>
+                <button
+                  onClick={abrirLogin}
+                  style={{
+                    padding: "8px 12px", fontSize: 12, background: acentoMarca,
+                    color: modoOscuro ? "#1B1200" : "#fff", border: "none", borderRadius: 6, cursor: "pointer",
+                  }}
+                >
+                  Iniciar sesión
+                </button>
+              </>
+            )}
 
             {menuAbierto && (
               <div
@@ -1798,10 +1989,10 @@ export default function Home() {
                   boxShadow: "0 6px 16px rgba(0,0,0,0.25)", overflow: "hidden",
                 }}
               >
-                {["Inicio", "Mis estudios (próximamente)", "Favoritos (próximamente)", "Historial de aciertos (próximamente)", "Ajustes (próximamente)"].map((item) => (
+                {["Inicio", "Mis estudios", "Favoritos", "Historial de aciertos", "Ajustes"].map((item) => (
                   <div
                     key={item}
-                    onClick={mostrarProximamente}
+                    onClick={item === "Inicio" ? () => setMenuAbierto(false) : accederOPedirCuenta}
                     style={{ padding: "10px 14px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
                   >
                     {item}
@@ -2084,6 +2275,15 @@ export default function Home() {
             <img src="/chat-icon.png" alt="Chat" />
           </button>
         </>
+      )}
+
+      {authModalAbierto && (
+        <AuthModal
+          tema={tema}
+          acentoMarca={acentoMarca}
+          modoInicial={authModalModo}
+          onCerrar={() => setAuthModalAbierto(false)}
+        />
       )}
     </div>
   );
