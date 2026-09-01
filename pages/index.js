@@ -1434,7 +1434,9 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
   const [modo, setModo] = useState(modoInicial || "login"); // "login" | "registro" | "magico"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
+  const [cargandoGoogle, setCargandoGoogle] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
 
@@ -1448,7 +1450,7 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
       if (modo === "registro") {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setMensaje("Cuenta creada. Revisa tu correo para confirmar tu cuenta.");
+        setMensaje("✅ ¡Cuenta creada! Verifica tu cuenta desde tu bandeja de entrada (revisa spam si no la ves) para poder iniciar sesión.");
       } else if (modo === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -1456,7 +1458,7 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
       } else if (modo === "magico") {
         const { error } = await supabase.auth.signInWithOtp({ email });
         if (error) throw error;
-        setMensaje("Te enviamos un enlace mágico a tu correo. Ábrelo desde este mismo dispositivo.");
+        setMensaje("✅ Te enviamos un enlace mágico a tu correo. Ábrelo desde este mismo dispositivo.");
       }
     } catch (err) {
       setError(err.message || "Ocurrió un error");
@@ -1464,28 +1466,77 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
     setCargando(false);
   }
 
+  async function entrarConGoogle() {
+    setError("");
+    setCargandoGoogle(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(err.message || "No se pudo iniciar sesión con Google");
+      setCargandoGoogle(false);
+    }
+  }
+
   return (
     <div
       onClick={onCerrar}
       style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
         display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16,
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: tema.panel, borderRadius: 10, padding: 24, width: 360, maxWidth: "100%", position: "relative" }}
+        style={{ background: tema.panel, borderRadius: 12, padding: 28, width: 380, maxWidth: "100%", position: "relative", borderTop: `3px solid ${acentoMarca}` }}
       >
         <button
           onClick={onCerrar}
-          style={{ position: "absolute", top: 12, right: 12, background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}
+          style={{ position: "absolute", top: 14, right: 14, background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}
         >
           ✕
         </button>
 
-        <h3 style={{ marginTop: 0, fontSize: 16 }}>
-          {modo === "registro" ? "Crear cuenta" : modo === "magico" ? "Enlace mágico" : "Iniciar sesión"}
-        </h3>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 18 }}>
+          <img src="/logo.png" alt="JMCS" width={48} height={48} style={{ marginBottom: 8 }} />
+          <h3 style={{ margin: 0, fontSize: 17 }}>
+            {modo === "registro" ? "Crea tu cuenta en JMCS" : modo === "magico" ? "Enlace mágico" : "Bienvenido de nuevo a JMCS"}
+          </h3>
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: tema.textoSuave, textAlign: "center" }}>
+            {modo === "registro"
+              ? "Guarda tus estudios, favoritos y tu historial de aciertos."
+              : modo === "magico"
+              ? "Te mandamos un enlace, sin necesidad de contraseña."
+              : "Accede a tus estudios, favoritos e historial."}
+          </p>
+        </div>
+
+        <button
+          onClick={entrarConGoogle}
+          disabled={cargandoGoogle}
+          style={{
+            width: "100%", padding: 10, fontSize: 13, marginBottom: 14, display: "flex", alignItems: "center",
+            justifyContent: "center", gap: 8, background: tema.fondo, color: tema.texto,
+            border: `1px solid ${tema.borde}`, borderRadius: 6, cursor: cargandoGoogle ? "default" : "pointer", fontWeight: 600,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 48 48">
+            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.6 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
+            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6 29.5 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+            <path fill="#4CAF50" d="M24 44c5.3 0 10.1-2 13.7-5.3l-6.3-5.3C29.4 35.4 26.8 36 24 36c-5.4 0-9.9-3.4-11.3-8.1l-6.5 5C9.6 39.6 16.3 44 24 44z" />
+            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1 3-3.2 5.4-6 6.9l6.3 5.3C39.7 37.1 44 31.3 44 24c0-1.3-.1-2.7-.4-3.5z" />
+          </svg>
+          {cargandoGoogle ? "Conectando..." : "Continuar con Google"}
+        </button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 14px" }}>
+          <div style={{ flex: 1, borderTop: `1px solid ${tema.borde}` }} />
+          <span style={{ fontSize: 10, color: tema.textoSuave }}>o con tu correo</span>
+          <div style={{ flex: 1, borderTop: `1px solid ${tema.borde}` }} />
+        </div>
 
         <form onSubmit={manejarSubmit}>
           <input
@@ -1498,19 +1549,32 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
           />
 
           {modo !== "magico" && (
-            <input
-              type="password"
-              placeholder="Contraseña"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              style={{ width: "100%", padding: 10, marginBottom: 10, fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
-            />
+            <div style={{ position: "relative", marginBottom: 10 }}>
+              <input
+                type={mostrarPassword ? "text" : "password"}
+                placeholder="Contraseña"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                style={{ width: "100%", padding: "10px 40px 10px 10px", fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarPassword(!mostrarPassword)}
+                aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                style={{
+                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                  background: "transparent", border: "none", cursor: "pointer", fontSize: 15, color: tema.textoSuave,
+                }}
+              >
+                {mostrarPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
           )}
 
           {error && <p style={{ color: "#e05555", fontSize: 12, marginBottom: 10 }}>{error}</p>}
-          {mensaje && <p style={{ color: "#2e9e4f", fontSize: 12, marginBottom: 10 }}>{mensaje}</p>}
+          {mensaje && <p style={{ color: "#2e9e4f", fontSize: 12, marginBottom: 10, lineHeight: 1.4 }}>{mensaje}</p>}
 
           <button
             type="submit"
@@ -1548,10 +1612,6 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
             </span>
           )}
         </div>
-
-        <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 14, textAlign: "center" }}>
-          Inicio de sesión con Google llegará pronto.
-        </p>
       </div>
     </div>
   );
