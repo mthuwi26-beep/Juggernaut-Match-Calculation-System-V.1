@@ -2428,4 +2428,120 @@ export default function Home() {
               disabled={cargandoPuntuales}
               style={{
                 width: "100%", marginTop: 24, padding: "14px", fontSize: 15, fontWeight: "bold",
-                background: carga
+                background: cargandoPuntuales ? tema.panel : acento, color: cargandoPuntuales ? tema.texto : "#fff",
+                border: "none", borderRadius: 8, cursor: cargandoPuntuales ? "default" : "pointer",
+              }}
+            >
+              {cargandoPuntuales
+                ? progreso
+                : `📊 Cargar datos puntuales (córners, tarjetas, faltas) — ${equipoLocal.team.name} y ${equipoVisitante.team.name}`}
+            </button>
+          )}
+
+          {datosPuntualesListos && (
+            <p style={{ textAlign: "center", marginTop: 20, color: "#2e9e4f", fontWeight: "bold" }}>
+              ✅ Datos puntuales cargados para este encuentro
+              {resumenCarga && (
+                <span style={{ display: "block", fontWeight: "normal", fontSize: 12, color: tema.textoSuave, marginTop: 4 }}>
+                  ({resumenCarga})
+                </span>
+              )}
+            </p>
+          )}
+
+          <PanelHeadToHead
+            h2h={h2h}
+            nombreLocal={equipoLocal?.team?.name}
+            nombreVisitante={equipoVisitante?.team?.name}
+            tema={tema}
+            statsMap={statsMap}
+            datosPuntualesListos={datosPuntualesListos}
+          />
+
+          {equipoLocal?.team && equipoVisitante?.team && (
+            <TablaComparativa
+              nombreLocal={equipoLocal.team.name}
+              nombreVisitante={equipoVisitante.team.name}
+              statsLocal={statsGoLocal}
+              statsVisitante={statsGoVisitante}
+              tema={tema}
+            />
+          )}
+
+          {datosPuntualesListos && equipoLocal?.team && equipoVisitante?.team && (
+            <TablaComparativaPuntual
+              nombreLocal={equipoLocal.team.name}
+              nombreVisitante={equipoVisitante.team.name}
+              fixturesLocal={fixturesLocal}
+              fixturesVisitante={fixturesVisitante}
+              idLocal={equipoLocal.team.id}
+              idVisitante={equipoVisitante.team.id}
+              statsMap={statsMap}
+              tema={tema}
+            />
+          )}
+
+          <PanelSemaforo
+            equipoLocal={equipoLocal}
+            equipoVisitante={equipoVisitante}
+            fixturesLocal={fixturesLocal}
+            fixturesVisitante={fixturesVisitante}
+            h2h={h2h}
+            statsMap={statsMap}
+            datosPuntualesListos={datosPuntualesListos}
+            esPartidoLiga={esPartidoLiga}
+            setEsPartidoLiga={setEsPartidoLiga}
+            tema={tema}
+            acento={acento}
+            climaAjuste={climaAjuste}
+            coberturaPuntuales={coberturaPuntuales}
+          />
+        </div>
+
+        <div className="jmcs-ala-visitante">
+          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} />
+        </div>
+      </div>
+
+      {equipoLocal?.team && equipoVisitante?.team && (
+        <>
+          <div className="jmcs-chat-panel" style={{ background: tema.panel, display: chatAbierto ? "block" : "none" }}>
+            <ChatIA
+              equipoLocal={equipoLocal}
+              equipoVisitante={equipoVisitante}
+              statsGoLocal={statsGoLocal}
+              statsGoVisitante={statsGoVisitante}
+              h2h={h2h}
+              esPartidoLiga={esPartidoLiga}
+              tema={tema}
+              acento={acento}
+              onCerrar={() => setChatAbierto(false)}
+            />
+          </div>
+
+          <button className="jmcs-chat-burbuja" onClick={() => setChatAbierto(!chatAbierto)} aria-label="Chat IA">
+            <img src="/chat-icon.png" alt="Chat" />
+          </button>
+        </>
+      )}
+
+      {authModalAbierto && (
+        <AuthModal
+          tema={tema}
+          acentoMarca={acentoMarca}
+          modoInicial={authModalModo}
+          onCerrar={() => setAuthModalAbierto(false)}
+        />
+      )}
+
+      {favoritosPanelAbierto && sesion && (
+        <PanelFavoritos
+          sesion={sesion}
+          tema={tema}
+          acentoMarca={acentoMarca}
+          onCerrar={() => setFavoritosPanelAbierto(false)}
+        />
+      )}
+    </div>
+  );
+}
