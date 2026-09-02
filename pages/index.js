@@ -476,7 +476,181 @@ function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento }) {
   );
 }
 
-function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca }) {
+function BotonFavorito({ equipo, sesion, tema, onPedirLogin }) {
+  const [esFavorito, setEsFavorito] = useState(false);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (!sesion || !equipo?.team?.id) {
+      setEsFavorito(false);
+      return;
+    }
+    let cancelado = false;
+    supabase
+      .from("favoritos")
+      .select("id")
+      .eq("user_id", sesion.user.id)
+      .eq("team_id", equipo.team.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelado) setEsFavorito(!!data);
+      });
+    return () => { cancelado = true; };
+  }, [sesion, equipo?.team?.id]);
+
+  async function alternar(e) {
+    e.stopPropagation();
+    if (!sesion) {
+      onPedirLogin();
+      return;
+    }
+    setCargando(true);
+    if (esFavorito) {
+      await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", equipo.team.id);
+      setEsFavorito(false);
+    } else {
+      await supabase.from("favoritos").insert({
+        user_id: sesion.user.id,
+        team_id: equipo.team.id,
+        team_name: equipo.team.name,
+        team_logo: equipo.team.logo,
+        team_country: equipo.team.country,
+      });
+      setEsFavorito(true);
+    }
+    setCargando(false);
+  }
+
+  if (!equipo?.team) return null;
+
+  return (
+    <button
+      onClick={alternar}
+      disabled={cargando}
+      aria-label="Favorito"
+      style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 18, padding: 0, lineHeight: 1 }}
+    >
+      {esFavorito ? "⭐" : "☆"}
+    </button>
+  );
+}
+
+function TarjetaFavorito({ favorito, tema, acento, onQuitar }) {
+  const [expandido, setExpandido] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [cargando, setCargando] = useState(false);
+
+  async function alternarExpandir() {
+    if (expandido) {
+      setExpandido(false);
+      return;
+    }
+    setExpandido(true);
+    if (!stats) {
+      setCargando(true);
+      try {
+        const res = await fetch(`/api/fixtures?teamId=${favorito.team_id}`);
+        const data = await res.json();
+        if (!data.error) setStats(calcularEstadisticasGoles(data, favorito.team_id));
+      } catch (err) {
+        // silencioso
+      }
+      setCargando(false);
+    }
+  }
+
+  return (
+    <div
+      onClick={alternarExpandir}
+      style={{
+        background: tema.panel, borderRadius: 12, border: `2px solid ${acento}`,
+        padding: 14, textAlign: "center", cursor: "pointer", width: 170,
+      }}
+    >
+      <img src={favorito.team_logo} alt={favorito.team_name} style={{ width: 70, height: 70, objectFit: "contain", margin: "0 auto 8px" }} />
+      <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 4 }}>{favorito.team_name}</div>
+      <div style={{ fontSize: 10, color: tema.textoSuave }}>{favorito.team_country || ""}</div>
+
+      {expandido && (
+        <div style={{ marginTop: 10, fontSize: 11, textAlign: "left", borderTop: `1px solid ${tema.borde}`, paddingTop: 8 }}>
+          {cargando ? (
+            <p style={{ color: tema.textoSuave }}>Cargando...</p>
+          ) : stats ? (
+            <>
+              <FilaStat etiqueta="Récord" valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
+              <FilaStat etiqueta="Goles favor" valor={stats.promedioGolesFavor} />
+              <FilaStat etiqueta="% Over 2.5" valor={`${stats.over25Pct}%`} />
+              <FilaStat etiqueta="% BTTS" valor={`${stats.bttsPct}%`} />
+            </>
+          ) : (
+            <p style={{ color: tema.textoSuave }}>Sin datos disponibles.</p>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onQuitar(favorito.team_id); }}
+            style={{ marginTop: 8, fontSize: 10, background: "transparent", border: "none", color: "#e05555", cursor: "pointer" }}
+          >
+            Quitar de favoritos
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelFavoritos({ sesion, tema, acentoMarca, onCerrar }) {
+  const [favoritos, setFavoritos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("favoritos")
+      .select("*")
+      .eq("user_id", sesion.user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setFavoritos(data || []);
+        setCargando(false);
+      });
+  }, [sesion]);
+
+  async function quitar(teamId) {
+    await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", teamId);
+    setFavoritos((prev) => prev.filter((f) => f.team_id !== teamId));
+  }
+
+  return (
+    <div
+      onClick={onCerrar}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: tema.fondo, borderRadius: 12, padding: 24, width: 640, maxWidth: "100%", maxHeight: "80vh", overflowY: "auto", borderTop: `3px solid ${acentoMarca}` }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>⭐ Mis favoritos</h3>
+          <button onClick={onCerrar} style={{ background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}>✕</button>
+        </div>
+
+        {cargando ? (
+          <p style={{ color: tema.textoSuave }}>Cargando...</p>
+        ) : favoritos.length === 0 ? (
+          <p style={{ color: tema.textoSuave, fontSize: 13 }}>
+            Aún no tienes equipos favoritos. Toca la estrella ⭐ junto al nombre de un equipo para guardarlo aquí.
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
+            {favoritos.map((f) => (
+              <TarjetaFavorito key={f.team_id} favorito={f} tema={tema} acento={acentoMarca} onQuitar={quitar} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca, sesion, onPedirLogin }) {
   const [query, setQuery] = useState("");
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -602,6 +776,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <img src={selectedTeam.team.logo} alt={selectedTeam.team.name} width={26} height={26} />
             <strong style={{ color: colorMarca || tema.texto }}>{selectedTeam.team.name}</strong>
+            <BotonFavorito equipo={selectedTeam} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
           </div>
 
           <div className="jmcs-subpaneles-individual" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -1199,7 +1374,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   );
 }
 
-function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento }) {
+function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, sesion, onPedirLogin }) {
   if (!equipo?.team) return null;
 
   const ultimos5 = (fixtures || []).slice(0, 5);
@@ -1207,7 +1382,10 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento })
   return (
     <div style={{ background: colorTenue(acento), borderTop: `3px solid ${acento}`, borderRadius: 6, padding: 16, textAlign: "center" }}>
       <img src={equipo.team.logo} alt={equipo.team.name} style={{ width: "100%", maxWidth: 130, height: "auto", margin: "0 auto 10px" }} />
-      <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento }}>{equipo.team.name}</h4>
+      <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        {equipo.team.name}
+        <BotonFavorito equipo={equipo} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+      </h4>
 
       {stats ? (
         <>
@@ -1679,14 +1857,20 @@ export default function Home() {
   // Los accesos del menú piden cuenta si no hay sesión; si ya hay sesión,
   // por ahora siguen siendo "próximamente" porque la función en sí (favoritos,
   // historial de aciertos, etc.) todavía no está construida.
-  function accederOPedirCuenta() {
+  function accederOPedirCuenta(itemMenu) {
     if (!sesion) {
       setMenuAbierto(false);
       abrirLogin();
+    } else if (itemMenu === "Favoritos") {
+      setMenuAbierto(false);
+      setFavoritosPanelAbierto(true);
     } else {
       mostrarProximamente();
     }
   }
+
+  const [favoritosPanelAbierto, setFavoritosPanelAbierto] = useState(false);
+
   const [equipoForzadoLocal, setEquipoForzadoLocal] = useState(null);
   const [equipoForzadoVisitante, setEquipoForzadoVisitante] = useState(null);
   const [partidoCalendario, setPartidoCalendario] = useState(null);
@@ -2052,7 +2236,7 @@ export default function Home() {
                 {["Inicio", "Mis estudios", "Favoritos", "Historial de aciertos", "Ajustes"].map((item) => (
                   <div
                     key={item}
-                    onClick={item === "Inicio" ? () => setMenuAbierto(false) : accederOPedirCuenta}
+                    onClick={item === "Inicio" ? () => setMenuAbierto(false) : () => accederOPedirCuenta(item)}
                     style={{ padding: "10px 14px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
                   >
                     {item}
@@ -2129,7 +2313,7 @@ export default function Home() {
         </div>
 
         <div className="jmcs-ala-local">
-          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} />
+          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} />
         </div>
 
         <div className="jmcs-centro">
@@ -2176,6 +2360,8 @@ export default function Home() {
                 statsMap={statsMap}
                 equipoForzado={equipoForzadoLocal}
                 colorMarca={colorMarcaLocal}
+                sesion={sesion}
+                onPedirLogin={abrirLogin}
                 onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoLocal(team);
                   setFixturesLocal(fixtures || []);
@@ -2192,6 +2378,8 @@ export default function Home() {
                 statsMap={statsMap}
                 equipoForzado={equipoForzadoVisitante}
                 colorMarca={colorMarcaVisitante}
+                sesion={sesion}
+                onPedirLogin={abrirLogin}
                 onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoVisitante(team);
                   setFixturesVisitante(fixtures || []);
@@ -2240,111 +2428,4 @@ export default function Home() {
               disabled={cargandoPuntuales}
               style={{
                 width: "100%", marginTop: 24, padding: "14px", fontSize: 15, fontWeight: "bold",
-                background: cargandoPuntuales ? tema.panel : acento, color: cargandoPuntuales ? tema.texto : "#fff",
-                border: "none", borderRadius: 8, cursor: cargandoPuntuales ? "default" : "pointer",
-              }}
-            >
-              {cargandoPuntuales
-                ? progreso
-                : `📊 Cargar datos puntuales (córners, tarjetas, faltas) — ${equipoLocal.team.name} y ${equipoVisitante.team.name}`}
-            </button>
-          )}
-
-          {datosPuntualesListos && (
-            <p style={{ textAlign: "center", marginTop: 20, color: "#2e9e4f", fontWeight: "bold" }}>
-              ✅ Datos puntuales cargados para este encuentro
-              {resumenCarga && (
-                <span style={{ display: "block", fontWeight: "normal", fontSize: 12, color: tema.textoSuave, marginTop: 4 }}>
-                  ({resumenCarga})
-                </span>
-              )}
-            </p>
-          )}
-
-          <PanelHeadToHead
-            h2h={h2h}
-            nombreLocal={equipoLocal?.team?.name}
-            nombreVisitante={equipoVisitante?.team?.name}
-            tema={tema}
-            statsMap={statsMap}
-            datosPuntualesListos={datosPuntualesListos}
-          />
-
-          {equipoLocal?.team && equipoVisitante?.team && (
-            <TablaComparativa
-              nombreLocal={equipoLocal.team.name}
-              nombreVisitante={equipoVisitante.team.name}
-              statsLocal={statsGoLocal}
-              statsVisitante={statsGoVisitante}
-              tema={tema}
-            />
-          )}
-
-          {datosPuntualesListos && equipoLocal?.team && equipoVisitante?.team && (
-            <TablaComparativaPuntual
-              nombreLocal={equipoLocal.team.name}
-              nombreVisitante={equipoVisitante.team.name}
-              fixturesLocal={fixturesLocal}
-              fixturesVisitante={fixturesVisitante}
-              idLocal={equipoLocal.team.id}
-              idVisitante={equipoVisitante.team.id}
-              statsMap={statsMap}
-              tema={tema}
-            />
-          )}
-
-          <PanelSemaforo
-            equipoLocal={equipoLocal}
-            equipoVisitante={equipoVisitante}
-            fixturesLocal={fixturesLocal}
-            fixturesVisitante={fixturesVisitante}
-            h2h={h2h}
-            statsMap={statsMap}
-            datosPuntualesListos={datosPuntualesListos}
-            esPartidoLiga={esPartidoLiga}
-            setEsPartidoLiga={setEsPartidoLiga}
-            tema={tema}
-            acento={acento}
-            climaAjuste={climaAjuste}
-            coberturaPuntuales={coberturaPuntuales}
-          />
-        </div>
-
-        <div className="jmcs-ala-visitante">
-          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} />
-        </div>
-      </div>
-
-      {equipoLocal?.team && equipoVisitante?.team && (
-        <>
-          <div className="jmcs-chat-panel" style={{ background: tema.panel, display: chatAbierto ? "block" : "none" }}>
-            <ChatIA
-              equipoLocal={equipoLocal}
-              equipoVisitante={equipoVisitante}
-              statsGoLocal={statsGoLocal}
-              statsGoVisitante={statsGoVisitante}
-              h2h={h2h}
-              esPartidoLiga={esPartidoLiga}
-              tema={tema}
-              acento={acento}
-              onCerrar={() => setChatAbierto(false)}
-            />
-          </div>
-
-          <button className="jmcs-chat-burbuja" onClick={() => setChatAbierto(!chatAbierto)} aria-label="Chat IA">
-            <img src="/chat-icon.png" alt="Chat" />
-          </button>
-        </>
-      )}
-
-      {authModalAbierto && (
-        <AuthModal
-          tema={tema}
-          acentoMarca={acentoMarca}
-          modoInicial={authModalModo}
-          onCerrar={() => setAuthModalAbierto(false)}
-        />
-      )}
-    </div>
-  );
-}
+                background: carga
