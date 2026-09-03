@@ -528,9 +528,11 @@ function BotonFavorito({ equipo, sesion, tema, onPedirLogin }) {
       onClick={alternar}
       disabled={cargando}
       aria-label="Favorito"
-      style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 18, padding: 0, lineHeight: 1 }}
+      style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, display: "inline-flex" }}
     >
-      {esFavorito ? "⭐" : "☆"}
+      <svg width="20" height="20" viewBox="0 0 24 24" fill={esFavorito ? "#D8A93B" : "none"} stroke={esFavorito ? "#D8A93B" : "#999"} strokeWidth="1.5">
+        <path d="M12 2.5l2.9 6.2 6.7.7-5 4.6 1.4 6.7-6-3.5-6 3.5 1.4-6.7-5-4.6 6.7-.7z" strokeLinejoin="round" />
+      </svg>
     </button>
   );
 }
@@ -591,6 +593,48 @@ function TarjetaFavorito({ favorito, tema, acento, onQuitar }) {
           >
             Quitar de favoritos
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelFavoritosPagina({ sesion, tema, acentoMarca }) {
+  const [favoritos, setFavoritos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("favoritos")
+      .select("*")
+      .eq("user_id", sesion.user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setFavoritos(data || []);
+        setCargando(false);
+      });
+  }, [sesion]);
+
+  async function quitar(teamId) {
+    await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", teamId);
+    setFavoritos((prev) => prev.filter((f) => f.team_id !== teamId));
+  }
+
+  return (
+    <div>
+      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center" }}>⭐ Mis favoritos</h3>
+
+      {cargando ? (
+        <p style={{ color: tema.textoSuave, textAlign: "center" }}>Cargando...</p>
+      ) : favoritos.length === 0 ? (
+        <p style={{ color: tema.textoSuave, fontSize: 13, textAlign: "center" }}>
+          Aún no tienes equipos favoritos. Toca la estrella junto al nombre de un equipo para guardarlo aquí.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center" }}>
+          {favoritos.map((f) => (
+            <TarjetaFavorito key={f.team_id} favorito={f} tema={tema} acento={acentoMarca} onQuitar={quitar} />
+          ))}
         </div>
       )}
     </div>
@@ -1795,6 +1839,104 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
   );
 }
 
+function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick }) {
+  const fecha = new Date(p.fixture.date);
+  const horaTexto = fecha.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const fechaTexto = fecha.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
+        padding: "14px 18px", background: tema.panel, borderRadius: 8, cursor: "pointer",
+        borderLeft: `4px solid ${acentoMarca}`, marginBottom: 10,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+          {p.league.name} · {fechaTexto} · {horaTexto}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <img src={p.teams.home.logo} alt="" width={22} height={22} />
+          <span style={{ fontSize: 14 }}>{p.teams.home.name}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <img src={p.teams.away.logo} alt="" width={22} height={22} />
+          <span style={{ fontSize: 14 }}>{p.teams.away.name}</span>
+        </div>
+      </div>
+      <div style={{ fontSize: 20, color: tema.textoSuave }}>›</div>
+    </div>
+  );
+}
+
+function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido }) {
+  const [partidos, setPartidos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const hoy = new Date().toISOString().split("T")[0];
+    setLoading(true);
+    fetch(`/api/partidos-por-fecha?date=${hoy}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) setError(data.error);
+        else setPartidos(data);
+      })
+      .catch(() => setError("No se pudieron cargar los partidos"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div>
+      <h3 style={{ fontSize: 15, marginBottom: 14 }}>⚽ Partidos de hoy</h3>
+      {loading && <p style={{ color: tema.textoSuave, fontSize: 13 }}>Cargando partidos...</p>}
+      {error && <p style={{ color: "#e05555", fontSize: 13 }}>{error}</p>}
+      {!loading && !error && partidos.length === 0 && (
+        <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay partidos disponibles para hoy en este plan.</p>
+      )}
+      {partidos.map((p) => (
+        <TarjetaPartidoInicio key={p.fixture.id} p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} />
+      ))}
+    </div>
+  );
+}
+
+function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado }) {
+  return (
+    <div>
+      {equipoInicio?.team && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ background: colorTenue(colorMarcaInicio), borderTop: `3px solid ${colorMarcaInicio}`, borderRadius: 8, padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <img src={equipoInicio.team.logo} alt={equipoInicio.team.name} width={30} height={30} />
+              <strong style={{ color: colorMarcaInicio, fontSize: 16 }}>{equipoInicio.team.name}</strong>
+              <BotonFavorito equipo={equipoInicio.team} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+            </div>
+            {(() => {
+              const stats = calcularEstadisticasGoles(fixturesInicio, equipoInicio.team.id);
+              if (!stats) return <p style={{ color: tema.textoSuave, fontSize: 12 }}>Sin datos.</p>;
+              return (
+                <div style={{ fontSize: 13 }}>
+                  <FilaStat etiqueta="Récord (V-E-D)" valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
+                  <FilaStat etiqueta="Goles a favor (prom.)" valor={stats.promedioGolesFavor} />
+                  <FilaStat etiqueta="Goles en contra (prom.)" valor={stats.promedioGolesContra} />
+                  <FilaStat etiqueta="% Over 2.5" valor={`${stats.over25Pct}%`} />
+                  <FilaStat etiqueta="% BTTS" valor={`${stats.bttsPct}%`} />
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      <ListaPartidosInicio tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} />
+    </div>
+  );
+}
+
 export default function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
@@ -1863,13 +2005,18 @@ export default function Home() {
       abrirLogin();
     } else if (itemMenu === "Favoritos") {
       setMenuAbierto(false);
-      setFavoritosPanelAbierto(true);
+      setVistaActual("favoritos");
     } else {
       mostrarProximamente();
     }
   }
 
   const [favoritosPanelAbierto, setFavoritosPanelAbierto] = useState(false);
+  const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos"
+  const [busquedaInicio, setBusquedaInicio] = useState("");
+  const [equipoInicio, setEquipoInicio] = useState(null);
+  const [fixturesInicio, setFixturesInicio] = useState([]);
+  const [buscandoInicio, setBuscandoInicio] = useState(false);
 
   const [equipoForzadoLocal, setEquipoForzadoLocal] = useState(null);
   const [equipoForzadoVisitante, setEquipoForzadoVisitante] = useState(null);
@@ -1994,6 +2141,28 @@ export default function Home() {
 
   const colorMarcaLocal = useColorDeEscudo(equipoLocal?.team?.logo, ACENTOS_CATEGORIA.local);
   const colorMarcaVisitante = useColorDeEscudo(equipoVisitante?.team?.logo, ACENTOS_CATEGORIA.visitante);
+  const colorMarcaInicio = useColorDeEscudo(equipoInicio?.team?.logo, DORADO);
+  const [partidoTocadoInicio, setPartidoTocadoInicio] = useState(null);
+
+  async function buscarEquipoInicio(e) {
+    e.preventDefault();
+    if (busquedaInicio.trim().length < 3) return;
+    setBuscandoInicio(true);
+    setEquipoInicio(null);
+    setFixturesInicio([]);
+    try {
+      const res = await fetch(`/api/teams?name=${encodeURIComponent(busquedaInicio)}`);
+      const data = await res.json();
+      if (!data.error && data.length > 0) {
+        const equipo = data[0];
+        setEquipoInicio(equipo);
+        const resFix = await fetch(`/api/fixtures?teamId=${equipo.team.id}`);
+        const fixturesData = await resFix.json();
+        if (!fixturesData.error) setFixturesInicio(fixturesData);
+      }
+    } catch (err) {}
+    setBuscandoInicio(false);
+  }
 
   // Ajuste experimental por clima: modesto, basado en tendencias generales, no en un estudio exacto de este partido
   let factorClima = 1;
@@ -2302,11 +2471,87 @@ export default function Home() {
           </p>
         )}
 
-        <p style={{ textAlign: "center", color: acentoMarca, fontSize: 12, margin: "10px 0 0", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          {mensajeEstudio}
-        </p>
+        {vistaActual === "estudio" && (
+          <p style={{ textAlign: "center", color: acentoMarca, fontSize: 12, margin: "10px 0 0", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {mensajeEstudio}
+          </p>
+        )}
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
+          {[
+            { id: "inicio", etiqueta: "🏠 Inicio" },
+            { id: "estudio", etiqueta: "📊 Estudio" },
+            { id: "favoritos", etiqueta: "⭐ Favoritos" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setVistaActual(tab.id)}
+              style={{
+                padding: "8px 18px", fontSize: 13, borderRadius: 20, cursor: "pointer",
+                background: vistaActual === tab.id ? acentoMarca : "transparent",
+                color: vistaActual === tab.id ? "#fff" : tema.texto,
+                border: `1px solid ${vistaActual === tab.id ? acentoMarca : tema.borde}`,
+                fontWeight: vistaActual === tab.id ? "bold" : "normal",
+              }}
+            >
+              {tab.etiqueta}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {vistaActual === "inicio" && (
+        <div style={{ maxWidth: 800, margin: "20px auto", padding: "0 12px" }}>
+          <form onSubmit={buscarEquipoInicio} style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            <input
+              type="text"
+              value={busquedaInicio}
+              onChange={(e) => setBusquedaInicio(e.target.value)}
+              placeholder="Busca un equipo (ej: Barcelona)"
+              style={{ flex: 1, padding: 12, fontSize: 15, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6 }}
+            />
+            <button
+              type="submit"
+              disabled={buscandoInicio}
+              style={{ padding: "12px 20px", fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+            >
+              {buscandoInicio ? "..." : "Buscar"}
+            </button>
+          </form>
+
+          <VistaInicio
+            tema={tema}
+            acentoMarca={acentoMarca}
+            sesion={sesion}
+            onPedirLogin={abrirLogin}
+            equipoInicio={equipoInicio}
+            fixturesInicio={fixturesInicio}
+            colorMarcaInicio={colorMarcaInicio}
+            onSeleccionarPartido={setPartidoTocadoInicio}
+            partidoTocado={partidoTocadoInicio}
+          />
+        </div>
+      )}
+
+      {vistaActual === "favoritos" && (
+        <div style={{ maxWidth: 900, margin: "20px auto", padding: "0 12px" }}>
+          {sesion ? (
+            <PanelFavoritosPagina sesion={sesion} tema={tema} acentoMarca={acentoMarca} />
+          ) : (
+            <div style={{ textAlign: "center", padding: 40 }}>
+              <p style={{ color: tema.textoSuave, marginBottom: 16 }}>Inicia sesión para ver tus equipos favoritos.</p>
+              <button
+                onClick={abrirLogin}
+                style={{ padding: "10px 20px", fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+              >
+                Iniciar sesión
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {vistaActual === "estudio" && (
       <div className="jmcs-grid" style={{ maxWidth: 2400, margin: "0 auto" }}>
         <div className="jmcs-calendario">
           <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} acentoMarca={acentoMarca} />
@@ -2502,8 +2747,9 @@ export default function Home() {
           <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} />
         </div>
       </div>
+      )}
 
-      {equipoLocal?.team && equipoVisitante?.team && (
+      {vistaActual === "estudio" && equipoLocal?.team && equipoVisitante?.team && (
         <>
           <div className="jmcs-chat-panel" style={{ background: tema.panel, display: chatAbierto ? "block" : "none" }}>
             <ChatIA
