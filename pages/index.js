@@ -1848,25 +1848,35 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick }) {
     <div
       onClick={onClick}
       style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
-        padding: "14px 18px", background: tema.panel, borderRadius: 8, cursor: "pointer",
-        borderLeft: `4px solid ${acentoMarca}`, marginBottom: 10,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+        padding: "16px 14px", background: tema.panel, borderRadius: 8, cursor: "pointer",
+        borderTop: `3px solid ${acentoMarca}`,
       }}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 10, color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
-          {p.league.name} · {fechaTexto} · {horaTexto}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <img src={p.teams.home.logo} alt="" width={22} height={22} />
-          <span style={{ fontSize: 14 }}>{p.teams.home.name}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <img src={p.teams.away.logo} alt="" width={22} height={22} />
-          <span style={{ fontSize: 14 }}>{p.teams.away.name}</span>
-        </div>
+      {/* Extremo izquierdo: equipo Local */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <img src={p.teams.home.logo} alt="" width={36} height={36} />
+        <span style={{ fontSize: 12, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+          {p.teams.home.name}
+        </span>
       </div>
-      <div style={{ fontSize: 20, color: tema.textoSuave }}>›</div>
+
+      {/* Centro: datos básicos */}
+      <div style={{ flexShrink: 0, textAlign: "center", padding: "0 6px" }}>
+        <div style={{ fontSize: 9, color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 4 }}>
+          {p.league.name}
+        </div>
+        <div style={{ fontSize: 13, fontWeight: "bold", color: acentoMarca }}>VS</div>
+        <div style={{ fontSize: 10, color: tema.textoSuave, marginTop: 4 }}>{fechaTexto} · {horaTexto}</div>
+      </div>
+
+      {/* Extremo derecho: equipo Visitante */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <img src={p.teams.away.logo} alt="" width={36} height={36} />
+        <span style={{ fontSize: 12, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+          {p.teams.away.name}
+        </span>
+      </div>
     </div>
   );
 }
@@ -1897,9 +1907,11 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido }) {
       {!loading && !error && partidos.length === 0 && (
         <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay partidos disponibles para hoy en este plan.</p>
       )}
+      <div className="jmcs-partidos-grid">
       {partidos.map((p) => (
         <TarjetaPartidoInicio key={p.fixture.id} p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} />
       ))}
+      </div>
     </div>
   );
 }
@@ -2313,6 +2325,18 @@ export default function Home() {
           z-index: 10;
         }
 
+        .jmcs-partidos-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        @media (min-width: 768px) {
+          .jmcs-partidos-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+        }
+
         .jmcs-chat-panel {
           position: fixed;
           bottom: 100px;
@@ -2527,7 +2551,10 @@ export default function Home() {
             equipoInicio={equipoInicio}
             fixturesInicio={fixturesInicio}
             colorMarcaInicio={colorMarcaInicio}
-            onSeleccionarPartido={setPartidoTocadoInicio}
+            onSeleccionarPartido={(p) => {
+              seleccionarPartidoDelCalendario(p);
+              setVistaActual("estudio");
+            }}
             partidoTocado={partidoTocadoInicio}
           />
         </div>
