@@ -599,7 +599,7 @@ function TarjetaFavorito({ favorito, tema, acento, onQuitar }) {
   );
 }
 
-function PanelFavoritosPagina({ sesion, tema, acentoMarca }) {
+function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
   const [favoritos, setFavoritos] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -633,7 +633,24 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca }) {
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center" }}>
           {favoritos.map((f) => (
-            <TarjetaFavorito key={f.team_id} favorito={f} tema={tema} acento={acentoMarca} onQuitar={quitar} />
+            <div
+              key={f.team_id}
+              onClick={() => onAbrirPerfil({ id: f.team_id, name: f.team_name, logo: f.team_logo, country: f.team_country })}
+              style={{
+                width: 160, background: tema.panel, borderTop: `3px solid ${acentoMarca}`, borderRadius: 8,
+                padding: 16, textAlign: "center", cursor: "pointer",
+              }}
+            >
+              <img src={f.team_logo} alt={f.team_name} width={60} height={60} style={{ marginBottom: 10 }} />
+              <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4 }}>{f.team_name}</div>
+              {f.team_country && <div style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 10 }}>{f.team_country}</div>}
+              <button
+                onClick={(e) => { e.stopPropagation(); quitar(f.team_id); }}
+                style={{ fontSize: 11, background: "transparent", border: `1px solid ${tema.borde}`, color: tema.textoSuave, borderRadius: 4, padding: "4px 8px", cursor: "pointer" }}
+              >
+                Quitar
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -1916,16 +1933,109 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido }) {
   );
 }
 
-function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado }) {
+function TablaProximosEncuentros({ partidos, tema }) {
+  if (!partidos || partidos.length === 0) {
+    return <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay próximos encuentros programados por ahora.</p>;
+  }
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <thead>
+        <tr style={{ background: tema.encabezadoTabla, textAlign: "left" }}>
+          <th style={{ padding: 6 }}>Fecha</th>
+          <th style={{ padding: 6 }}>Torneo</th>
+          <th style={{ padding: 6 }}>Partido</th>
+        </tr>
+      </thead>
+      <tbody>
+        {partidos.map((f) => (
+          <tr key={f.fixture.id} style={{ borderBottom: `1px solid ${tema.filaBorde}` }}>
+            <td style={{ padding: 6 }}>{new Date(f.fixture.date).toLocaleDateString("es-ES")}</td>
+            <td style={{ padding: 6 }}>{f.league.name}</td>
+            <td style={{ padding: 6 }}>{f.teams.home.name} vs {f.teams.away.name}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
+  const [fixtures, setFixtures] = useState([]);
+  const [proximos, setProximos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const colorMarca = useColorDeEscudo(equipo?.logo, DORADO);
+
+  useEffect(() => {
+    if (!equipo?.id) return;
+    setLoading(true);
+    Promise.all([
+      fetch(`/api/fixtures?teamId=${equipo.id}`).then((r) => r.json()),
+      fetch(`/api/proximos-partidos?teamId=${equipo.id}`).then((r) => r.json()),
+    ]).then(([fx, prox]) => {
+      setFixtures(Array.isArray(fx) ? fx : []);
+      setProximos(Array.isArray(prox) ? prox : []);
+      setLoading(false);
+    });
+  }, [equipo?.id]);
+
+  if (!equipo) return null;
+
+  const categorias = dividirPorCategorias(fixtures, equipo.id);
+
+  return (
+    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "0 12px" }}>
+      <button
+        onClick={onVolver}
+        style={{ background: "transparent", border: "none", color: tema.textoSuave, cursor: "pointer", fontSize: 13, marginBottom: 14 }}
+      >
+        ← Volver
+      </button>
+
+      <div style={{ background: colorTenue(colorMarca), borderTop: `3px solid ${colorMarca}`, borderRadius: 8, padding: 20, marginBottom: 20, textAlign: "center" }}>
+        <img src={equipo.logo} alt={equipo.name} width={70} height={70} style={{ marginBottom: 10 }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+          <h2 style={{ margin: 0, color: colorMarca }}>{equipo.name}</h2>
+          <BotonFavorito equipo={equipo} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+        </div>
+        {equipo.country && <p style={{ margin: "4px 0 0", color: tema.textoSuave, fontSize: 12 }}>{equipo.country}</p>}
+      </div>
+
+      {loading ? (
+        <p style={{ color: tema.textoSuave, textAlign: "center" }}>Cargando estadísticas...</p>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 30 }}>
+            <SubPanel titulo="Como Local" fixtures={categorias.local} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.local} />
+            <SubPanel titulo="Como Visitante" fixtures={categorias.visitante} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
+            <SubPanel titulo="Liga actual" fixtures={categorias.liga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
+            <SubPanel titulo="No liga (copas)" fixtures={categorias.noLiga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
+            <SubPanel titulo="Forma reciente (5)" fixtures={categorias.forma} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
+          </div>
+
+          <h3 style={{ fontSize: 15, marginBottom: 12 }}>📅 Próximos encuentros</h3>
+          <TablaProximosEncuentros partidos={proximos} tema={tema} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil }) {
   return (
     <div>
       {equipoInicio?.team && (
         <div style={{ marginBottom: 24 }}>
-          <div style={{ background: colorTenue(colorMarcaInicio), borderTop: `3px solid ${colorMarcaInicio}`, borderRadius: 8, padding: 16 }}>
+          <div
+            onClick={() => onAbrirPerfil(equipoInicio.team)}
+            style={{ background: colorTenue(colorMarcaInicio), borderTop: `3px solid ${colorMarcaInicio}`, borderRadius: 8, padding: 16, cursor: "pointer" }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <img src={equipoInicio.team.logo} alt={equipoInicio.team.name} width={30} height={30} />
               <strong style={{ color: colorMarcaInicio, fontSize: 16 }}>{equipoInicio.team.name}</strong>
-              <BotonFavorito equipo={equipoInicio.team} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+              <span onClick={(e) => e.stopPropagation()}>
+                <BotonFavorito equipo={equipoInicio.team} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+              </span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: tema.textoSuave }}>Toca para ver todo →</span>
             </div>
             {(() => {
               const stats = calcularEstadisticasGoles(fixturesInicio, equipoInicio.team.id);
@@ -2024,7 +2134,15 @@ export default function Home() {
   }
 
   const [favoritosPanelAbierto, setFavoritosPanelAbierto] = useState(false);
-  const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos"
+  const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
+  const [vistaAnterior, setVistaAnterior] = useState("inicio");
+  const [equipoPerfil, setEquipoPerfil] = useState(null);
+
+  function abrirPerfilEquipo(team) {
+    setVistaAnterior(vistaActual);
+    setEquipoPerfil(team);
+    setVistaActual("equipo");
+  }
   const [busquedaInicio, setBusquedaInicio] = useState("");
   const [equipoInicio, setEquipoInicio] = useState(null);
   const [fixturesInicio, setFixturesInicio] = useState([]);
@@ -2556,6 +2674,7 @@ export default function Home() {
               setVistaActual("estudio");
             }}
             partidoTocado={partidoTocadoInicio}
+            onAbrirPerfil={abrirPerfilEquipo}
           />
         </div>
       )}
@@ -2563,7 +2682,7 @@ export default function Home() {
       {vistaActual === "favoritos" && (
         <div style={{ maxWidth: 900, margin: "20px auto", padding: "0 12px" }}>
           {sesion ? (
-            <PanelFavoritosPagina sesion={sesion} tema={tema} acentoMarca={acentoMarca} />
+            <PanelFavoritosPagina sesion={sesion} tema={tema} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} />
           ) : (
             <div style={{ textAlign: "center", padding: 40 }}>
               <p style={{ color: tema.textoSuave, marginBottom: 16 }}>Inicia sesión para ver tus equipos favoritos.</p>
@@ -2575,6 +2694,18 @@ export default function Home() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {vistaActual === "equipo" && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaEquipoCompleto
+            equipo={equipoPerfil}
+            tema={tema}
+            sesion={sesion}
+            onPedirLogin={abrirLogin}
+            onVolver={() => setVistaActual(vistaAnterior)}
+          />
         </div>
       )}
 
