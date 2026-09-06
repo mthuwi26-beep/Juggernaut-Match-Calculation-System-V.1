@@ -1856,6 +1856,42 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
   );
 }
 
+function MigasDePan({ vistaActual, vistaAnterior, equipoPerfil, tema, acentoMarca, onIrA }) {
+  const nombres = { inicio: "Inicio", estudio: "Estudio", favoritos: "Favoritos" };
+
+  const segmentos = [{ id: "inicio", etiqueta: "Inicio" }];
+
+  if (vistaActual === "estudio") {
+    segmentos.push({ id: "estudio", etiqueta: "Estudio" });
+  } else if (vistaActual === "favoritos") {
+    segmentos.push({ id: "favoritos", etiqueta: "Favoritos" });
+  } else if (vistaActual === "equipo") {
+    if (vistaAnterior !== "inicio") {
+      segmentos.push({ id: vistaAnterior, etiqueta: nombres[vistaAnterior] || "Inicio" });
+    }
+    segmentos.push({ id: "equipo", etiqueta: equipoPerfil?.name || "Equipo" });
+  }
+
+  if (segmentos.length < 2) return null;
+
+  return (
+    <div className="jmcs-solo-pc" style={{ textAlign: "center", marginTop: 10, fontSize: 12, color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      {segmentos.map((s, i) => (
+        <span key={s.id}>
+          {i > 0 && <span style={{ margin: "0 6px" }}>/</span>}
+          {s.id === "equipo" ? (
+            <span style={{ color: acentoMarca, fontWeight: "bold" }}>{s.etiqueta}</span>
+          ) : (
+            <span onClick={() => onIrA(s.id)} style={{ cursor: "pointer" }}>
+              {s.etiqueta}
+            </span>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick }) {
   const fecha = new Date(p.fixture.date);
   const horaTexto = fecha.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -2443,6 +2479,11 @@ export default function Home() {
           z-index: 10;
         }
 
+        .jmcs-solo-pc { display: none; }
+        @media (min-width: 1024px) {
+          .jmcs-solo-pc { display: block; }
+        }
+
         .jmcs-partidos-grid {
           display: grid;
           grid-template-columns: 1fr;
@@ -2640,6 +2681,15 @@ export default function Home() {
             </button>
           ))}
         </div>
+
+        <MigasDePan
+          vistaActual={vistaActual}
+          vistaAnterior={vistaAnterior}
+          equipoPerfil={equipoPerfil}
+          tema={tema}
+          acentoMarca={acentoMarca}
+          onIrA={(id) => setVistaActual(id)}
+        />
       </div>
 
       {vistaActual === "inicio" && (
