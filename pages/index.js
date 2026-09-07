@@ -1758,6 +1758,9 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
             <div style={{ minWidth: 0 }}>🌡️ {climaData.temperaturaMin}° – {climaData.temperaturaMax}°C</div>
             <div style={{ minWidth: 0 }}>🌧️ {climaData.precipitacionMm} mm lluvia</div>
             <div style={{ minWidth: 0 }}>💨 Viento máx. {climaData.vientoMaxKmh} km/h</div>
+            {climaData.humedadPct !== null && climaData.humedadPct !== undefined && (
+              <div style={{ minWidth: 0 }}>💧 Humedad {Math.round(climaData.humedadPct)}%</div>
+            )}
           </>
         )}
       </div>
@@ -2201,18 +2204,25 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
 function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
   const [fixtures, setFixtures] = useState([]);
   const [proximos, setProximos] = useState([]);
+  const [errorProximos, setErrorProximos] = useState("");
   const [loading, setLoading] = useState(true);
   const colorMarca = useColorDeEscudo(equipo?.logo, DORADO);
 
   useEffect(() => {
     if (!equipo?.id) return;
     setLoading(true);
+    setErrorProximos("");
     Promise.all([
       fetch(`/api/fixtures?teamId=${equipo.id}`).then((r) => r.json()),
       fetch(`/api/proximos-partidos?teamId=${equipo.id}`).then((r) => r.json()),
     ]).then(([fx, prox]) => {
       setFixtures(Array.isArray(fx) ? fx : []);
-      setProximos(Array.isArray(prox) ? prox : []);
+      if (Array.isArray(prox)) {
+        setProximos(prox);
+      } else {
+        setProximos([]);
+        setErrorProximos((prox && prox.error) || "Respuesta inesperada al pedir los próximos encuentros.");
+      }
       setLoading(false);
     });
   }, [equipo?.id]);
@@ -2252,6 +2262,9 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
           </div>
 
           <h3 style={{ fontSize: 15, marginBottom: 12 }}>📅 Próximos encuentros</h3>
+          {errorProximos && (
+            <p style={{ color: "#e05555", fontSize: 12, marginBottom: 10 }}>⚠️ {errorProximos}</p>
+          )}
           <TablaProximosEncuentros partidos={proximos} tema={tema} />
         </>
       )}
