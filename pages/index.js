@@ -24,6 +24,27 @@ const TEMAS = {
 
 const DORADO = "#D8A93B";
 const VERDE_MARCA = "#1E5631";
+// Traducción del "esqueleto" de la app (menú, pestañas, botones principales).
+// Las etiquetas internas de estadísticas siguen en español por ahora (fase 2 de traducción).
+const TEXTOS = {
+  es: {
+    inicio: "🏠 Inicio", estudio: "📊 Estudio", favoritos: "⭐ Favoritos",
+    registrarse: "Registrarse", iniciarSesion: "Iniciar sesión", cerrarSesion: "Cerrar sesión",
+    buscar: "Buscar", local: "Local", visitante: "Visitante",
+    menuInicio: "Inicio", menuMisEstudios: "Mis estudios", menuFavoritos: "Favoritos",
+    menuHistorial: "Historial de aciertos", menuAjustes: "Ajustes",
+    buscarEquipoPlaceholder: "Busca un equipo (ej: Barcelona)",
+  },
+  en: {
+    inicio: "🏠 Home", estudio: "📊 Study", favoritos: "⭐ Favorites",
+    registrarse: "Sign up", iniciarSesion: "Log in", cerrarSesion: "Log out",
+    buscar: "Search", local: "Home", visitante: "Away",
+    menuInicio: "Home", menuMisEstudios: "My studies", menuFavoritos: "Favorites",
+    menuHistorial: "Track record", menuAjustes: "Settings",
+    buscarEquipoPlaceholder: "Search a team (e.g. Barcelona)",
+  },
+};
+
 const ACENTOS_CATEGORIA = {
   local: "#D8A93B",
   visitante: "#C1694F",
@@ -1085,7 +1106,7 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertencia
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin }) {
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
   const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
@@ -1208,7 +1229,66 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       <p style={{ fontSize: 11, color: tema.textoSuave, marginTop: 16 }}>
         Esto es un modelo estadístico de tendencias, no una certeza. No contempla lesiones, sanciones, clima ni decisiones arbitrales puntuales.
       </p>
+
+      <BotonGuardarPronostico
+        sesion={sesion}
+        onPedirLogin={onPedirLogin}
+        tema={tema}
+        acento={acento}
+        datos={{
+          equipo_local: equipoLocal.team.name,
+          equipo_visitante: equipoVisitante.team.name,
+          goles_esperados: lambdaGolesTotal !== null ? Number(lambdaGolesTotal.toFixed(2)) : null,
+          prob_over25: lambdaGolesTotal !== null ? Math.round(probabilidadOver(lambdaGolesTotal, 2.5) * 100) : null,
+          prob_btts: probBTTS !== null ? Math.round(probBTTS * 100) : null,
+          pick_1x2: prob1X2
+            ? (prob1X2.pLocal >= prob1X2.pEmpate && prob1X2.pLocal >= prob1X2.pVisitante
+                ? equipoLocal.team.name
+                : prob1X2.pEmpate >= prob1X2.pVisitante
+                ? "Empate"
+                : equipoVisitante.team.name)
+            : null,
+        }}
+      />
     </div>
+  );
+}
+
+function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos }) {
+  const [guardado, setGuardado] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  async function guardar() {
+    if (!sesion) {
+      onPedirLogin();
+      return;
+    }
+    setGuardando(true);
+    const { error } = await supabase.from("predicciones").insert({
+      user_id: sesion.user.id,
+      equipo_local: datos.equipo_local,
+      equipo_visitante: datos.equipo_visitante,
+      goles_esperados: datos.goles_esperados,
+      prob_over25: datos.prob_over25,
+      prob_btts: datos.prob_btts,
+      pick_1x2: datos.pick_1x2,
+    });
+    if (!error) setGuardado(true);
+    setGuardando(false);
+  }
+
+  return (
+    <button
+      onClick={guardar}
+      disabled={guardando || guardado}
+      style={{
+        width: "100%", marginTop: 16, padding: 12, fontSize: 13, fontWeight: "bold",
+        background: guardado ? "#2e9e4f" : acento, color: "#fff", border: "none",
+        borderRadius: 6, cursor: guardado ? "default" : "pointer",
+      }}
+    >
+      {guardado ? "✅ Pronóstico guardado en tu historial" : guardando ? "Guardando..." : "💾 Guardar este pronóstico en mi historial"}
+    </button>
   );
 }
 
@@ -1331,13 +1411,14 @@ function armarContextoParaIA({ equipoLocal, equipoVisitante, statsGoLocal, stats
   return contexto;
 }
 
-function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga, tema, acento, onCerrar }) {
+function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga, tema, acento, onCerrar, contextoOverride, tituloOverride, sugerenciasOverride }) {
   const [pregunta, setPregunta] = useState("");
   const [mensajes, setMensajes] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
-  if (!equipoLocal?.team || !equipoVisitante?.team) return null;
+  const usaModoGenerico = !!contextoOverride;
+  if (!usaModoGenerico && !(equipoLocal?.team && equipoVisitante?.team)) return null;
 
   async function enviarPregunta(e) {
     e.preventDefault();
@@ -1349,7 +1430,9 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
     setError("");
     setCargando(true);
 
-    const contexto = armarContextoParaIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga });
+    const contexto = usaModoGenerico
+      ? contextoOverride
+      : armarContextoParaIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, h2h, esPartidoLiga });
 
     try {
       const res = await fetch("/api/analisis-ia", {
@@ -1372,7 +1455,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h3 style={{ margin: 0, fontSize: 13 }}>💬 IA sobre este partido</h3>
+        <h3 style={{ margin: 0, fontSize: 13 }}>💬 {tituloOverride || "IA sobre este partido"}</h3>
         {onCerrar && (
           <button onClick={onCerrar} style={{ background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}>
             ✕
@@ -1383,7 +1466,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
       <div style={{ maxHeight: 350, overflowY: "auto", marginBottom: 14, marginTop: 10 }}>
         {mensajes.length === 0 && (
           <p style={{ color: tema.textoSuave, fontSize: 13 }}>
-            Ej: "¿Qué opinas de este partido?", "¿Ves valor en el over de goles?", "¿Qué equipo ves más sólido?"
+            {sugerenciasOverride || 'Ej: "¿Qué opinas de este partido?", "¿Ves valor en el over de goles?", "¿Qué equipo ves más sólido?"'}
           </p>
         )}
         {mensajes.map((m, i) => (
@@ -1634,11 +1717,27 @@ function SeccionEspejo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   );
 }
 
+// Estadios cubiertos conocidos (lista manual — el clima no los afecta)
+const ESTADIOS_CUBIERTOS = [
+  "johan cruyff arena", "amsterdam arena", "mercedes-benz stadium",
+  "u.s. bank stadium", "allegiant stadium", "at&t stadium",
+  "state farm stadium", "sapporo dome", "singapore national stadium",
+  "docomo stadium", "friends arena", "wanda metropolitano",
+  "tottenham hotspur stadium", "principality stadium", "juegos olimpicos stadium",
+];
+
+function esEstadioCubierto(nombreEstadio) {
+  if (!nombreEstadio) return false;
+  const nombre = nombreEstadio.toLowerCase();
+  return ESTADIOS_CUBIERTOS.some((e) => nombre.includes(e));
+}
+
 function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, estimarClima, setEstimarClima, tema, acentoMarca }) {
   if (!partidoCalendario) return null;
 
   const arbitro = partidoCalendario.fixture?.referee;
   const venue = partidoCalendario.fixture?.venue;
+  const cubierto = esEstadioCubierto(venue?.name);
 
   if (!arbitro && !venue && !climaData && !cargandoClima) return null;
 
@@ -1647,10 +1746,14 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
       <h4 style={{ margin: "0 0 8px", fontSize: 11, color: acentoMarca }}>📋 Datos generales del encuentro</h4>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-        {venue?.name && <div style={{ minWidth: 0, wordBreak: "break-word" }}>🏟️ {venue.name}{venue.city ? `, ${venue.city}` : ""}</div>}
+        {venue?.name && (
+          <div style={{ minWidth: 0, wordBreak: "break-word" }}>
+            🏟️ {venue.name}{venue.city ? `, ${venue.city}` : ""}{cubierto && " (cubierto)"}
+          </div>
+        )}
         <div style={{ minWidth: 0, wordBreak: "break-word" }}>🧑‍⚖️ Árbitro: {arbitro || "Sin datos"}</div>
         {cargandoClima && <div style={{ color: tema.textoSuave }}>Cargando clima...</div>}
-        {climaData && (
+        {climaData && !cubierto && (
           <>
             <div style={{ minWidth: 0 }}>🌡️ {climaData.temperaturaMin}° – {climaData.temperaturaMax}°C</div>
             <div style={{ minWidth: 0 }}>🌧️ {climaData.precipitacionMm} mm lluvia</div>
@@ -1660,9 +1763,23 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
       </div>
 
       {climaData && (
-        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, cursor: "pointer", fontSize: 12 }}>
-          <input type="checkbox" checked={estimarClima} onChange={(e) => setEstimarClima(e.target.checked)} style={{ accentColor: acentoMarca }} />
-          Incluir estimación de impacto del clima en el semáforo (experimental)
+        <label
+          style={{
+            display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 12,
+            cursor: cubierto ? "not-allowed" : "pointer", opacity: cubierto ? 0.5 : 1,
+          }}
+          title={cubierto ? "Opción no disponible: estadio cerrado" : ""}
+        >
+          <input
+            type="checkbox"
+            checked={cubierto ? false : estimarClima}
+            disabled={cubierto}
+            onChange={(e) => setEstimarClima(e.target.checked)}
+            style={{ accentColor: acentoMarca }}
+          />
+          {cubierto
+            ? "Opción no disponible: estadio cerrado"
+            : "Incluir estimación de impacto del clima en el semáforo (experimental)"}
         </label>
       )}
     </div>
@@ -1995,6 +2112,92 @@ function TablaProximosEncuentros({ partidos, tema }) {
   );
 }
 
+function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
+  const [predicciones, setPredicciones] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    if (!sesion) return;
+    supabase
+      .from("predicciones")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setPredicciones(data || []);
+        setCargando(false);
+      });
+  }, [sesion]);
+
+  async function marcarResultado(id, resultado) {
+    await supabase.from("predicciones").update({ resultado }).eq("id", id);
+    setPredicciones((prev) => prev.map((p) => (p.id === id ? { ...p, resultado } : p)));
+  }
+
+  if (!sesion) {
+    return (
+      <div style={{ textAlign: "center", padding: 40 }}>
+        <p style={{ color: tema.textoSuave, marginBottom: 16 }}>Inicia sesión para ver tu historial de aciertos.</p>
+        <button onClick={onPedirLogin} style={{ padding: "10px 20px", fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+          Iniciar sesión
+        </button>
+      </div>
+    );
+  }
+
+  const resueltas = predicciones.filter((p) => p.resultado !== "pendiente");
+  const aciertos = resueltas.filter((p) => p.resultado === "acierto").length;
+  const porcentaje = resueltas.length > 0 ? Math.round((aciertos / resueltas.length) * 100) : null;
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 12px" }}>
+      <h3 style={{ fontSize: 18, marginBottom: 6, textAlign: "center" }}>📈 Historial de aciertos</h3>
+      {porcentaje !== null && (
+        <p style={{ textAlign: "center", color: acentoMarca, fontWeight: "bold", marginBottom: 20 }}>
+          {aciertos}/{resueltas.length} aciertos verificados — {porcentaje}%
+        </p>
+      )}
+
+      {cargando ? (
+        <p style={{ color: tema.textoSuave, textAlign: "center" }}>Cargando...</p>
+      ) : predicciones.length === 0 ? (
+        <p style={{ color: tema.textoSuave, fontSize: 13, textAlign: "center" }}>
+          Aún no has guardado ningún pronóstico. Ve a "Estudio", arma un análisis, y toca "Guardar este pronóstico".
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {predicciones.map((p) => (
+            <div key={p.id} style={{ background: tema.panel, borderRadius: 8, padding: 14, borderTop: `3px solid ${acentoMarca}` }}>
+              <div style={{ fontWeight: "bold", marginBottom: 6 }}>{p.equipo_local} vs {p.equipo_visitante}</div>
+              <div style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 8, lineHeight: 1.6 }}>
+                Ganador estimado: <strong>{p.pick_1x2 || "—"}</strong> · Goles esperados: <strong>{p.goles_esperados ?? "—"}</strong> · Over 2.5: <strong>{p.prob_over25 ?? "—"}%</strong> · BTTS: <strong>{p.prob_btts ?? "—"}%</strong>
+                <br />
+                Guardado: {new Date(p.created_at).toLocaleDateString("es-ES")}
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: tema.textoSuave }}>Resultado real:</span>
+                {["pendiente", "acierto", "fallo"].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => marcarResultado(p.id, r)}
+                    style={{
+                      fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
+                      border: `1px solid ${p.resultado === r ? acentoMarca : tema.borde}`,
+                      background: p.resultado === r ? acentoMarca : "transparent",
+                      color: p.resultado === r ? "#fff" : tema.texto,
+                    }}
+                  >
+                    {r === "pendiente" ? "Pendiente" : r === "acierto" ? "✓ Acertó" : "✗ Falló"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
   const [fixtures, setFixtures] = useState([]);
   const [proximos, setProximos] = useState([]);
@@ -2111,6 +2314,7 @@ export default function Home() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [idiomaAbierto, setIdiomaAbierto] = useState(false);
   const [idioma, setIdioma] = useState("es");
+  const t = (clave) => TEXTOS[idioma]?.[clave] || TEXTOS.es[clave] || clave;
   const [notaProximamente, setNotaProximamente] = useState(false);
   const [tarjetaActivaMovil, setTarjetaActivaMovil] = useState("local");
   const [toqueInicioX, setToqueInicioX] = useState(null);
@@ -2161,15 +2365,53 @@ export default function Home() {
     if (!sesion) {
       setMenuAbierto(false);
       abrirLogin();
-    } else if (itemMenu === "Favoritos") {
+    } else if (itemMenu === "favoritos") {
       setMenuAbierto(false);
       setVistaActual("favoritos");
+    } else if (itemMenu === "historial") {
+      setMenuAbierto(false);
+      setVistaActual("historial");
     } else {
       mostrarProximamente();
     }
   }
 
   const [favoritosPanelAbierto, setFavoritosPanelAbierto] = useState(false);
+  const [contextoFavoritosIA, setContextoFavoritosIA] = useState("");
+
+  useEffect(() => {
+    if (vistaActual !== "favoritos" || !sesion) return;
+    let cancelado = false;
+
+    supabase
+      .from("favoritos")
+      .select("*")
+      .eq("user_id", sesion.user.id)
+      .order("created_at", { ascending: false })
+      .limit(8)
+      .then(async ({ data }) => {
+        if (!data || data.length === 0 || cancelado) return;
+        const partes = await Promise.all(
+          data.map(async (f) => {
+            try {
+              const res = await fetch(`/api/fixtures?teamId=${f.team_id}`);
+              const fixtures = await res.json();
+              const s = calcularEstadisticasGoles(Array.isArray(fixtures) ? fixtures : [], f.team_id);
+              if (!s) return `${f.team_name}: sin datos suficientes.`;
+              return `${f.team_name}: Récord ${s.victorias}V-${s.empates}E-${s.derrotas}D, prom. goles a favor ${s.promedioGolesFavor}, en contra ${s.promedioGolesContra}, % Over 2.5: ${s.over25Pct}%, % BTTS: ${s.bttsPct}%`;
+            } catch {
+              return `${f.team_name}: no se pudo cargar.`;
+            }
+          })
+        );
+        if (!cancelado) {
+          setContextoFavoritosIA(`Equipos favoritos del usuario (últimos partidos de cada uno):\n${partes.join("\n")}`);
+        }
+      });
+
+    return () => { cancelado = true; };
+  }, [vistaActual, sesion]);
+
   const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
   const [vistaAnterior, setVistaAnterior] = useState("inicio");
   const [equipoPerfil, setEquipoPerfil] = useState(null);
@@ -2551,7 +2793,7 @@ export default function Home() {
                     color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6, cursor: "pointer",
                   }}
                 >
-                  Cerrar sesión
+                  {t("cerrarSesion")}
                 </button>
               </>
             ) : (
@@ -2563,7 +2805,7 @@ export default function Home() {
                     color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6, cursor: "pointer",
                   }}
                 >
-                  Registrarse
+                  {t("registrarse")}
                 </button>
                 <button
                   onClick={abrirLogin}
@@ -2572,7 +2814,7 @@ export default function Home() {
                     color: modoOscuro ? "#1B1200" : "#fff", border: "none", borderRadius: 6, cursor: "pointer",
                   }}
                 >
-                  Iniciar sesión
+                  {t("iniciarSesion")}
                 </button>
               </>
             )}
@@ -2585,13 +2827,19 @@ export default function Home() {
                   boxShadow: "0 6px 16px rgba(0,0,0,0.25)", overflow: "hidden",
                 }}
               >
-                {["Inicio", "Mis estudios", "Favoritos", "Historial de aciertos", "Ajustes"].map((item) => (
+                {[
+                  { clave: "inicio", etiqueta: t("menuInicio") },
+                  { clave: "misEstudios", etiqueta: t("menuMisEstudios") },
+                  { clave: "favoritos", etiqueta: t("menuFavoritos") },
+                  { clave: "historial", etiqueta: t("menuHistorial") },
+                  { clave: "ajustes", etiqueta: t("menuAjustes") },
+                ].map((item) => (
                   <div
-                    key={item}
-                    onClick={item === "Inicio" ? () => setMenuAbierto(false) : () => accederOPedirCuenta(item)}
+                    key={item.clave}
+                    onClick={item.clave === "inicio" ? () => { setMenuAbierto(false); setVistaActual("inicio"); } : () => accederOPedirCuenta(item.clave)}
                     style={{ padding: "10px 14px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
                   >
-                    {item}
+                    {item.etiqueta}
                   </div>
                 ))}
               </div>
@@ -2631,7 +2879,7 @@ export default function Home() {
                 }}
               >
                 <div onClick={() => { setIdioma("es"); setIdiomaAbierto(false); }} style={{ padding: "8px 14px", fontSize: 18, cursor: "pointer" }}>🇪🇸</div>
-                <div onClick={mostrarProximamente} style={{ padding: "8px 14px", fontSize: 18, cursor: "pointer" }}>🇺🇸</div>
+                <div onClick={() => { setIdioma("en"); setIdiomaAbierto(false); }} style={{ padding: "8px 14px", fontSize: 18, cursor: "pointer" }}>🇺🇸</div>
               </div>
             )}
 
@@ -2662,9 +2910,9 @@ export default function Home() {
 
         <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
           {[
-            { id: "inicio", etiqueta: "🏠 Inicio" },
-            { id: "estudio", etiqueta: "📊 Estudio" },
-            { id: "favoritos", etiqueta: "⭐ Favoritos" },
+            { id: "inicio", etiqueta: t("inicio") },
+            { id: "estudio", etiqueta: t("estudio") },
+            { id: "favoritos", etiqueta: t("favoritos") },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -2699,7 +2947,7 @@ export default function Home() {
               type="text"
               value={busquedaInicio}
               onChange={(e) => setBusquedaInicio(e.target.value)}
-              placeholder="Busca un equipo (ej: Barcelona)"
+              placeholder={t("buscarEquipoPlaceholder")}
               style={{ flex: 1, padding: 12, fontSize: 15, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6 }}
             />
             <button
@@ -2759,6 +3007,12 @@ export default function Home() {
         </div>
       )}
 
+      {vistaActual === "historial" && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} />
+        </div>
+      )}
+
       {vistaActual === "estudio" && (
       <div className="jmcs-grid" style={{ maxWidth: 2400, margin: "0 auto" }}>
         <div className="jmcs-calendario">
@@ -2808,7 +3062,7 @@ export default function Home() {
           >
             <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "local" ? "true" : "false"} style={{ flex: 1, minWidth: 320 }}>
               <BuscadorEquipo
-                etiqueta="Local"
+                etiqueta={t("local")}
                 tema={tema}
                 statsMap={statsMap}
                 equipoForzado={equipoForzadoLocal}
@@ -2826,7 +3080,7 @@ export default function Home() {
             </div>
             <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "visitante" ? "true" : "false"} style={{ flex: 1, minWidth: 320 }}>
               <BuscadorEquipo
-                etiqueta="Visitante"
+                etiqueta={t("visitante")}
                 tema={tema}
                 statsMap={statsMap}
                 equipoForzado={equipoForzadoVisitante}
@@ -2948,6 +3202,8 @@ export default function Home() {
             acento={acento}
             climaAjuste={climaAjuste}
             coberturaPuntuales={coberturaPuntuales}
+            sesion={sesion}
+            onPedirLogin={abrirLogin}
           />
         </div>
 
@@ -2973,6 +3229,46 @@ export default function Home() {
             />
           </div>
 
+          <button className="jmcs-chat-burbuja" onClick={() => setChatAbierto(!chatAbierto)} aria-label="Chat IA">
+            <img src="/chat-icon.png" alt="Chat" />
+          </button>
+        </>
+      )}
+
+      {vistaActual === "inicio" && equipoInicio?.team && (
+        <>
+          <div className="jmcs-chat-panel" style={{ background: tema.panel, display: chatAbierto ? "block" : "none" }}>
+            <ChatIA
+              tema={tema}
+              acento={acentoMarca}
+              onCerrar={() => setChatAbierto(false)}
+              tituloOverride={`IA sobre ${equipoInicio.team.name}`}
+              sugerenciasOverride={`Ej: "¿Cómo ha venido rindiendo ${equipoInicio.team.name}?", "¿Es buen momento para apostarle?"`}
+              contextoOverride={(() => {
+                const s = calcularEstadisticasGoles(fixturesInicio, equipoInicio.team.id);
+                if (!s) return `Equipo: ${equipoInicio.team.name}. Sin datos suficientes todavía.`;
+                return `Equipo: ${equipoInicio.team.name}\nÚltimos ${s.total} partidos: Récord ${s.victorias}V-${s.empates}E-${s.derrotas}D, promedio goles a favor ${s.promedioGolesFavor}, en contra ${s.promedioGolesContra}, % Over 2.5: ${s.over25Pct}%, % BTTS: ${s.bttsPct}%`;
+              })()}
+            />
+          </div>
+          <button className="jmcs-chat-burbuja" onClick={() => setChatAbierto(!chatAbierto)} aria-label="Chat IA">
+            <img src="/chat-icon.png" alt="Chat" />
+          </button>
+        </>
+      )}
+
+      {vistaActual === "favoritos" && sesion && (
+        <>
+          <div className="jmcs-chat-panel" style={{ background: tema.panel, display: chatAbierto ? "block" : "none" }}>
+            <ChatIA
+              tema={tema}
+              acento={acentoMarca}
+              onCerrar={() => setChatAbierto(false)}
+              tituloOverride="IA sobre tus favoritos"
+              sugerenciasOverride='Ej: "¿Cuál de mis favoritos rinde mejor ahora?", "¿A cuál le apostarías esta semana?"'
+              contextoOverride={contextoFavoritosIA || "El usuario todavía no tiene equipos favoritos guardados, o sus estadísticas se están cargando."}
+            />
+          </div>
           <button className="jmcs-chat-burbuja" onClick={() => setChatAbierto(!chatAbierto)} aria-label="Chat IA">
             <img src="/chat-icon.png" alt="Chat" />
           </button>
