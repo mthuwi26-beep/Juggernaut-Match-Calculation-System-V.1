@@ -1939,7 +1939,7 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
 
 function TimelineClima({ titulo, valorOficial, activo, valorUsuario, onToggleActivo, onCambiarValor, tema, unidadTexto }) {
   const ANCHO = 280;
-  const ALTO = 60;
+  const ALTO = 72;
   const svgRef = useRef(null);
   const [arrastrando, setArrastrando] = useState(false);
 
@@ -1980,10 +1980,10 @@ function TimelineClima({ titulo, valorOficial, activo, valorUsuario, onToggleAct
   return (
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 11, fontWeight: "bold", color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        <span style={{ fontSize: 11, fontWeight: "bold", color: "#9fc4ac", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           {titulo}
         </span>
-        <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", color: tema.textoSuave }}>
+        <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", color: "#9fc4ac" }}>
           <input type="checkbox" checked={activo} onChange={(e) => onToggleActivo(e.target.checked)} style={{ accentColor: COLOR_AJUSTE_USUARIO }} />
           Mi propio ajuste
         </label>
@@ -2008,17 +2008,17 @@ function TimelineClima({ titulo, valorOficial, activo, valorUsuario, onToggleAct
           <line x1="0" y1={ALTO / 2} x2={ANCHO} y2={ALTO / 2} stroke="#333" strokeDasharray="2,3" />
 
           {/* Onda del dato oficial de JMCS */}
-          <path d={pathHastaX(ondaOficial, xOficial)} fill="none" stroke={colorOficial} strokeWidth="1.5" opacity={activo ? 0.5 : 0.9} />
-          <circle cx={xOficial} cy={waveY(ondaOficial, xOficial)} r="5" fill={colorOficial} />
+          <path d={pathHastaX(ondaOficial, xOficial)} fill="none" stroke={colorOficial} strokeWidth="1.5" opacity={activo ? 0.5 : 0.75} />
+          <circle cx={xOficial} cy={waveY(ondaOficial, xOficial)} r="5" fill={colorOficial} opacity={activo ? 1 : 0.78} />
 
           {/* Onda del ajuste del usuario (solo si está activo) */}
           {activo && (
             <>
-              <path d={pathHastaX(ondaUsuario, xUsuario)} fill="none" stroke={colorUsuario} strokeWidth="1.5" />
+              <path d={pathHastaX(ondaUsuario, xUsuario)} fill="none" stroke={colorUsuario} strokeWidth="1.5" opacity="0.8" />
               {arrastrando ? (
-                <rect x={xUsuario - 1.5} y="2" width="3" height={ALTO - 4} fill={colorUsuario} />
+                <rect x={xUsuario - 1.5} y="2" width="3" height={ALTO - 4} fill={colorUsuario} opacity="0.8" />
               ) : (
-                <circle cx={xUsuario} cy={waveY(ondaUsuario, xUsuario)} r="5" fill={colorUsuario} />
+                <circle cx={xUsuario} cy={waveY(ondaUsuario, xUsuario)} r="5" fill={colorUsuario} opacity="0.78" />
               )}
             </>
           )}
@@ -2030,7 +2030,7 @@ function TimelineClima({ titulo, valorOficial, activo, valorUsuario, onToggleAct
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 6, color: tema.textoSuave }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 6, color: "#9fc4ac" }}>
         <span>Oficial (JMCS): <strong style={{ color: colorOficial }}>{valorOficial.toFixed(1)}</strong>{unidadTexto ? ` · ${unidadTexto}` : ""}</span>
         {activo && <span>Mi ajuste: <strong style={{ color: colorUsuario }}>{valorUsuario.toFixed(1)}</strong></span>}
       </div>
@@ -2067,15 +2067,15 @@ function ModalEstudioClimatico({
   equipoLocal, equipoVisitante, climaOficial, ajustesClima, onCambiarAjuste,
   modoGlobalClima, onPedirActivarGlobal, onDesactivarGlobal,
   confirmarGlobalAbierto, onConfirmarGlobal, onCancelarConfirmarGlobal,
-  statsGoLocal, statsGoVisitante, factorLocal, factorVisitante,
+  lambdaGolesLocalReal, lambdaGolesVisitanteReal, factorLocal, factorVisitante,
   onRestaurar, onGuardar, guardando, guardado,
   tema, acentoMarca, colorMarcaLocal, colorMarcaVisitante, onCerrar,
 }) {
   if (!ajustesClima || !climaOficial) return null;
 
-  // Estimación ilustrativa simple (oficial vs personal) solo para esta ventana de comparación.
-  const baseLocal = statsGoLocal ? parseFloat(statsGoLocal.promedioGolesFavor) : 1.3;
-  const baseVisitante = statsGoVisitante ? parseFloat(statsGoVisitante.promedioGolesFavor) : 1.1;
+  // Mismo cálculo exacto que usa el semáforo real de Estudio — sin aproximaciones.
+  const baseLocal = lambdaGolesLocalReal ?? 1.3;
+  const baseVisitante = lambdaGolesVisitanteReal ?? 1.1;
   const totalOficial = baseLocal + baseVisitante;
   const totalPersonal = baseLocal * factorLocal + baseVisitante * factorVisitante;
   const over25Oficial = Math.round(probabilidadOver(totalOficial, 2.5) * 100);
@@ -2085,12 +2085,23 @@ function ModalEstudioClimatico({
 
   return (
     <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 12 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: tema.panel, borderRadius: 12, padding: 20, width: 720, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
-        <button onClick={onCerrar} style={{ position: "absolute", top: 12, right: 14, background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}>✕</button>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "rgba(14, 42, 27, 0.93)", borderRadius: 12, padding: 20, width: "min(92vw, 900px)", maxHeight: "90vh", overflowY: "auto", position: "relative", color: "#EAF3EC" }}>
+        <div style={{ position: "sticky", top: 0, display: "flex", justifyContent: "flex-end", zIndex: 10, marginBottom: -8 }}>
+          <button
+            onClick={onCerrar}
+            style={{
+              background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "50%",
+              width: 30, height: 30, fontSize: 16, cursor: "pointer", color: "#fff",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+            }}
+          >
+            ✕
+          </button>
+        </div>
 
         <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>🌦️ Estudio Climático Personalizado</h3>
-        <p style={{ margin: "0 0 4px", fontSize: 12, color: tema.textoSuave }}>{equipoLocal.team.name} vs {equipoVisitante.team.name}</p>
-        <p style={{ margin: "0 0 16px", fontSize: 11, color: tema.textoSuave, fontStyle: "italic" }}>
+        <p style={{ margin: "0 0 4px", fontSize: 12, color: "#b9d6c3" }}>{equipoLocal.team.name} vs {equipoVisitante.team.name}</p>
+        <p style={{ margin: "0 0 16px", fontSize: 11, color: "#b9d6c3", fontStyle: "italic" }}>
           Esto es tu estudio personal — no cambia el pronóstico oficial de JMCS, solo lo que ves aquí y en tu Estudio mientras esté activo.
         </p>
 
@@ -2110,7 +2121,7 @@ function ModalEstudioClimatico({
         </div>
 
         <div style={{ marginTop: 20, padding: 14, background: "#111", borderRadius: 8 }}>
-          <h4 style={{ margin: "0 0 10px", fontSize: 12, color: tema.textoSuave, textTransform: "uppercase" }}>Comparación (ilustrativa)</h4>
+          <h4 style={{ margin: "0 0 10px", fontSize: 12, color: "#b9d6c3", textTransform: "uppercase" }}>Comparación (ilustrativa)</h4>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13 }}>
             <div>Over 2.5 — Oficial: <strong style={{ color: VERDE_APAGADO }}>{over25Oficial}%</strong> · Mi estudio: <strong style={{ color: COLOR_AJUSTE_USUARIO }}>{over25Personal}%</strong></div>
             <div>BTTS — Oficial: <strong style={{ color: VERDE_APAGADO }}>{bttsOficial}%</strong> · Mi estudio: <strong style={{ color: COLOR_AJUSTE_USUARIO }}>{bttsPersonal}%</strong></div>
@@ -2118,13 +2129,16 @@ function ModalEstudioClimatico({
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button onClick={onRestaurar} style={{ flex: 1, padding: 10, fontSize: 13, background: "transparent", border: `1px solid ${tema.borde}`, color: tema.texto, borderRadius: 6, cursor: "pointer" }}>
-            ↺ Restaurar
+          <button onClick={onRestaurar} style={{ flex: 1, padding: 10, fontSize: 13, background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "#fff", borderRadius: 6, cursor: "pointer" }}>
+            ↺ Restaurar a lo oficial
           </button>
           <button onClick={onGuardar} disabled={guardando || guardado} style={{ flex: 1, padding: 10, fontSize: 13, fontWeight: "bold", background: guardado ? "#2e9e4f" : acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
-            {guardado ? "✅ Guardado" : guardando ? "Guardando..." : "💾 Guardar mi estudio"}
+            {guardado ? "✅ Guardado" : guardando ? "Guardando..." : "💾 Guardar en mi Historial"}
           </button>
         </div>
+        <p style={{ fontSize: 10, color: "#9fc4ac", marginTop: 6, textAlign: "center" }}>
+          Tu ajuste ya está activo en Estudio sin necesidad de guardar — esto solo envía una copia a tu Historial de aciertos, para comparar después contra el resultado real.
+        </p>
 
         {confirmarGlobalAbierto && (
           <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 20 }}>
@@ -3071,6 +3085,31 @@ export default function Home() {
 
   const acentoMarca = modoOscuro ? DORADO : "#1F7A46";
 
+  // Mismo cálculo exacto que usa el semáforo real, para que la ventana del
+  // Estudio Climático muestre números consistentes con lo que ves en Estudio.
+  let lambdaGolesLocalReal = null;
+  let lambdaGolesVisitanteReal = null;
+  if (equipoLocal?.team && equipoVisitante?.team) {
+    const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
+    const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap);
+    const partidosH2H = h2h?.partidos || [];
+    const h2hGolesLocal = calcularGolesNumerico(partidosH2H, equipoLocal.team.id);
+    const h2hGolesVisitante = calcularGolesNumerico(partidosH2H, equipoVisitante.team.id);
+    const motorGolesLocal = {
+      actual: fuentesEqLocal.local.goles, contraria: fuentesEqLocal.visitante.goles,
+      liga: fuentesEqLocal.liga.goles, noLiga: fuentesEqLocal.noLiga.goles,
+      temporada: fuentesEqLocal.temporada.goles, forma: fuentesEqLocal.forma.goles, h2h: h2hGolesLocal,
+    };
+    const motorGolesVisitante = {
+      actual: fuentesEqVisitante.visitante.goles, contraria: fuentesEqVisitante.local.goles,
+      liga: fuentesEqVisitante.liga.goles, noLiga: fuentesEqVisitante.noLiga.goles,
+      temporada: fuentesEqVisitante.temporada.goles, forma: fuentesEqVisitante.forma.goles, h2h: h2hGolesVisitante,
+    };
+    lambdaGolesLocalReal = calcularValorEsperado(motorGolesLocal, esPartidoLiga);
+    lambdaGolesVisitanteReal = calcularValorEsperado(motorGolesVisitante, esPartidoLiga);
+  }
+
+
   return (
     <div style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}>
       <style jsx global>{`
@@ -3224,6 +3263,12 @@ export default function Home() {
         @media (min-width: 768px) {
           .jmcs-partidos-grid {
             grid-template-columns: 1fr 1fr;
+          }
+        }
+
+        @media (min-width: 1200px) {
+          .jmcs-partidos-grid {
+            grid-template-columns: 1fr 1fr 1fr;
           }
         }
 
@@ -3430,8 +3475,8 @@ export default function Home() {
       </div>
 
       {vistaActual === "inicio" && (
-        <div style={{ maxWidth: 800, margin: "20px auto", padding: "0 12px" }}>
-          <form onSubmit={buscarEquipoInicio} style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <div style={{ maxWidth: 1400, margin: "20px auto", padding: "0 20px" }}>
+          <form onSubmit={buscarEquipoInicio} style={{ display: "flex", gap: 8, marginBottom: 20, maxWidth: 800 }}>
             <input
               type="text"
               value={busquedaInicio}
@@ -3553,7 +3598,7 @@ export default function Home() {
               cargandoClima={cargandoClima}
               tema={tema}
               acentoMarca={acentoMarca}
-              onAbrirEstudioClimatico={() => setEstudioClimaticoAbierto(true)}
+              onAbrirEstudioClimatico={() => (sesion ? setEstudioClimaticoAbierto(true) : abrirRegistro())}
             />
           </div>
 
@@ -3829,8 +3874,8 @@ export default function Home() {
           confirmarGlobalAbierto={confirmarGlobalAbierto}
           onConfirmarGlobal={activarModoGlobal}
           onCancelarConfirmarGlobal={() => setConfirmarGlobalAbierto(false)}
-          statsGoLocal={statsGoLocal}
-          statsGoVisitante={statsGoVisitante}
+          lambdaGolesLocalReal={lambdaGolesLocalReal}
+          lambdaGolesVisitanteReal={lambdaGolesVisitanteReal}
           factorLocal={climaAjuste.factorLocal}
           factorVisitante={climaAjuste.factorVisitante}
           onRestaurar={() => {
