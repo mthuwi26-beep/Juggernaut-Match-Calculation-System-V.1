@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 const TEMAS = {
@@ -590,7 +590,7 @@ function TarjetaFavorito({ favorito, tema, acento, onQuitar }) {
         padding: 14, textAlign: "center", cursor: "pointer", width: 170,
       }}
     >
-      <img src={corregirEscudo(favorito.team_logo)} alt={favorito.team_name} style={{ width: 70, height: 70, objectFit: "contain", margin: "0 auto 8px" }} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
+      <img src={corregirEscudo(favorito.team_logo)} alt={favorito.team_name} style={{ width: 70, height: 70, objectFit: "contain", margin: "0 auto 8px" }} onError={manejarErrorEscudo} />
       <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 4 }}>{favorito.team_name}</div>
       <div style={{ fontSize: 10, color: tema.textoSuave }}>{favorito.team_country || ""}</div>
 
@@ -662,7 +662,7 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
                 padding: 16, textAlign: "center", cursor: "pointer",
               }}
             >
-              <img src={corregirEscudo(f.team_logo)} alt={f.team_name} width={60} height={60} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
+              <img src={corregirEscudo(f.team_logo)} alt={f.team_name} width={60} height={60} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
               <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4 }}>{f.team_name}</div>
               {f.team_country && <div style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 10 }}>{f.team_country}</div>}
               <button
@@ -846,7 +846,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: 14,
               }}
             >
-              <img src={corregirEscudo(t.team.logo)} alt={t.team.name} width={22} height={22} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
+              <img src={corregirEscudo(t.team.logo)} alt={t.team.name} width={22} height={22} onError={manejarErrorEscudo} />
               <span>{t.team.name} — {t.team.country}</span>
             </div>
           ))}
@@ -861,7 +861,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
               style={{ display: "flex", alignItems: "center", gap: 8, cursor: onAbrirPerfil ? "pointer" : "default" }}
               title="Ver perfil completo del equipo"
             >
-              <img src={corregirEscudo(selectedTeam.team.logo)} alt={selectedTeam.team.name} width={26} height={26} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
+              <img src={corregirEscudo(selectedTeam.team.logo)} alt={selectedTeam.team.name} width={26} height={26} onError={manejarErrorEscudo} />
               <strong style={{ color: colorMarca || tema.texto }}>{selectedTeam.team.name}</strong>
             </div>
             <BotonFavorito equipo={selectedTeam} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
@@ -1139,7 +1139,10 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   const lambdaGolesLocal = calcularValorEsperado(motorLocal.goles, esPartidoLiga);
   const lambdaGolesVisitante = calcularValorEsperado(motorVisitante.goles, esPartidoLiga);
   const lambdaGolesTotal = lambdaGolesLocal !== null && lambdaGolesVisitante !== null ? lambdaGolesLocal + lambdaGolesVisitante : null;
-  const lambdaGolesTotalAjustado = climaAjuste?.activo && lambdaGolesTotal !== null ? lambdaGolesTotal * climaAjuste.factor : null;
+  const lambdaGolesTotalAjustado =
+    climaAjuste?.activo && lambdaGolesLocal !== null && lambdaGolesVisitante !== null
+      ? lambdaGolesLocal * climaAjuste.factorLocal + lambdaGolesVisitante * climaAjuste.factorVisitante
+      : null;
 
   const lambdaCornersLocal = calcularValorEsperado(motorLocal.corners, esPartidoLiga);
   const lambdaCornersVisitante = calcularValorEsperado(motorVisitante.corners, esPartidoLiga);
@@ -1384,7 +1387,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                 <img
                   src={corregirEscudo(p.teams.home.logo)} alt="" width={16} height={16}
-                  onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous"
+                  onError={manejarErrorEscudo}
                   onClick={(e) => { e.stopPropagation(); onAbrirPerfil && onAbrirPerfil({ id: p.teams.home.id, name: p.teams.home.name, logo: p.teams.home.logo, country: p.league.country }); }}
                   style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}
                 />
@@ -1398,7 +1401,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <img
                   src={corregirEscudo(p.teams.away.logo)} alt="" width={16} height={16}
-                  onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous"
+                  onError={manejarErrorEscudo}
                   onClick={(e) => { e.stopPropagation(); onAbrirPerfil && onAbrirPerfil({ id: p.teams.away.id, name: p.teams.away.name, logo: p.teams.away.logo, country: p.league.country }); }}
                   style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}
                 />
@@ -1556,7 +1559,7 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, s
         style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}
         title="Ver perfil completo del equipo"
       >
-        <img src={corregirEscudo(equipo.team.logo)} alt={equipo.team.name} style={{ width: "100%", maxWidth: 130, height: "auto", margin: "0 auto 10px" }} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
+        <img src={corregirEscudo(equipo.team.logo)} alt={equipo.team.name} style={{ width: "100%", maxWidth: 130, height: "auto", margin: "0 auto 10px" }} onError={manejarErrorEscudo} />
       </div>
       <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
         <span onClick={() => onAbrirPerfil && onAbrirPerfil(equipo.team)} style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}>
@@ -1831,7 +1834,57 @@ function MarcadorEnVivo({ fixtureId, nombreLocal, nombreVisitante, tema, acentoM
   );
 }
 
-function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, estimarClima, setEstimarClima, tema, acentoMarca }) {
+// ===== Estudio Climático Personalizado =====
+
+const VERDE_FOSFO = "#39ff14";
+const VERDE_APAGADO = "#2e6b3e";
+const COLOR_AJUSTE_USUARIO = "#ff8a3d";
+
+// Convierte los datos reales de clima (mm, km/h, °C, %) a una escala 0-10,
+// usando las fórmulas que acordamos. La de temperatura es una primera
+// propuesta (18°C = impacto mínimo, los extremos suben hacia 10) — ajustable.
+function normalizarClima(climaData) {
+  if (!climaData) return null;
+  const viento = Math.min(10, (climaData.vientoMaxKmh || 0) / 6);
+  const lluvia = Math.min(10, (climaData.precipitacionMm || 0) / 2);
+  const humedad = Math.min(10, (climaData.humedadPct || 0) / 10);
+  const tempProm = ((climaData.temperaturaMax || 18) + (climaData.temperaturaMin || 18)) / 2;
+  const temperatura = Math.min(10, Math.abs(tempProm - 18) / 1.7);
+  return { viento, lluvia, temperatura, humedad };
+}
+
+// Genera los puntos de una onda senoidal uniforme. phase=0 arranca en el valle,
+// phase=1 arranca en el pico — así las dos ondas de una misma línea se cruzan.
+function genWave(ancho, alto, phase, puntos = 60) {
+  const pts = [];
+  for (let i = 0; i <= puntos; i++) {
+    const x = (i / puntos) * ancho;
+    const angulo = (i / puntos) * Math.PI * 4 + (phase ? Math.PI : 0);
+    const y = alto / 2 + Math.sin(angulo) * (alto * 0.32);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+// Construye el "d" del SVG <path>, revelando solo el tramo hasta limitX
+function pathHastaX(puntos, limitX) {
+  const visibles = puntos.filter((p) => p[0] <= limitX);
+  if (visibles.length < 2) return "";
+  return visibles.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+}
+
+// Altura de la onda en una posición X exacta (interpolando entre los puntos más cercanos)
+function waveY(puntos, x) {
+  for (let i = 0; i < puntos.length - 1; i++) {
+    if (x >= puntos[i][0] && x <= puntos[i + 1][0]) {
+      const t = (x - puntos[i][0]) / (puntos[i + 1][0] - puntos[i][0] || 1);
+      return puntos[i][1] + (puntos[i + 1][1] - puntos[i][1]) * t;
+    }
+  }
+  return puntos[puntos.length - 1][1];
+}
+
+function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, tema, acentoMarca, cubierto: cubiertoProp, onAbrirEstudioClimatico }) {
   if (!partidoCalendario) return null;
 
   const arbitro = partidoCalendario.fixture?.referee;
@@ -1864,29 +1917,238 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
         )}
       </div>
 
-      {climaData && (
-        <label
+      {climaData && !cubierto && (
+        <button
+          onClick={onAbrirEstudioClimatico}
           style={{
-            display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 12,
-            cursor: cubierto ? "not-allowed" : "pointer", opacity: cubierto ? 0.5 : 1,
+            marginTop: 12, padding: "8px 14px", fontSize: 12, fontWeight: "bold",
+            background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer",
           }}
-          title={cubierto ? "Opción no disponible: estadio cerrado" : ""}
         >
-          <input
-            type="checkbox"
-            checked={cubierto ? false : estimarClima}
-            disabled={cubierto}
-            onChange={(e) => setEstimarClima(e.target.checked)}
-            style={{ accentColor: acentoMarca }}
-          />
-          {cubierto
-            ? "Opción no disponible: estadio cerrado"
-            : "Incluir estimación de impacto del clima en el semáforo (experimental)"}
-        </label>
+          🌦️ Estudio Climático Personalizado
+        </button>
+      )}
+      {climaData && cubierto && (
+        <p style={{ marginTop: 10, fontSize: 11, color: tema.textoSuave }}>
+          Opción no disponible: estadio cerrado.
+        </p>
       )}
     </div>
   );
 }
+
+function TimelineClima({ titulo, valorOficial, activo, valorUsuario, onToggleActivo, onCambiarValor, tema, unidadTexto }) {
+  const ANCHO = 280;
+  const ALTO = 60;
+  const svgRef = useRef(null);
+  const [arrastrando, setArrastrando] = useState(false);
+
+  const ondaOficial = genWave(ANCHO, ALTO, 0);
+  const ondaUsuario = genWave(ANCHO, ALTO, 1);
+
+  const xOficial = (valorOficial / 10) * ANCHO;
+  const xUsuario = (valorUsuario / 10) * ANCHO;
+
+  // Cuando el usuario NO activó su ajuste, JMCS brilla (fosforescente).
+  // Cuando SÍ lo activó, el usuario pasa a brillar y JMCS baja de intensidad.
+  const colorOficial = activo ? VERDE_APAGADO : VERDE_FOSFO;
+  const colorUsuario = VERDE_FOSFO;
+
+  function valorDesdeEvento(clientX) {
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(ANCHO, ((clientX - rect.left) / rect.width) * ANCHO));
+    return Math.round((x / ANCHO) * 10 * 10) / 10; // redondeado a 1 decimal
+  }
+
+  function iniciarArrastre(e) {
+    if (!activo) return;
+    setArrastrando(true);
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    onCambiarValor(valorDesdeEvento(clientX));
+  }
+
+  function moverArrastre(e) {
+    if (!arrastrando) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    onCambiarValor(valorDesdeEvento(clientX));
+  }
+
+  function soltarArrastre() {
+    setArrastrando(false);
+  }
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: "bold", color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          {titulo}
+        </span>
+        <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", color: tema.textoSuave }}>
+          <input type="checkbox" checked={activo} onChange={(e) => onToggleActivo(e.target.checked)} style={{ accentColor: COLOR_AJUSTE_USUARIO }} />
+          Mi propio ajuste
+        </label>
+      </div>
+
+      <div style={{ background: "#0a0a0a", borderRadius: 6, padding: "8px 10px" }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${ANCHO} ${ALTO}`}
+          width="100%"
+          height={ALTO}
+          style={{ display: "block", touchAction: "none", cursor: activo ? "pointer" : "default" }}
+          onMouseDown={iniciarArrastre}
+          onMouseMove={moverArrastre}
+          onMouseUp={soltarArrastre}
+          onMouseLeave={soltarArrastre}
+          onTouchStart={iniciarArrastre}
+          onTouchMove={moverArrastre}
+          onTouchEnd={soltarArrastre}
+        >
+          {/* Línea guía central punteada */}
+          <line x1="0" y1={ALTO / 2} x2={ANCHO} y2={ALTO / 2} stroke="#333" strokeDasharray="2,3" />
+
+          {/* Onda del dato oficial de JMCS */}
+          <path d={pathHastaX(ondaOficial, xOficial)} fill="none" stroke={colorOficial} strokeWidth="1.5" opacity={activo ? 0.5 : 0.9} />
+          <circle cx={xOficial} cy={waveY(ondaOficial, xOficial)} r="5" fill={colorOficial} />
+
+          {/* Onda del ajuste del usuario (solo si está activo) */}
+          {activo && (
+            <>
+              <path d={pathHastaX(ondaUsuario, xUsuario)} fill="none" stroke={colorUsuario} strokeWidth="1.5" />
+              {arrastrando ? (
+                <rect x={xUsuario - 1.5} y="2" width="3" height={ALTO - 4} fill={colorUsuario} />
+              ) : (
+                <circle cx={xUsuario} cy={waveY(ondaUsuario, xUsuario)} r="5" fill={colorUsuario} />
+              )}
+            </>
+          )}
+        </svg>
+
+        {/* Escala 0-10 */}
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#666", marginTop: 2 }}>
+          <span>0</span><span>5</span><span>10</span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 6, color: tema.textoSuave }}>
+        <span>Oficial (JMCS): <strong style={{ color: colorOficial }}>{valorOficial.toFixed(1)}</strong>{unidadTexto ? ` · ${unidadTexto}` : ""}</span>
+        {activo && <span>Mi ajuste: <strong style={{ color: colorUsuario }}>{valorUsuario.toFixed(1)}</strong></span>}
+      </div>
+    </div>
+  );
+}
+
+const NOMBRES_VARIABLES = { viento: "Viento", lluvia: "Lluvia", temperatura: "Temperatura", humedad: "Humedad" };
+
+function TarjetaEquipoClima({ equipo, rol, ajustes, climaOficial, onCambiar, tema, colorMarca }) {
+  return (
+    <div style={{ flex: 1, minWidth: 260, background: "#111", borderRadius: 8, padding: 14, borderTop: `3px solid ${colorMarca}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={26} height={26} onError={manejarErrorEscudo} />
+        <strong style={{ color: colorMarca, fontSize: 14 }}>{equipo.name}</strong>
+      </div>
+      {["viento", "lluvia", "temperatura", "humedad"].map((v) => (
+        <TimelineClima
+          key={v}
+          titulo={NOMBRES_VARIABLES[v]}
+          valorOficial={climaOficial[v]}
+          activo={ajustes[v]?.activo || false}
+          valorUsuario={ajustes[v]?.valorUsuario ?? climaOficial[v]}
+          onToggleActivo={(activo) => onCambiar(rol, v, { activo, valorUsuario: activo ? (ajustes[v]?.valorUsuario ?? climaOficial[v]) : ajustes[v]?.valorUsuario })}
+          onCambiarValor={(valor) => onCambiar(rol, v, { valorUsuario: valor })}
+          tema={tema}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ModalEstudioClimatico({
+  equipoLocal, equipoVisitante, climaOficial, ajustesClima, onCambiarAjuste,
+  modoGlobalClima, onPedirActivarGlobal, onDesactivarGlobal,
+  confirmarGlobalAbierto, onConfirmarGlobal, onCancelarConfirmarGlobal,
+  statsGoLocal, statsGoVisitante, factorLocal, factorVisitante,
+  onRestaurar, onGuardar, guardando, guardado,
+  tema, acentoMarca, colorMarcaLocal, colorMarcaVisitante, onCerrar,
+}) {
+  if (!ajustesClima || !climaOficial) return null;
+
+  // Estimación ilustrativa simple (oficial vs personal) solo para esta ventana de comparación.
+  const baseLocal = statsGoLocal ? parseFloat(statsGoLocal.promedioGolesFavor) : 1.3;
+  const baseVisitante = statsGoVisitante ? parseFloat(statsGoVisitante.promedioGolesFavor) : 1.1;
+  const totalOficial = baseLocal + baseVisitante;
+  const totalPersonal = baseLocal * factorLocal + baseVisitante * factorVisitante;
+  const over25Oficial = Math.round(probabilidadOver(totalOficial, 2.5) * 100);
+  const over25Personal = Math.round(probabilidadOver(totalPersonal, 2.5) * 100);
+  const bttsOficial = Math.round((probabilidadBTTS(baseLocal, baseVisitante) || 0) * 100);
+  const bttsPersonal = Math.round((probabilidadBTTS(baseLocal * factorLocal, baseVisitante * factorVisitante) || 0) * 100);
+
+  return (
+    <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 12 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: tema.panel, borderRadius: 12, padding: 20, width: 720, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
+        <button onClick={onCerrar} style={{ position: "absolute", top: 12, right: 14, background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}>✕</button>
+
+        <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>🌦️ Estudio Climático Personalizado</h3>
+        <p style={{ margin: "0 0 4px", fontSize: 12, color: tema.textoSuave }}>{equipoLocal.team.name} vs {equipoVisitante.team.name}</p>
+        <p style={{ margin: "0 0 16px", fontSize: 11, color: tema.textoSuave, fontStyle: "italic" }}>
+          Esto es tu estudio personal — no cambia el pronóstico oficial de JMCS, solo lo que ves aquí y en tu Estudio mientras esté activo.
+        </p>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18, padding: "8px 10px", background: "rgba(255,60,60,0.08)", borderRadius: 6, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={modoGlobalClima}
+            onChange={(e) => (e.target.checked ? onPedirActivarGlobal() : onDesactivarGlobal())}
+            style={{ accentColor: "#e05555" }}
+          />
+          <span style={{ fontSize: 12, color: "#e05555", fontWeight: "bold" }}>Aplicar para todos los encuentros</span>
+        </label>
+
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <TarjetaEquipoClima equipo={equipoLocal.team} rol="local" ajustes={ajustesClima.local} climaOficial={climaOficial} onCambiar={onCambiarAjuste} tema={tema} colorMarca={colorMarcaLocal} />
+          <TarjetaEquipoClima equipo={equipoVisitante.team} rol="visitante" ajustes={ajustesClima.visitante} climaOficial={climaOficial} onCambiar={onCambiarAjuste} tema={tema} colorMarca={colorMarcaVisitante} />
+        </div>
+
+        <div style={{ marginTop: 20, padding: 14, background: "#111", borderRadius: 8 }}>
+          <h4 style={{ margin: "0 0 10px", fontSize: 12, color: tema.textoSuave, textTransform: "uppercase" }}>Comparación (ilustrativa)</h4>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13 }}>
+            <div>Over 2.5 — Oficial: <strong style={{ color: VERDE_APAGADO }}>{over25Oficial}%</strong> · Mi estudio: <strong style={{ color: COLOR_AJUSTE_USUARIO }}>{over25Personal}%</strong></div>
+            <div>BTTS — Oficial: <strong style={{ color: VERDE_APAGADO }}>{bttsOficial}%</strong> · Mi estudio: <strong style={{ color: COLOR_AJUSTE_USUARIO }}>{bttsPersonal}%</strong></div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+          <button onClick={onRestaurar} style={{ flex: 1, padding: 10, fontSize: 13, background: "transparent", border: `1px solid ${tema.borde}`, color: tema.texto, borderRadius: 6, cursor: "pointer" }}>
+            ↺ Restaurar
+          </button>
+          <button onClick={onGuardar} disabled={guardando || guardado} style={{ flex: 1, padding: 10, fontSize: 13, fontWeight: "bold", background: guardado ? "#2e9e4f" : acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+            {guardado ? "✅ Guardado" : guardando ? "Guardando..." : "💾 Guardar mi estudio"}
+          </button>
+        </div>
+
+        {confirmarGlobalAbierto && (
+          <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 20 }}>
+            <div style={{ background: tema.panel, borderRadius: 10, padding: 22, maxWidth: 360 }}>
+              <h4 style={{ marginTop: 0, fontSize: 14 }}>Aplicar a todos los encuentros</h4>
+              <p style={{ fontSize: 12, color: tema.textoSuave, lineHeight: 1.5 }}>
+                Vas a aplicar tu ajuste climático a todos los partidos que analices de ahora en adelante — no un valor fijo, sino tu misma diferencia respecto al clima real de cada encuentro. Puedes desactivarlo cuando quieras. ¿Estás de acuerdo?
+              </p>
+              <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                <button onClick={onCancelarConfirmarGlobal} style={{ flex: 1, padding: 10, fontSize: 13, background: "transparent", border: `1px solid ${tema.borde}`, color: tema.texto, borderRadius: 6, cursor: "pointer" }}>
+                  Cancelar
+                </button>
+                <button onClick={onConfirmarGlobal} style={{ flex: 1, padding: 10, fontSize: 13, fontWeight: "bold", background: "#e05555", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+                  Sí, activar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
   const [modo, setModo] = useState(modoInicial || "login"); // "login" | "registro" | "magico"
@@ -2124,41 +2386,6 @@ function corregirEscudo(url) {
   return url;
 }
 
-// El aviso de "no disponible" no siempre usa el mismo nombre de archivo
-// (se han visto 23394.png, 25764.png, ...). Como respaldo adicional, revisamos
-// el CONTENIDO de la imagen: ese aviso es un ícono de cámara gris sobre fondo
-// claro, casi sin color real. Si la imagen es casi toda gris clara, la tratamos
-// como el aviso. Requiere que el servidor permita leer píxeles entre dominios
-// (CORS) — si no lo permite, simplemente no hace nada, sin romper nada.
-function manejarCargaEscudoContenido(e) {
-  const img = e.target;
-  try {
-    const canvas = document.createElement("canvas");
-    const TAM = 20;
-    canvas.width = TAM;
-    canvas.height = TAM;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, TAM, TAM);
-    const datos = ctx.getImageData(0, 0, TAM, TAM).data;
-
-    let pixelesClarosYGrises = 0;
-    const totalPixeles = TAM * TAM;
-
-    for (let i = 0; i < datos.length; i += 4) {
-      const r = datos[i], g = datos[i + 1], b = datos[i + 2];
-      const esGris = Math.abs(r - g) < 12 && Math.abs(g - b) < 12 && Math.abs(r - b) < 12;
-      const esClaro = (r + g + b) / 3 > 140;
-      if (esGris && esClaro) pixelesClarosYGrises++;
-    }
-
-    if (pixelesClarosYGrises / totalPixeles > 0.85) {
-      img.src = "/logo.png";
-    }
-  } catch (err) {
-    // El servidor no permite leer los píxeles (CORS) — no hacemos nada
-  }
-}
-
 function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) {
   const fecha = new Date(p.fixture.date);
   const horaTexto = fecha.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -2182,7 +2409,7 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
         <img
           src={corregirEscudo(p.teams.home.logo)} alt="" width={36} height={36}
-          onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous"
+          onError={manejarErrorEscudo}
           onClick={(e) => irAPerfil(e, p.teams.home)}
           style={{ cursor: "pointer" }}
         />
@@ -2207,7 +2434,7 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
         <img
           src={corregirEscudo(p.teams.away.logo)} alt="" width={36} height={36}
-          onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous"
+          onError={manejarErrorEscudo}
           onClick={(e) => irAPerfil(e, p.teams.away)}
           style={{ cursor: "pointer" }}
         />
@@ -2409,7 +2636,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
       </button>
 
       <div style={{ background: colorTenue(colorMarca), borderTop: `3px solid ${colorMarca}`, borderRadius: 8, padding: 20, marginBottom: 20, textAlign: "center" }}>
-        <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={70} height={70} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
+        <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={70} height={70} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
           <h2 style={{ margin: 0, color: colorMarca }}>{equipo.name}</h2>
           <BotonFavorito equipo={{ team: equipo }} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
@@ -2450,7 +2677,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
             style={{ background: colorTenue(colorMarcaInicio), borderTop: `3px solid ${colorMarcaInicio}`, borderRadius: 8, padding: 16, cursor: "pointer" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <img src={corregirEscudo(equipoInicio.team.logo)} alt={equipoInicio.team.name} width={30} height={30} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
+              <img src={corregirEscudo(equipoInicio.team.logo)} alt={equipoInicio.team.name} width={30} height={30} onError={manejarErrorEscudo} />
               <strong style={{ color: colorMarcaInicio, fontSize: 16 }}>{equipoInicio.team.name}</strong>
               <span onClick={(e) => e.stopPropagation()}>
                 <BotonFavorito equipo={equipoInicio} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
@@ -2612,7 +2839,7 @@ export default function Home() {
   const [partidoCalendario, setPartidoCalendario] = useState(null);
   const [climaData, setClimaData] = useState(null);
   const [cargandoClima, setCargandoClima] = useState(false);
-  const [estimarClima, setEstimarClima] = useState(false);
+  // (estimarClima quedó reemplazado por el nuevo Estudio Climático Personalizado)
 
   function seleccionarPartidoDelCalendario(p) {
     setEquipoForzadoLocal({
@@ -2753,14 +2980,95 @@ export default function Home() {
     setBuscandoInicio(false);
   }
 
-  // Ajuste experimental por clima: modesto, basado en tendencias generales, no en un estudio exacto de este partido
-  let factorClima = 1;
-  if (climaData) {
-    if (climaData.precipitacionMm > 5) factorClima *= 0.93;
-    if (climaData.vientoMaxKmh > 35) factorClima *= 0.95;
-    if (climaData.temperaturaMax > 32) factorClima *= 0.97;
+  // ===== Estudio Climático Personalizado =====
+  const [estudioClimaticoAbierto, setEstudioClimaticoAbierto] = useState(false);
+  const [ajustesClima, setAjustesClima] = useState(null);
+  const [modoGlobalClima, setModoGlobalClima] = useState(false);
+  const [deltasGlobalesClima, setDeltasGlobalesClima] = useState({ local: {}, visitante: {} });
+  const [confirmarGlobalAbierto, setConfirmarGlobalAbierto] = useState(false);
+  const [indicadorClimaAbierto, setIndicadorClimaAbierto] = useState(false);
+  const [guardandoClima, setGuardandoClima] = useState(false);
+  const [guardadoClima, setGuardadoClima] = useState(false);
+
+  async function guardarEstudioClimatico() {
+    if (!sesion) { abrirLogin(); return; }
+    setGuardandoClima(true);
+    await supabase.from("predicciones").insert({
+      user_id: sesion.user.id,
+      equipo_local: equipoLocal?.team?.name || "",
+      equipo_visitante: equipoVisitante?.team?.name || "",
+      ajuste_climatico: {
+        activo: climaAjuste.activo,
+        equipos: ajustesClima,
+        factorLocal: climaAjuste.factorLocal,
+        factorVisitante: climaAjuste.factorVisitante,
+      },
+    });
+    setGuardandoClima(false);
+    setGuardadoClima(true);
+    setTimeout(() => setGuardadoClima(false), 2500);
   }
-  const climaAjuste = estimarClima && climaData ? { activo: true, factor: factorClima } : { activo: false, factor: 1 };
+
+  const climaOficialNorm = normalizarClima(climaData);
+
+  useEffect(() => {
+    if (!climaOficialNorm) { setAjustesClima(null); return; }
+    const nuevo = { local: {}, visitante: {} };
+    ["local", "visitante"].forEach((rol) => {
+      ["viento", "lluvia", "temperatura", "humedad"].forEach((v) => {
+        const delta = modoGlobalClima ? deltasGlobalesClima?.[rol]?.[v] : undefined;
+        if (delta !== undefined && delta !== null) {
+          nuevo[rol][v] = { activo: true, valorUsuario: Math.max(0, Math.min(10, climaOficialNorm[v] + delta)) };
+        } else {
+          nuevo[rol][v] = { activo: false, valorUsuario: climaOficialNorm[v] };
+        }
+      });
+    });
+    setAjustesClima(nuevo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [climaData, equipoLocal?.team?.id, equipoVisitante?.team?.id]);
+
+  function actualizarAjusteClima(rol, variable, cambios) {
+    setAjustesClima((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [rol]: { ...prev[rol], [variable]: { ...prev[rol][variable], ...cambios } } };
+    });
+  }
+
+  function activarModoGlobal() {
+    // Convertimos los ajustes activos actuales en "diferencias" respecto al oficial de este partido
+    const nuevosDeltas = { local: {}, visitante: {} };
+    ["local", "visitante"].forEach((rol) => {
+      ["viento", "lluvia", "temperatura", "humedad"].forEach((v) => {
+        const a = ajustesClima?.[rol]?.[v];
+        if (a?.activo && climaOficialNorm) {
+          nuevosDeltas[rol][v] = a.valorUsuario - climaOficialNorm[v];
+        }
+      });
+    });
+    setDeltasGlobalesClima(nuevosDeltas);
+    setModoGlobalClima(true);
+    setConfirmarGlobalAbierto(false);
+  }
+
+  function calcularFactorEquipoClima(rol) {
+    if (!ajustesClima || !climaOficialNorm) return 1;
+    let sumaDeltas = 0;
+    ["viento", "lluvia", "temperatura", "humedad"].forEach((v) => {
+      const a = ajustesClima[rol]?.[v];
+      if (a?.activo) sumaDeltas += a.valorUsuario - climaOficialNorm[v];
+    });
+    return Math.max(0.7, Math.min(1.3, 1 + sumaDeltas * 0.015));
+  }
+
+  const hayAjusteClimaActivo =
+    ajustesClima &&
+    (["local", "visitante"].some((rol) => ["viento", "lluvia", "temperatura", "humedad"].some((v) => ajustesClima[rol]?.[v]?.activo)));
+
+  const climaAjuste = hayAjusteClimaActivo
+    ? { activo: true, factorLocal: calcularFactorEquipoClima("local"), factorVisitante: calcularFactorEquipoClima("visitante") }
+    : { activo: false, factorLocal: 1, factorVisitante: 1 };
+
   const acentoMarca = modoOscuro ? DORADO : "#1F7A46";
 
   return (
@@ -3215,14 +3523,37 @@ export default function Home() {
                 acentoMarca={acentoMarca}
               />
             )}
+
+            {modoGlobalClima && (
+              <div style={{ position: "relative", display: "inline-block", marginBottom: 10 }}>
+                <button
+                  onClick={() => setIndicadorClimaAbierto(!indicadorClimaAbierto)}
+                  title="Estudio personalizado activo"
+                  style={{
+                    width: 26, height: 26, borderRadius: "50%", background: "#e05555", color: "#fff",
+                    border: "none", fontWeight: "bold", fontSize: 14, cursor: "pointer",
+                  }}
+                >
+                  ❗
+                </button>
+                {indicadorClimaAbierto && (
+                  <div style={{
+                    position: "absolute", top: "115%", left: 0, background: "rgba(224,85,85,0.9)", color: "#fff",
+                    padding: "8px 12px", borderRadius: 6, fontSize: 12, whiteSpace: "nowrap", zIndex: 30,
+                  }}>
+                    Estudio personalizado activo
+                  </div>
+                )}
+              </div>
+            )}
+
             <DatosGeneralesEncuentro
               partidoCalendario={partidoCalendario}
               climaData={climaData}
               cargandoClima={cargandoClima}
-              estimarClima={estimarClima}
-              setEstimarClima={setEstimarClima}
               tema={tema}
               acentoMarca={acentoMarca}
+              onAbrirEstudioClimatico={() => setEstudioClimaticoAbierto(true)}
             />
           </div>
 
@@ -3482,6 +3813,45 @@ export default function Home() {
           tema={tema}
           acentoMarca={acentoMarca}
           onCerrar={() => setFavoritosPanelAbierto(false)}
+        />
+      )}
+
+      {estudioClimaticoAbierto && ajustesClima && climaOficialNorm && equipoLocal?.team && equipoVisitante?.team && (
+        <ModalEstudioClimatico
+          equipoLocal={equipoLocal}
+          equipoVisitante={equipoVisitante}
+          climaOficial={climaOficialNorm}
+          ajustesClima={ajustesClima}
+          onCambiarAjuste={actualizarAjusteClima}
+          modoGlobalClima={modoGlobalClima}
+          onPedirActivarGlobal={() => setConfirmarGlobalAbierto(true)}
+          onDesactivarGlobal={() => { setModoGlobalClima(false); setDeltasGlobalesClima({ local: {}, visitante: {} }); }}
+          confirmarGlobalAbierto={confirmarGlobalAbierto}
+          onConfirmarGlobal={activarModoGlobal}
+          onCancelarConfirmarGlobal={() => setConfirmarGlobalAbierto(false)}
+          statsGoLocal={statsGoLocal}
+          statsGoVisitante={statsGoVisitante}
+          factorLocal={climaAjuste.factorLocal}
+          factorVisitante={climaAjuste.factorVisitante}
+          onRestaurar={() => {
+            setAjustesClima((prev) => {
+              const nuevo = { local: {}, visitante: {} };
+              ["local", "visitante"].forEach((rol) => {
+                ["viento", "lluvia", "temperatura", "humedad"].forEach((v) => {
+                  nuevo[rol][v] = { activo: false, valorUsuario: climaOficialNorm[v] };
+                });
+              });
+              return nuevo;
+            });
+          }}
+          onGuardar={guardarEstudioClimatico}
+          guardando={guardandoClima}
+          guardado={guardadoClima}
+          tema={tema}
+          acentoMarca={acentoMarca}
+          colorMarcaLocal={colorMarcaLocal}
+          colorMarcaVisitante={colorMarcaVisitante}
+          onCerrar={() => setEstudioClimaticoAbierto(false)}
         />
       )}
     </div>
