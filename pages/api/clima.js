@@ -1,41 +1,42 @@
+// Trae el clima de una ciudad en una fecha específica, usando Open-Meteo (gratis, sin key)
 export default async function handler(req, res) {
   const { ciudad, fecha } = req.query;
 
   if (!ciudad || !fecha) {
-    return res.status(400).json({ error: "Falta la ciudad o la fecha" });
+    return res.status(400).json({ error: "Faltan ciudad o fecha" });
   }
 
   try {
-    // 1. Geocodificar la ciudad (gratis, sin key)
+    // Paso 1: geocodificar la ciudad a coordenadas
     const geoRes = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(ciudad)}&count=1&language=es`
     );
     const geoData = await geoRes.json();
 
     if (!geoData.results || geoData.results.length === 0) {
-      return res.status(200).json({ error: `No se encontró la ciudad "${ciudad}"` });
+      return res.status(200).json({ error: `No se encontró la ciudad: ${ciudad}` });
     }
 
-    const { latitude, longitude, name } = geoData.results[0];
+    const { latitude, longitude } = geoData.results[0];
 
-    // 2. Pedir el pronóstico para esa fecha (gratis, sin key)
+    // Paso 2: pedir el pronóstico para esa fecha
     const climaRes = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&timezone=auto&start_date=${fecha}&end_date=${fecha}`
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,relative_humidity_2m_mean&timezone=auto&start_date=${fecha}&end_date=${fecha}`
     );
     const climaData = await climaRes.json();
 
     if (!climaData.daily || !climaData.daily.time || climaData.daily.time.length === 0) {
-      return res.status(200).json({ error: "No hay pronóstico disponible para esa fecha (puede estar muy lejana)" });
+      return res.status(200).json({ error: "No hay pronóstico disponible para esa fecha (puede estar muy lejos en el futuro o en el pasado)" });
     }
 
     res.status(200).json({
-      ciudad: name,
       temperaturaMax: climaData.daily.temperature_2m_max[0],
       temperaturaMin: climaData.daily.temperature_2m_min[0],
       precipitacionMm: climaData.daily.precipitation_sum[0],
-      vientoMaxKmh: climaData.daily.windspeed_10m_max[0],
+      vientoMaxKmh: climaData.daily.wind_speed_10m_max[0],
+      humedadPct: climaData.daily.relative_humidity_2m_mean ? climaData.daily.relative_humidity_2m_mean[0] : null,
     });
   } catch (error) {
-    res.status(500).json({ error: "No se pudo obtener el clima" });
+    res.status(500).json({ error: "No se pudo conectar con el servicio de clima" });
   }
 }
