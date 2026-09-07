@@ -590,7 +590,7 @@ function TarjetaFavorito({ favorito, tema, acento, onQuitar }) {
         padding: 14, textAlign: "center", cursor: "pointer", width: 170,
       }}
     >
-      <img src={corregirEscudo(favorito.team_logo)} alt={favorito.team_name} style={{ width: 70, height: 70, objectFit: "contain", margin: "0 auto 8px" }} onError={manejarErrorEscudo} />
+      <img src={corregirEscudo(favorito.team_logo)} alt={favorito.team_name} style={{ width: 70, height: 70, objectFit: "contain", margin: "0 auto 8px" }} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
       <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 4 }}>{favorito.team_name}</div>
       <div style={{ fontSize: 10, color: tema.textoSuave }}>{favorito.team_country || ""}</div>
 
@@ -662,7 +662,7 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
                 padding: 16, textAlign: "center", cursor: "pointer",
               }}
             >
-              <img src={corregirEscudo(f.team_logo)} alt={f.team_name} width={60} height={60} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
+              <img src={corregirEscudo(f.team_logo)} alt={f.team_name} width={60} height={60} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
               <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4 }}>{f.team_name}</div>
               {f.team_country && <div style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 10 }}>{f.team_country}</div>}
               <button
@@ -846,7 +846,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: 14,
               }}
             >
-              <img src={corregirEscudo(t.team.logo)} alt={t.team.name} width={22} height={22} onError={manejarErrorEscudo} />
+              <img src={corregirEscudo(t.team.logo)} alt={t.team.name} width={22} height={22} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
               <span>{t.team.name} — {t.team.country}</span>
             </div>
           ))}
@@ -861,7 +861,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
               style={{ display: "flex", alignItems: "center", gap: 8, cursor: onAbrirPerfil ? "pointer" : "default" }}
               title="Ver perfil completo del equipo"
             >
-              <img src={corregirEscudo(selectedTeam.team.logo)} alt={selectedTeam.team.name} width={26} height={26} onError={manejarErrorEscudo} />
+              <img src={corregirEscudo(selectedTeam.team.logo)} alt={selectedTeam.team.name} width={26} height={26} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
               <strong style={{ color: colorMarca || tema.texto }}>{selectedTeam.team.name}</strong>
             </div>
             <BotonFavorito equipo={selectedTeam} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
@@ -1384,7 +1384,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                 <img
                   src={corregirEscudo(p.teams.home.logo)} alt="" width={16} height={16}
-                  onError={manejarErrorEscudo}
+                  onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous"
                   onClick={(e) => { e.stopPropagation(); onAbrirPerfil && onAbrirPerfil({ id: p.teams.home.id, name: p.teams.home.name, logo: p.teams.home.logo, country: p.league.country }); }}
                   style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}
                 />
@@ -1398,7 +1398,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <img
                   src={corregirEscudo(p.teams.away.logo)} alt="" width={16} height={16}
-                  onError={manejarErrorEscudo}
+                  onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous"
                   onClick={(e) => { e.stopPropagation(); onAbrirPerfil && onAbrirPerfil({ id: p.teams.away.id, name: p.teams.away.name, logo: p.teams.away.logo, country: p.league.country }); }}
                   style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}
                 />
@@ -1556,7 +1556,7 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, s
         style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}
         title="Ver perfil completo del equipo"
       >
-        <img src={corregirEscudo(equipo.team.logo)} alt={equipo.team.name} style={{ width: "100%", maxWidth: 130, height: "auto", margin: "0 auto 10px" }} onError={manejarErrorEscudo} />
+        <img src={corregirEscudo(equipo.team.logo)} alt={equipo.team.name} style={{ width: "100%", maxWidth: 130, height: "auto", margin: "0 auto 10px" }} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
       </div>
       <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
         <span onClick={() => onAbrirPerfil && onAbrirPerfil(equipo.team)} style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}>
@@ -2124,6 +2124,41 @@ function corregirEscudo(url) {
   return url;
 }
 
+// El aviso de "no disponible" no siempre usa el mismo nombre de archivo
+// (se han visto 23394.png, 25764.png, ...). Como respaldo adicional, revisamos
+// el CONTENIDO de la imagen: ese aviso es un ícono de cámara gris sobre fondo
+// claro, casi sin color real. Si la imagen es casi toda gris clara, la tratamos
+// como el aviso. Requiere que el servidor permita leer píxeles entre dominios
+// (CORS) — si no lo permite, simplemente no hace nada, sin romper nada.
+function manejarCargaEscudoContenido(e) {
+  const img = e.target;
+  try {
+    const canvas = document.createElement("canvas");
+    const TAM = 20;
+    canvas.width = TAM;
+    canvas.height = TAM;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, TAM, TAM);
+    const datos = ctx.getImageData(0, 0, TAM, TAM).data;
+
+    let pixelesClarosYGrises = 0;
+    const totalPixeles = TAM * TAM;
+
+    for (let i = 0; i < datos.length; i += 4) {
+      const r = datos[i], g = datos[i + 1], b = datos[i + 2];
+      const esGris = Math.abs(r - g) < 12 && Math.abs(g - b) < 12 && Math.abs(r - b) < 12;
+      const esClaro = (r + g + b) / 3 > 140;
+      if (esGris && esClaro) pixelesClarosYGrises++;
+    }
+
+    if (pixelesClarosYGrises / totalPixeles > 0.85) {
+      img.src = "/logo.png";
+    }
+  } catch (err) {
+    // El servidor no permite leer los píxeles (CORS) — no hacemos nada
+  }
+}
+
 function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) {
   const fecha = new Date(p.fixture.date);
   const horaTexto = fecha.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -2147,7 +2182,7 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
         <img
           src={corregirEscudo(p.teams.home.logo)} alt="" width={36} height={36}
-          onError={manejarErrorEscudo}
+          onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous"
           onClick={(e) => irAPerfil(e, p.teams.home)}
           style={{ cursor: "pointer" }}
         />
@@ -2172,7 +2207,7 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
         <img
           src={corregirEscudo(p.teams.away.logo)} alt="" width={36} height={36}
-          onError={manejarErrorEscudo}
+          onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous"
           onClick={(e) => irAPerfil(e, p.teams.away)}
           style={{ cursor: "pointer" }}
         />
@@ -2374,7 +2409,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
       </button>
 
       <div style={{ background: colorTenue(colorMarca), borderTop: `3px solid ${colorMarca}`, borderRadius: 8, padding: 20, marginBottom: 20, textAlign: "center" }}>
-        <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={70} height={70} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
+        <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={70} height={70} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
           <h2 style={{ margin: 0, color: colorMarca }}>{equipo.name}</h2>
           <BotonFavorito equipo={{ team: equipo }} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
@@ -2415,7 +2450,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
             style={{ background: colorTenue(colorMarcaInicio), borderTop: `3px solid ${colorMarcaInicio}`, borderRadius: 8, padding: 16, cursor: "pointer" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <img src={corregirEscudo(equipoInicio.team.logo)} alt={equipoInicio.team.name} width={30} height={30} onError={manejarErrorEscudo} />
+              <img src={corregirEscudo(equipoInicio.team.logo)} alt={equipoInicio.team.name} width={30} height={30} onError={manejarErrorEscudo} onLoad={manejarCargaEscudoContenido} crossOrigin="anonymous" />
               <strong style={{ color: colorMarcaInicio, fontSize: 16 }}>{equipoInicio.team.name}</strong>
               <span onClick={(e) => e.stopPropagation()}>
                 <BotonFavorito equipo={equipoInicio} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
