@@ -2391,6 +2391,15 @@ export default function Home() {
 
   const [favoritosPanelAbierto, setFavoritosPanelAbierto] = useState(false);
   const [contextoFavoritosIA, setContextoFavoritosIA] = useState("");
+  const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
+  const [vistaAnterior, setVistaAnterior] = useState("inicio");
+  const [equipoPerfil, setEquipoPerfil] = useState(null);
+
+  function abrirPerfilEquipo(team) {
+    setVistaAnterior(vistaActual);
+    setEquipoPerfil(team);
+    setVistaActual("equipo");
+  }
 
   useEffect(() => {
     if (vistaActual !== "favoritos" || !sesion) return;
@@ -2425,15 +2434,6 @@ export default function Home() {
     return () => { cancelado = true; };
   }, [vistaActual, sesion]);
 
-  const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
-  const [vistaAnterior, setVistaAnterior] = useState("inicio");
-  const [equipoPerfil, setEquipoPerfil] = useState(null);
-
-  function abrirPerfilEquipo(team) {
-    setVistaAnterior(vistaActual);
-    setEquipoPerfil(team);
-    setVistaActual("equipo");
-  }
   const [busquedaInicio, setBusquedaInicio] = useState("");
   const [equipoInicio, setEquipoInicio] = useState(null);
   const [fixturesInicio, setFixturesInicio] = useState([]);
