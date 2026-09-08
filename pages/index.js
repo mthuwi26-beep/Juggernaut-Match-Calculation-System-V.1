@@ -1822,6 +1822,68 @@ const ETIQUETAS_ESTADO = {
   NS: "Aún no comienza", PST: "Pospuesto", CANC: "Cancelado",
 };
 
+function EstadisticasPartidoReal({ fixtureId, nombreLocal, nombreVisitante, tema, acentoMarca }) {
+  const [stats, setStats] = useState(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    if (!fixtureId) { setStats(null); setCargando(false); return; }
+    let cancelado = false;
+    setCargando(true);
+
+    fetch(`/api/marcador-vivo?fixtureId=${fixtureId}`)
+      .then((r) => r.json())
+      .then(async (marcador) => {
+        if (cancelado) return;
+        const finalizado = !marcador.error && ["FT", "AET", "PEN"].includes(marcador.estadoCorto);
+        if (!finalizado) { setStats(null); setCargando(false); return; }
+
+        const res = await fetch(`/api/estadisticas-partido?fixtureId=${fixtureId}`);
+        const data = await res.json();
+        if (cancelado) return;
+        if (!data.error) {
+          const procesado = procesarEstadisticasPartido(data, data?.[0]?.team?.id);
+          setStats(procesado);
+        }
+        setCargando(false);
+      })
+      .catch(() => { if (!cancelado) setCargando(false); });
+
+    return () => { cancelado = true; };
+  }, [fixtureId]);
+
+  if (cargando || !stats) return null;
+
+  return (
+    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 14, marginBottom: 18, fontSize: 12 }}>
+      <h4 style={{ margin: "0 0 10px", fontSize: 11, color: acentoMarca }}>📊 Estadísticas reales de este encuentro</h4>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ textAlign: "center" }}>
+            <th style={{ textAlign: "left", fontWeight: "normal", color: tema.textoSuave }}></th>
+            <th style={{ padding: 4 }}>{nombreLocal}</th>
+            <th style={{ padding: 4 }}>{nombreVisitante}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            { etiqueta: "Córners", dato: stats.corners },
+            { etiqueta: "Tarjetas amarillas", dato: stats.amarillas },
+            { etiqueta: "Faltas", dato: stats.faltas },
+            { etiqueta: "Posesión", dato: stats.posesion },
+          ].map((fila) => (
+            <tr key={fila.etiqueta} style={{ borderTop: `1px solid ${tema.borde}`, textAlign: "center" }}>
+              <td style={{ padding: "6px 4px", textAlign: "left", color: tema.textoSuave }}>{fila.etiqueta}</td>
+              <td style={{ padding: "6px 4px", fontWeight: "bold" }}>{fila.dato.home ?? "—"}</td>
+              <td style={{ padding: "6px 4px", fontWeight: "bold" }}>{fila.dato.away ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function MarcadorEnVivo({ fixtureId, nombreLocal, nombreVisitante, tema, acentoMarca }) {
   const [marcador, setMarcador] = useState(null);
   const [error, setError] = useState("");
@@ -2496,7 +2558,24 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
         <div style={{ fontSize: 9, color: tema.textoSuave, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 4 }}>
           {p.league.name}
         </div>
-        <div style={{ fontSize: 13, fontWeight: "bold", color: acentoMarca }}>VS</div>
+        {(() => {
+          const estado = p.fixture?.status?.short;
+          const yaJugado = estado && estado !== "NS" && estado !== "TBD" && estado !== "PST" && estado !== "CANC";
+          if (yaJugado && p.goals?.home !== null && p.goals?.home !== undefined) {
+            const enVivo = ESTADOS_EN_VIVO.includes(estado);
+            return (
+              <>
+                <div style={{ fontSize: 16, fontWeight: "bold", color: enVivo ? "#e05555" : acentoMarca }}>
+                  {p.goals.home} - {p.goals.away}
+                </div>
+                <div style={{ fontSize: 8, color: enVivo ? "#e05555" : tema.textoSuave, fontWeight: enVivo ? "bold" : "normal" }}>
+                  {enVivo ? `${p.fixture.status.elapsed || ""}' EN VIVO` : (ETIQUETAS_ESTADO[estado] || estado)}
+                </div>
+              </>
+            );
+          }
+          return <div style={{ fontSize: 13, fontWeight: "bold", color: acentoMarca }}>VS</div>;
+        })()}
         <div style={{ fontSize: 10, color: tema.textoSuave, marginTop: 4 }}>{fechaTexto} · {horaTexto}</div>
       </div>
 
@@ -3341,6 +3420,7 @@ export default function Home() {
           padding: 0;
           background: ${tema.fondo};
           font-family: 'IBM Plex Sans', Arial, sans-serif;
+          overscroll-behavior-y: contain;
         }
 
         @media (max-width: 767px) {
@@ -3768,6 +3848,7 @@ export default function Home() {
             if (toqueJalarY === null) return;
             const delta = e.touches[0].clientY - toqueJalarY;
             if (delta > 10) {
+              e.preventDefault();
               setJalando(true);
               setJaladoSuficiente(delta > 80);
             }
@@ -3879,13 +3960,22 @@ export default function Home() {
         <div className="jmcs-centro">
           <div className="jmcs-datos-sticky">
             {equipoLocal?.team && equipoVisitante?.team && (
-              <MarcadorEnVivo
-                fixtureId={partidoCalendario?.fixture?.id}
-                nombreLocal={equipoLocal.team.name}
-                nombreVisitante={equipoVisitante.team.name}
-                tema={tema}
-                acentoMarca={acentoMarca}
-              />
+              <>
+                <EstadisticasPartidoReal
+                  fixtureId={partidoCalendario?.fixture?.id}
+                  nombreLocal={equipoLocal.team.name}
+                  nombreVisitante={equipoVisitante.team.name}
+                  tema={tema}
+                  acentoMarca={acentoMarca}
+                />
+                <MarcadorEnVivo
+                  fixtureId={partidoCalendario?.fixture?.id}
+                  nombreLocal={equipoLocal.team.name}
+                  nombreVisitante={equipoVisitante.team.name}
+                  tema={tema}
+                  acentoMarca={acentoMarca}
+                />
+              </>
             )}
 
             {modoGlobalClima && (
