@@ -2344,10 +2344,21 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
                 aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 style={{
                   position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-                  background: "transparent", border: "none", cursor: "pointer", fontSize: 15, color: tema.textoSuave,
+                  background: "transparent", border: "none", cursor: "pointer", color: tema.textoSuave,
+                  display: "flex", alignItems: "center", padding: 4,
                 }}
               >
-                {mostrarPassword ? "🙈" : "👁️"}
+                {mostrarPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-10-8-10-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s3-8 11-8 11 8 11 8-3 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
               </button>
             </div>
           )}
@@ -2854,7 +2865,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
   );
 }
 
-function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil }) {
+function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey }) {
   return (
     <div>
       {equipoInicio?.team && (
@@ -2888,7 +2899,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
         </div>
       )}
 
-      <ListaPartidosInicio tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} />
+      <ListaPartidosInicio key={refrescarKey} tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} />
     </div>
   );
 }
@@ -3033,6 +3044,10 @@ export default function Home() {
   }, [vistaActual, sesion]);
 
   const [busquedaInicio, setBusquedaInicio] = useState("");
+  const [refrescarInicioKey, setRefrescarInicioKey] = useState(0);
+  const [jalando, setJalando] = useState(false);
+  const [jaladoSuficiente, setJaladoSuficiente] = useState(false);
+  const [toqueJalarY, setToqueJalarY] = useState(null);
   const [equipoInicio, setEquipoInicio] = useState(null);
   const [fixturesInicio, setFixturesInicio] = useState([]);
   const [buscandoInicio, setBuscandoInicio] = useState(false);
@@ -3744,8 +3759,36 @@ export default function Home() {
       </div>
 
       {vistaActual === "inicio" && (
-        <div style={{ maxWidth: 1400, margin: "20px auto", padding: "0 20px" }}>
-          <form onSubmit={buscarEquipoInicio} style={{ display: "flex", gap: 8, marginBottom: 20, maxWidth: 800 }}>
+        <div
+          style={{ maxWidth: 1400, margin: "20px auto", padding: "0 20px" }}
+          onTouchStart={(e) => {
+            if (window.scrollY === 0) setToqueJalarY(e.touches[0].clientY);
+          }}
+          onTouchMove={(e) => {
+            if (toqueJalarY === null) return;
+            const delta = e.touches[0].clientY - toqueJalarY;
+            if (delta > 10) {
+              setJalando(true);
+              setJaladoSuficiente(delta > 80);
+            }
+          }}
+          onTouchEnd={() => {
+            if (jaladoSuficiente) setRefrescarInicioKey((k) => k + 1);
+            setJalando(false);
+            setJaladoSuficiente(false);
+            setToqueJalarY(null);
+          }}
+        >
+          {jalando && (
+            <p style={{ textAlign: "center", fontSize: 12, color: acentoMarca, marginBottom: 8 }}>
+              {jaladoSuficiente ? "🔄 Suelta para actualizar" : "↓ Jala para actualizar"}
+            </p>
+          )}
+          <form
+            onSubmit={buscarEquipoInicio}
+            className="jmcs-datos-sticky"
+            style={{ display: "flex", gap: 8, marginBottom: 20, maxWidth: 800, background: tema.fondo, paddingTop: 4, paddingBottom: 4 }}
+          >
             <input
               type="text"
               value={busquedaInicio}
@@ -3776,6 +3819,7 @@ export default function Home() {
             }}
             partidoTocado={partidoTocadoInicio}
             onAbrirPerfil={abrirPerfilEquipo}
+            refrescarKey={refrescarInicioKey}
           />
         </div>
       )}
