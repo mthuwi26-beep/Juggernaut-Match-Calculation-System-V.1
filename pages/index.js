@@ -2524,6 +2524,134 @@ function TablaProximosEncuentros({ partidos, tema }) {
   );
 }
 
+function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
+  const [stats, setStats] = useState(null);
+  const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(true);
+  const [admins, setAdmins] = useState([]);
+  const [nuevoEmail, setNuevoEmail] = useState("");
+  const [mensajeAdmin, setMensajeAdmin] = useState("");
+  const [errorAdmin, setErrorAdmin] = useState("");
+
+  function cargarTodo() {
+    setCargando(true);
+    supabase.rpc("admin_dashboard_stats").then(({ data, error }) => {
+      if (error) setError(error.message);
+      else setStats(data);
+      setCargando(false);
+    });
+    supabase.rpc("listar_admins").then(({ data }) => {
+      if (data) setAdmins(data);
+    });
+  }
+
+  useEffect(() => { cargarTodo(); }, []); // eslint-disable-line
+
+  async function agregarAdmin(e) {
+    e.preventDefault();
+    setMensajeAdmin("");
+    setErrorAdmin("");
+    const { error } = await supabase.rpc("agregar_admin", { nuevo_email: nuevoEmail });
+    if (error) {
+      setErrorAdmin(error.message);
+    } else {
+      setMensajeAdmin(`✅ ${nuevoEmail} ahora es administrador.`);
+      setNuevoEmail("");
+      cargarTodo();
+    }
+  }
+
+  async function quitarAdmin(userId) {
+    setErrorAdmin("");
+    const { error } = await supabase.rpc("quitar_admin", { admin_user_id: userId });
+    if (error) setErrorAdmin(error.message);
+    else cargarTodo();
+  }
+
+  if (cargando) return <p style={{ textAlign: "center", color: tema.textoSuave }}>Cargando panel...</p>;
+  if (error) return <p style={{ textAlign: "center", color: "#e05555" }}>⚠️ {error}</p>;
+  if (!stats) return null;
+
+  const resueltas = stats.aciertos + stats.fallos;
+  const porcentajeAciertos = resueltas > 0 ? Math.round((stats.aciertos / resueltas) * 100) : null;
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 12px" }}>
+      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center" }}>👑 Panel de administrador</h3>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 24 }}>
+        {[
+          { etiqueta: "Usuarios registrados", valor: stats.totalUsuarios },
+          { etiqueta: "Estudios guardados", valor: stats.totalEstudiosGuardados },
+          { etiqueta: "% de aciertos (verificados)", valor: porcentajeAciertos !== null ? `${porcentajeAciertos}%` : "Sin datos aún" },
+          { etiqueta: "Equipos en favoritos", valor: stats.totalFavoritos },
+        ].map((c) => (
+          <div key={c.etiqueta} style={{ flex: "1 1 200px", background: tema.panel, borderRadius: 8, padding: 16, borderTop: `3px solid ${acentoMarca}` }}>
+            <div style={{ fontSize: 22, fontWeight: "bold" }}>{c.valor}</div>
+            <div style={{ fontSize: 12, color: tema.textoSuave, marginTop: 4 }}>{c.etiqueta}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+        <h4 style={{ margin: "0 0 10px", fontSize: 13 }}>⭐ Equipos más marcados como favoritos</h4>
+        {stats.equiposFavoritosTop.length === 0 ? (
+          <p style={{ fontSize: 12, color: tema.textoSuave }}>Todavía no hay suficientes datos.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {stats.equiposFavoritosTop.map((e, i) => (
+              <div key={e.team_name} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", borderBottom: `1px solid ${tema.borde}` }}>
+                <span>{i + 1}. {e.team_name}</span>
+                <strong>{e.veces}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {esAdminPrincipal && (
+        <div style={{ background: tema.panel, borderRadius: 8, padding: 16 }}>
+          <h4 style={{ margin: "0 0 10px", fontSize: 13 }}>🔑 Gestión de administradores</h4>
+
+          <form onSubmit={agregarAdmin} style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <input
+              type="email"
+              value={nuevoEmail}
+              onChange={(e) => setNuevoEmail(e.target.value)}
+              placeholder="Correo de la nueva persona admin"
+              required
+              style={{ flex: 1, padding: 10, fontSize: 13, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+            />
+            <button type="submit" style={{ padding: "10px 16px", fontSize: 13, background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+              Agregar
+            </button>
+          </form>
+
+          {mensajeAdmin && <p style={{ fontSize: 12, color: "#2e9e4f", marginBottom: 10 }}>{mensajeAdmin}</p>}
+          {errorAdmin && <p style={{ fontSize: 12, color: "#e05555", marginBottom: 10 }}>⚠️ {errorAdmin}</p>}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {admins.map((a) => (
+              <div key={a.user_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, padding: "8px 10px", background: tema.fondo, borderRadius: 6 }}>
+                <span>{a.email} {a.es_principal && <strong style={{ color: acentoMarca }}>(Principal)</strong>}</span>
+                {!a.es_principal && (
+                  <button
+                    onClick={() => quitarAdmin(a.user_id)}
+                    style={{ fontSize: 11, background: "transparent", border: "1px solid #e05555", color: "#e05555", borderRadius: 4, padding: "4px 10px", cursor: "pointer" }}
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
   const [predicciones, setPredicciones] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -2745,6 +2873,8 @@ export default function Home() {
   const [cargandoSesion, setCargandoSesion] = useState(true);
   const [authModalAbierto, setAuthModalAbierto] = useState(false);
   const [authModalModo, setAuthModalModo] = useState("login");
+  const [esAdmin, setEsAdmin] = useState(false);
+  const [esAdminPrincipal, setEsAdminPrincipal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -2758,6 +2888,19 @@ export default function Home() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!sesion) { setEsAdmin(false); setEsAdminPrincipal(false); return; }
+    supabase
+      .from("admins")
+      .select("es_principal")
+      .eq("user_id", sesion.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setEsAdmin(!!data);
+        setEsAdminPrincipal(!!data?.es_principal);
+      });
+  }, [sesion]);
 
   function abrirLogin() {
     setAuthModalModo("login");
@@ -3367,10 +3510,17 @@ export default function Home() {
                   { clave: "favoritos", etiqueta: t("menuFavoritos") },
                   { clave: "historial", etiqueta: t("menuHistorial") },
                   { clave: "ajustes", etiqueta: t("menuAjustes") },
+                  ...(esAdmin ? [{ clave: "admin", etiqueta: "👑 Panel de administrador" }] : []),
                 ].map((item) => (
                   <div
                     key={item.clave}
-                    onClick={item.clave === "inicio" ? () => { setMenuAbierto(false); setVistaActual("inicio"); } : () => accederOPedirCuenta(item.clave)}
+                    onClick={
+                      item.clave === "inicio"
+                        ? () => { setMenuAbierto(false); setVistaActual("inicio"); }
+                        : item.clave === "admin"
+                        ? () => { setMenuAbierto(false); setVistaActual("admin"); }
+                        : () => accederOPedirCuenta(item.clave)
+                    }
                     style={{ padding: "10px 14px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
                   >
                     {item.etiqueta}
@@ -3544,6 +3694,12 @@ export default function Home() {
       {vistaActual === "historial" && (
         <div style={{ margin: "20px auto" }}>
           <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} />
+        </div>
+      )}
+
+      {vistaActual === "admin" && esAdmin && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaAdmin sesion={sesion} esAdminPrincipal={esAdminPrincipal} tema={tema} acentoMarca={acentoMarca} />
         </div>
       )}
 
