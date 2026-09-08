@@ -1159,6 +1159,11 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   const probBTTS = probabilidadBTTS(lambdaGolesLocal, lambdaGolesVisitante);
   const prob1X2 = probabilidad1X2(lambdaGolesLocal, lambdaGolesVisitante);
 
+  const lambdaGolesLocalAjustado = climaAjuste?.activo && lambdaGolesLocal !== null ? lambdaGolesLocal * climaAjuste.factorLocal : null;
+  const lambdaGolesVisitanteAjustado = climaAjuste?.activo && lambdaGolesVisitante !== null ? lambdaGolesVisitante * climaAjuste.factorVisitante : null;
+  const probBTTSAjustado = climaAjuste?.activo ? probabilidadBTTS(lambdaGolesLocalAjustado, lambdaGolesVisitanteAjustado) : null;
+  const prob1X2Ajustado = climaAjuste?.activo ? probabilidad1X2(lambdaGolesLocalAjustado, lambdaGolesVisitanteAjustado) : null;
+
   let advertenciaMuestra = null;
   if (coberturaPuntuales && coberturaPuntuales.total > 0) {
     const proporcion = coberturaPuntuales.exitos / coberturaPuntuales.total;
@@ -1206,6 +1211,32 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
               );
             })}
           </div>
+
+          {prob1X2Ajustado && (
+            <div style={{ marginTop: 8 }}>
+              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>🌦️ Con mi Estudio Climático:</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {[
+                  { etiqueta: equipoLocal.team.name, prob: prob1X2Ajustado.pLocal },
+                  { etiqueta: "Empate", prob: prob1X2Ajustado.pEmpate },
+                  { etiqueta: equipoVisitante.team.name, prob: prob1X2Ajustado.pVisitante },
+                ].map((item) => {
+                  const { color } = colorSemaforo(item.prob);
+                  return (
+                    <div
+                      key={item.etiqueta}
+                      style={{
+                        padding: "8px 14px", borderRadius: 6, background: color, color: "#fff", opacity: 0.85,
+                        fontSize: 13, fontWeight: "bold", minWidth: 110, textAlign: "center",
+                      }}
+                    >
+                      {item.etiqueta}<br />{Math.round(item.prob * 100)}%
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1222,6 +1253,20 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
               </div>
             );
           })()}
+
+          {probBTTSAjustado !== null && (
+            <div style={{ marginTop: 8 }}>
+              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>🌦️ Con mi Estudio Climático:</p>
+              {(() => {
+                const { color } = colorSemaforo(probBTTSAjustado);
+                return (
+                  <div style={{ display: "inline-block", padding: "8px 16px", borderRadius: 6, background: color, color: "#fff", opacity: 0.85, fontWeight: "bold", fontSize: 13 }}>
+                    {Math.round(probBTTSAjustado * 100)}%
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 
@@ -2944,6 +2989,7 @@ export default function Home() {
   const [favoritosPanelAbierto, setFavoritosPanelAbierto] = useState(false);
   const [contextoFavoritosIA, setContextoFavoritosIA] = useState("");
   const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
+  const [toqueSwipeX, setToqueSwipeX] = useState(null);
   const [vistaAnterior, setVistaAnterior] = useState("inicio");
   const [equipoPerfil, setEquipoPerfil] = useState(null);
 
@@ -3254,7 +3300,22 @@ export default function Home() {
 
 
   return (
-    <div style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}>
+    <div
+      style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}
+      onTouchStart={(e) => setToqueSwipeX(e.touches[0].clientX)}
+      onTouchEnd={(e) => {
+        if (toqueSwipeX === null) return;
+        const deltaX = e.changedTouches[0].clientX - toqueSwipeX;
+        const ORDEN_PESTANAS = ["inicio", "estudio", "favoritos"];
+        const indiceActual = ORDEN_PESTANAS.indexOf(vistaActual);
+        const hayModalAbierto = estudioClimaticoAbierto || authModalAbierto || favoritosPanelAbierto || chatAbierto;
+        if (!hayModalAbierto && indiceActual !== -1 && Math.abs(deltaX) > 70) {
+          if (deltaX < 0 && indiceActual < ORDEN_PESTANAS.length - 1) setVistaActual(ORDEN_PESTANAS[indiceActual + 1]);
+          else if (deltaX > 0 && indiceActual > 0) setVistaActual(ORDEN_PESTANAS[indiceActual - 1]);
+        }
+        setToqueSwipeX(null);
+      }}
+    >
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -3265,6 +3326,10 @@ export default function Home() {
           padding: 0;
           background: ${tema.fondo};
           font-family: 'IBM Plex Sans', Arial, sans-serif;
+        }
+
+        @media (max-width: 767px) {
+          body { padding-bottom: 64px; }
         }
 
         img { max-width: 100%; }
@@ -3380,6 +3445,14 @@ export default function Home() {
           animation: jmcsPulso 10s ease-in-out infinite;
         }
 
+        @media (max-width: 767px) {
+          .jmcs-chat-burbuja {
+            width: 56px;
+            bottom: 76px;
+            right: 14px;
+          }
+        }
+
         .jmcs-chat-burbuja img {
           width: 100%;
           height: auto;
@@ -3395,6 +3468,41 @@ export default function Home() {
         .jmcs-solo-pc { display: none; }
         @media (min-width: 1024px) {
           .jmcs-solo-pc { display: block; }
+        }
+
+        .jmcs-nav-pc { display: none; }
+        @media (min-width: 768px) {
+          .jmcs-nav-pc { display: flex; }
+        }
+
+        .jmcs-nav-movil {
+          display: flex;
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          justify-content: space-around;
+          align-items: center;
+          background: ${tema.panel};
+          border-top: 1px solid ${tema.borde};
+          padding: 6px 0;
+          padding-bottom: calc(6px + env(safe-area-inset-bottom));
+          z-index: 100;
+        }
+        @media (min-width: 768px) {
+          .jmcs-nav-movil { display: none; }
+        }
+
+        .jmcs-nav-movil-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          background: transparent;
+          border: none;
+          font-size: 9px;
+          cursor: pointer;
+          padding: 4px 6px;
         }
 
         .jmcs-partidos-grid {
@@ -3426,6 +3534,13 @@ export default function Home() {
           overflow-y: auto;
           border-radius: 10px;
           box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        @media (max-width: 767px) {
+          .jmcs-chat-panel {
+            bottom: 138px;
+            right: 12px;
+          }
         }
 
         /* Modo espejo: solo visible en pantallas amplias */
@@ -3596,7 +3711,7 @@ export default function Home() {
           </p>
         )}
 
-        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
+        <div className="jmcs-nav-pc" style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
           {[
             { id: "inicio", etiqueta: t("inicio") },
             { id: "estudio", etiqueta: t("estudio") },
@@ -4020,6 +4135,33 @@ export default function Home() {
           onCerrar={() => setFavoritosPanelAbierto(false)}
         />
       )}
+
+      <div className="jmcs-nav-movil">
+        {[
+          { id: "inicio", icono: "🏠", etiqueta: t("inicio").replace(/^\S+\s/, "") },
+          { id: "estudio", icono: "📊", etiqueta: t("estudio").replace(/^\S+\s/, "") },
+          { id: "favoritos", icono: "⭐", etiqueta: t("favoritos").replace(/^\S+\s/, "") },
+          { id: "historial", icono: "📈", etiqueta: "Historial" },
+        ].map((item) => (
+          <button
+            key={item.id}
+            className="jmcs-nav-movil-item"
+            onClick={() => (item.id === "inicio" ? setVistaActual("inicio") : accederOPedirCuenta(item.id))}
+            style={{ color: vistaActual === item.id ? acentoMarca : tema.textoSuave, fontWeight: vistaActual === item.id ? "bold" : "normal" }}
+          >
+            <span style={{ fontSize: 18 }}>{item.icono}</span>
+            {item.etiqueta}
+          </button>
+        ))}
+        <button
+          className="jmcs-nav-movil-item"
+          onClick={() => setMenuAbierto(!menuAbierto)}
+          style={{ color: tema.textoSuave }}
+        >
+          <span style={{ fontSize: 18 }}>☰</span>
+          Más
+        </button>
+      </div>
 
       {estudioClimaticoAbierto && ajustesClima && climaOficialNorm && equipoLocal?.team && equipoVisitante?.team && (
         <ModalEstudioClimatico
