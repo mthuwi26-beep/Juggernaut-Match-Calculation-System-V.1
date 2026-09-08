@@ -3530,8 +3530,12 @@ export default function Home() {
             )}
           </div>
 
-          {/* Zona centro: logo + título */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Zona centro: logo + título — clic lleva a Inicio */}
+          <div
+            onClick={() => setVistaActual("inicio")}
+            style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
+            title="Ir a Inicio"
+          >
             <img src="/logo.png" alt="JMCS" width={40} height={40} />
             <div>
               <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1 }}>JMCS</h1>
