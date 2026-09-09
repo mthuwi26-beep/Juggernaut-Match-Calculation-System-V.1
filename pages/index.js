@@ -83,6 +83,21 @@ const TEXTOS = {
     menuInicio: "Inicio", menuMisEstudios: "Mis estudios", menuFavoritos: "Favoritos",
     menuHistorial: "Historial de aciertos", menuAjustes: "Ajustes",
     buscarEquipoPlaceholder: "Busca un equipo (ej: Barcelona)",
+    // Etiquetas de estadísticas (las que más se repiten en toda la app)
+    record: "Récord (V-E-D)", golesFavor: "Goles a favor (prom.)", golesContra: "Goles en contra (prom.)",
+    over25: "% Over 2.5", btts: "% BTTS", corners: "Córners (prom.)", tarjetasAm: "Tarjetas am. (prom.)",
+    faltas: "Faltas (prom.)", posesion: "Posesión (prom.)", ultimos5: "Últimos 5",
+    comoLocal: "Como Local", comoVisitante: "Como Visitante", ligaActual: "Liga actual",
+    noLiga: "No liga (copas)", formaReciente: "Forma reciente (5)", sinDatos: "Sin datos.",
+    sinPartidos: "Sin partidos.", fecha: "Fecha", partido: "Partido", resultado: "Res.",
+    proximosEncuentros: "Próximos encuentros",
+    // Semáforo y mercados
+    golesTotales: "Goles totales del partido", ambosAnotan: "Ambos anotan (BTTS)",
+    ganadorPartido: "Ganador del partido", cornersTotales: "Córners totales del partido",
+    amarillasTotales: "Tarjetas amarillas totales", faltasTotales: "Faltas totales del partido",
+    empate: "Empate", datosGenerales: "Datos generales del encuentro", arbitro: "Árbitro",
+    sinDatosCorto: "Sin datos", guardarPronostico: "Guardar este pronóstico en mi historial",
+    pronosticoGuardado: "Pronóstico guardado en tu historial",
   },
   en: {
     inicio: "🏠 Home", estudio: "📊 Study", favoritos: "⭐ Favorites",
@@ -91,8 +106,29 @@ const TEXTOS = {
     menuInicio: "Home", menuMisEstudios: "My studies", menuFavoritos: "Favorites",
     menuHistorial: "Track record", menuAjustes: "Settings",
     buscarEquipoPlaceholder: "Search a team (e.g. Barcelona)",
+    record: "Record (W-D-L)", golesFavor: "Goals for (avg.)", golesContra: "Goals against (avg.)",
+    over25: "% Over 2.5", btts: "% BTTS", corners: "Corners (avg.)", tarjetasAm: "Yellow cards (avg.)",
+    faltas: "Fouls (avg.)", posesion: "Possession (avg.)", ultimos5: "Last 5",
+    comoLocal: "As Home", comoVisitante: "As Away", ligaActual: "Current league",
+    noLiga: "Non-league (cups)", formaReciente: "Recent form (5)", sinDatos: "No data.",
+    sinPartidos: "No matches.", fecha: "Date", partido: "Match", resultado: "Res.",
+    proximosEncuentros: "Upcoming matches",
+    golesTotales: "Total match goals", ambosAnotan: "Both teams score (BTTS)",
+    ganadorPartido: "Match winner", cornersTotales: "Total match corners",
+    amarillasTotales: "Total yellow cards", faltasTotales: "Total match fouls",
+    empate: "Draw", datosGenerales: "Match general info", arbitro: "Referee",
+    sinDatosCorto: "No data", guardarPronostico: "Save this prediction to my history",
+    pronosticoGuardado: "Prediction saved to your history",
   },
 };
+
+// Función de traducción accesible desde cualquier componente del archivo.
+// Lee el idioma actual de una variable simple que Home mantiene actualizada en cada render,
+// así no hay que pasar "idioma" como prop por cada componente de la app.
+let IDIOMA_ACTUAL = "es";
+function traducir(clave) {
+  return TEXTOS[IDIOMA_ACTUAL]?.[clave] || TEXTOS.es[clave] || clave;
+}
 
 const ACENTOS_CATEGORIA = {
   local: "#D8A93B",
@@ -483,23 +519,23 @@ function FilaStat({ etiqueta, valor }) {
   );
 }
 
-function MiniTabla({ fixtures, tema }) {
+function MiniTabla({ fixtures, tema, idioma = "es" }) {
   if (!fixtures || fixtures.length === 0) {
-    return <p style={{ color: tema.textoSuave, fontSize: 12 }}>Sin partidos.</p>;
+    return <p style={{ color: tema.textoSuave, fontSize: 12 }}>{traducir("sinPartidos")}</p>;
   }
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5, marginTop: 8 }}>
       <thead>
         <tr style={{ background: tema.encabezadoTabla, textAlign: "left" }}>
-          <th style={{ padding: 4 }}>Fecha</th>
-          <th style={{ padding: 4 }}>Partido</th>
-          <th style={{ padding: 4 }}>Res.</th>
+          <th style={{ padding: 4 }}>{traducir("fecha")}</th>
+          <th style={{ padding: 4 }}>{traducir("partido")}</th>
+          <th style={{ padding: 4 }}>{traducir("resultado")}</th>
         </tr>
       </thead>
       <tbody>
         {fixtures.map((f) => (
           <tr key={f.fixture.id} style={{ borderBottom: `1px solid ${tema.filaBorde}` }}>
-            <td style={{ padding: 4 }}>{new Date(f.fixture.date).toLocaleDateString("es-ES")}</td>
+            <td style={{ padding: 4 }}>{new Date(f.fixture.date).toLocaleDateString(idioma === "en" ? "en-US" : "es-ES")}</td>
             <td style={{ padding: 4 }}>{f.teams.home.name} vs {f.teams.away.name}</td>
             <td style={{ padding: 4 }}>{f.goals.home}-{f.goals.away}</td>
           </tr>
@@ -515,7 +551,7 @@ function esLiga(fixture) {
   return !palabrasNoLiga.some((p) => nombre.includes(p));
 }
 
-function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento }) {
+function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento, idioma = "es" }) {
   const statsGoles = calcularEstadisticasGoles(fixtures, teamId);
   const statsPuntuales = calcularEstadisticasPuntuales(fixtures, teamId, statsMap);
 
@@ -524,24 +560,24 @@ function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento }) {
       <h4 style={{ marginBottom: 6, fontSize: 12, color: acento }}>{titulo}</h4>
       {statsGoles ? (
         <div style={{ padding: 10, paddingTop: 8, background: tema.panel, borderRadius: 4, borderTop: `3px solid ${acento}`, fontSize: 12 }}>
-          <FilaStat etiqueta="Récord (V-E-D)" valor={`${statsGoles.victorias}-${statsGoles.empates}-${statsGoles.derrotas}`} />
-          <FilaStat etiqueta="Goles a favor (prom.)" valor={statsGoles.promedioGolesFavor} />
-          <FilaStat etiqueta="Goles en contra (prom.)" valor={statsGoles.promedioGolesContra} />
-          <FilaStat etiqueta="% Over 2.5" valor={`${statsGoles.over25Pct}%`} />
-          <FilaStat etiqueta="% BTTS" valor={`${statsGoles.bttsPct}%`} />
+          <FilaStat etiqueta={traducir("record")} valor={`${statsGoles.victorias}-${statsGoles.empates}-${statsGoles.derrotas}`} />
+          <FilaStat etiqueta={traducir("golesFavor")} valor={statsGoles.promedioGolesFavor} />
+          <FilaStat etiqueta={traducir("golesContra")} valor={statsGoles.promedioGolesContra} />
+          <FilaStat etiqueta={traducir("over25")} valor={`${statsGoles.over25Pct}%`} />
+          <FilaStat etiqueta={traducir("btts")} valor={`${statsGoles.bttsPct}%`} />
           {statsPuntuales && (
             <>
               <div style={{ borderTop: `1px solid ${tema.borde}`, margin: "6px 0" }} />
-              <FilaStat etiqueta="Córners (prom.)" valor={statsPuntuales.promedioCorners} />
-              <FilaStat etiqueta="Tarjetas am. (prom.)" valor={statsPuntuales.promedioAmarillas} />
-              <FilaStat etiqueta="Faltas (prom.)" valor={statsPuntuales.promedioFaltas} />
+              <FilaStat etiqueta={traducir("corners")} valor={statsPuntuales.promedioCorners} />
+              <FilaStat etiqueta={traducir("tarjetasAm")} valor={statsPuntuales.promedioAmarillas} />
+              <FilaStat etiqueta={traducir("faltas")} valor={statsPuntuales.promedioFaltas} />
             </>
           )}
         </div>
       ) : (
-        <p style={{ color: tema.textoSuave, fontSize: 12 }}>Sin datos.</p>
+        <p style={{ color: tema.textoSuave, fontSize: 12 }}>{traducir("sinDatos")}</p>
       )}
-      <MiniTabla fixtures={fixtures} tema={tema} />
+      <MiniTabla fixtures={fixtures} tema={tema} idioma={idioma} />
     </div>
   );
 }
@@ -649,10 +685,10 @@ function TarjetaFavorito({ favorito, tema, acento, onQuitar }) {
             <p style={{ color: tema.textoSuave }}>Cargando...</p>
           ) : stats ? (
             <>
-              <FilaStat etiqueta="Récord" valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
+              <FilaStat etiqueta={traducir("record")} valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
               <FilaStat etiqueta="Goles favor" valor={stats.promedioGolesFavor} />
-              <FilaStat etiqueta="% Over 2.5" valor={`${stats.over25Pct}%`} />
-              <FilaStat etiqueta="% BTTS" valor={`${stats.bttsPct}%`} />
+              <FilaStat etiqueta={traducir("over25")} valor={`${stats.over25Pct}%`} />
+              <FilaStat etiqueta={traducir("btts")} valor={`${stats.bttsPct}%`} />
             </>
           ) : (
             <p style={{ color: tema.textoSuave }}>Sin datos disponibles.</p>
@@ -917,11 +953,11 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
           </div>
 
           <div className="jmcs-subpaneles-individual" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <SubPanel titulo="Como Local" fixtures={fixturesLocalVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
-            <SubPanel titulo="Como Visitante" fixtures={fixturesVisitanteVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
-            <SubPanel titulo="Liga actual" fixtures={fixturesLigaActual} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
-            <SubPanel titulo="No liga (copas)" fixtures={fixturesNoLiga} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
-            <SubPanel titulo="Forma reciente (5)" fixtures={fixturesFormaReciente} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
+            <SubPanel titulo={traducir("comoLocal")} fixtures={fixturesLocalVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
+            <SubPanel titulo={traducir("comoVisitante")} fixtures={fixturesVisitanteVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
+            <SubPanel titulo={traducir("ligaActual")} fixtures={fixturesLigaActual} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
+            <SubPanel titulo={traducir("noLiga")} fixtures={fixturesNoLiga} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
+            <SubPanel titulo={traducir("formaReciente")} fixtures={fixturesFormaReciente} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
           </div>
         </div>
       )}
@@ -1216,6 +1252,16 @@ function CalculadoraValor({ opciones, tema, acento }) {
 
 function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos }) {
   const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
+  const [permisoNotificaciones, setPermisoNotificaciones] = useState(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"
+  );
+  const yaNotificado = useRef(new Set());
+
+  function activarNotificaciones() {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    Notification.requestPermission().then((permiso) => setPermisoNotificaciones(permiso));
+  }
+
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
   const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
@@ -1279,7 +1325,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   const opcionesValor = [];
   if (prob1X2) {
     opcionesValor.push({ etiqueta: `Gana ${equipoLocal.team.name}`, prob: prob1X2.pLocal });
-    opcionesValor.push({ etiqueta: "Empate", prob: prob1X2.pEmpate });
+    opcionesValor.push({ etiqueta: traducir("empate"), prob: prob1X2.pEmpate });
     opcionesValor.push({ etiqueta: `Gana ${equipoVisitante.team.name}`, prob: prob1X2.pVisitante });
   }
   if (probBTTS !== null) opcionesValor.push({ etiqueta: "Ambos anotan (BTTS)", prob: probBTTS });
@@ -1296,9 +1342,44 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
     LINEAS_MERCADOS.faltas.forEach((l) => opcionesValor.push({ etiqueta: `Faltas Over ${l}`, prob: probabilidadOver(lambdaFaltasTotal, l) }));
   }
 
+  useEffect(() => {
+    if (permisoNotificaciones !== "granted") return;
+    const claveEncuentro = `${equipoLocal.team.id}-${equipoVisitante.team.id}`;
+    opcionesValor.forEach((o) => {
+      if (o.prob >= 0.7) {
+        const clave = `${claveEncuentro}-${o.etiqueta}`;
+        if (!yaNotificado.current.has(clave)) {
+          yaNotificado.current.add(clave);
+          new Notification("🟢 JMCS — Semáforo en verde", {
+            body: `${equipoLocal.team.name} vs ${equipoVisitante.team.name}\n${o.etiqueta}: ${Math.round(o.prob * 100)}%`,
+            icon: "/logo.png",
+          });
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permisoNotificaciones, equipoLocal?.team?.id, equipoVisitante?.team?.id, opcionesValor.length]);
+
   return (
     <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
       <h3 style={{ marginTop: 0 }}>🚦 Pronóstico y semáforo</h3>
+
+      {permisoNotificaciones !== "unsupported" && (
+        <div style={{ marginBottom: 16 }}>
+          {permisoNotificaciones === "granted" ? (
+            <span style={{ fontSize: 11, color: "#2e9e4f" }}>🔔 Te avisaremos si algo aquí llega a semáforo verde (mientras esta pestaña esté abierta).</span>
+          ) : permisoNotificaciones === "denied" ? (
+            <span style={{ fontSize: 11, color: tema.textoSuave }}>🔕 Notificaciones bloqueadas — actívalas desde la configuración de tu navegador si quieres recibirlas.</span>
+          ) : (
+            <button
+              onClick={activarNotificaciones}
+              style={{ fontSize: 11, padding: "6px 12px", background: "transparent", border: `1px solid ${acento}`, color: acento, borderRadius: 14, cursor: "pointer" }}
+            >
+              🔔 Avisarme cuando haya semáforo verde
+            </button>
+          )}
+        </div>
+      )}
 
       <div style={{ marginBottom: 20, fontSize: 13, display: "flex", gap: 16 }}>
         <label style={{ cursor: "pointer" }}>
@@ -1311,14 +1392,14 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
       {prob1X2 && mostrarMercado("ganador") && (
         <div style={{ marginBottom: 18 }}>
-          <h4 style={{ marginBottom: 8, fontSize: 14 }}>Ganador del partido</h4>
+          <h4 style={{ marginBottom: 8, fontSize: 14 }}>{traducir("ganadorPartido")}</h4>
           <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
             Aproximación estándar basada en el mismo modelo de goles esperados — no es un modelo profesional de casa de apuestas.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {[
               { etiqueta: equipoLocal.team.name, prob: prob1X2.pLocal },
-              { etiqueta: "Empate", prob: prob1X2.pEmpate },
+              { etiqueta: traducir("empate"), prob: prob1X2.pEmpate },
               { etiqueta: equipoVisitante.team.name, prob: prob1X2.pVisitante },
             ].map((item) => {
               const { color } = colorSemaforo(item.prob);
@@ -1342,7 +1423,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {[
                   { etiqueta: equipoLocal.team.name, prob: prob1X2Ajustado.pLocal },
-                  { etiqueta: "Empate", prob: prob1X2Ajustado.pEmpate },
+                  { etiqueta: traducir("empate"), prob: prob1X2Ajustado.pEmpate },
                   { etiqueta: equipoVisitante.team.name, prob: prob1X2Ajustado.pVisitante },
                 ].map((item) => {
                   const { color } = colorSemaforo(item.prob);
@@ -1365,12 +1446,12 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       )}
 
       {mostrarMercado("goles") && (
-        <FilaMercado nombre="Goles totales del partido" lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
+        <FilaMercado nombre={traducir("golesTotales")} lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
       )}
 
       {probBTTS !== null && mostrarMercado("btts") && (
         <div style={{ marginBottom: 18 }}>
-          <h4 style={{ marginBottom: 8, fontSize: 14 }}>Ambos anotan (BTTS)</h4>
+          <h4 style={{ marginBottom: 8, fontSize: 14 }}>{traducir("ambosAnotan")}</h4>
           {(() => {
             const { color } = colorSemaforo(probBTTS);
             return (
@@ -1397,13 +1478,13 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       )}
 
       {mostrarMercado("corners") && (
-        <FilaMercado nombre="Córners totales del partido" lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado nombre={traducir("cornersTotales")} lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
       {mostrarMercado("amarillas") && (
-        <FilaMercado nombre="Tarjetas amarillas totales" lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado nombre={traducir("amarillasTotales")} lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
       {mostrarMercado("faltas") && (
-        <FilaMercado nombre="Faltas totales del partido" lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado nombre={traducir("faltasTotales")} lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
 
       {!datosPuntualesListos && (
@@ -1433,7 +1514,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
             ? (prob1X2.pLocal >= prob1X2.pEmpate && prob1X2.pLocal >= prob1X2.pVisitante
                 ? equipoLocal.team.name
                 : prob1X2.pEmpate >= prob1X2.pVisitante
-                ? "Empate"
+                ? traducir("empate")
                 : equipoVisitante.team.name)
             : null,
         }}
@@ -1784,15 +1865,15 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, s
       {stats ? (
         <>
           <div style={{ fontSize: 12, textAlign: "left" }}>
-            <FilaStat etiqueta="Récord" valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
+            <FilaStat etiqueta={traducir("record")} valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
             <FilaStat etiqueta="Goles favor" valor={stats.promedioGolesFavor} />
             <FilaStat etiqueta="Goles contra" valor={stats.promedioGolesContra} />
-            <FilaStat etiqueta="% Over 2.5" valor={`${stats.over25Pct}%`} />
-            <FilaStat etiqueta="% BTTS" valor={`${stats.bttsPct}%`} />
+            <FilaStat etiqueta={traducir("over25")} valor={`${stats.over25Pct}%`} />
+            <FilaStat etiqueta={traducir("btts")} valor={`${stats.bttsPct}%`} />
             {posesion !== null && posesion !== undefined && (
               <>
                 <div style={{ borderTop: `1px solid ${tema.borde}`, margin: "6px 0" }} />
-                <FilaStat etiqueta="Posesión (prom.)" valor={`${posesion}%`} />
+                <FilaStat etiqueta={traducir("posesion")} valor={`${posesion}%`} />
               </>
             )}
           </div>
@@ -1800,7 +1881,7 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, s
           {ultimos5.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: tema.textoSuave, marginBottom: 6, textAlign: "left" }}>
-                Últimos 5
+                {traducir("ultimos5")}
               </p>
               <div style={{ display: "flex", gap: 4 }}>
                 {ultimos5.map((f) => {
@@ -1930,16 +2011,16 @@ function CategoriaEspejo({ titulo, fixturesLocal, fixturesVisitante, idLocal, id
   return (
     <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acento}`, padding: "12px 16px", marginBottom: 14 }}>
       <h4 style={{ textAlign: "center", margin: "0 0 8px", fontSize: 12, color: acento }}>{titulo}</h4>
-      <FilaEspejo etiqueta="Récord" valorLocal={statsL ? `${statsL.victorias}-${statsL.empates}-${statsL.derrotas}` : "—"} valorVisitante={statsV ? `${statsV.victorias}-${statsV.empates}-${statsV.derrotas}` : "—"} tema={tema} />
-      <FilaEspejo etiqueta="Goles a favor" valorLocal={statsL?.promedioGolesFavor ?? "—"} valorVisitante={statsV?.promedioGolesFavor ?? "—"} tema={tema} />
-      <FilaEspejo etiqueta="Goles en contra" valorLocal={statsL?.promedioGolesContra ?? "—"} valorVisitante={statsV?.promedioGolesContra ?? "—"} tema={tema} />
-      <FilaEspejo etiqueta="% Over 2.5" valorLocal={statsL ? `${statsL.over25Pct}%` : "—"} valorVisitante={statsV ? `${statsV.over25Pct}%` : "—"} tema={tema} />
-      <FilaEspejo etiqueta="% BTTS" valorLocal={statsL ? `${statsL.bttsPct}%` : "—"} valorVisitante={statsV ? `${statsV.bttsPct}%` : "—"} tema={tema} />
+      <FilaEspejo etiqueta={traducir("record")} valorLocal={statsL ? `${statsL.victorias}-${statsL.empates}-${statsL.derrotas}` : "—"} valorVisitante={statsV ? `${statsV.victorias}-${statsV.empates}-${statsV.derrotas}` : "—"} tema={tema} />
+      <FilaEspejo etiqueta={traducir("golesFavor")} valorLocal={statsL?.promedioGolesFavor ?? "—"} valorVisitante={statsV?.promedioGolesFavor ?? "—"} tema={tema} />
+      <FilaEspejo etiqueta={traducir("golesContra")} valorLocal={statsL?.promedioGolesContra ?? "—"} valorVisitante={statsV?.promedioGolesContra ?? "—"} tema={tema} />
+      <FilaEspejo etiqueta={traducir("over25")} valorLocal={statsL ? `${statsL.over25Pct}%` : "—"} valorVisitante={statsV ? `${statsV.over25Pct}%` : "—"} tema={tema} />
+      <FilaEspejo etiqueta={traducir("btts")} valorLocal={statsL ? `${statsL.bttsPct}%` : "—"} valorVisitante={statsV ? `${statsV.bttsPct}%` : "—"} tema={tema} />
       {(puntualesL || puntualesV) && (
         <>
-          <FilaEspejo etiqueta="Córners" valorLocal={puntualesL?.promedioCorners ?? "—"} valorVisitante={puntualesV?.promedioCorners ?? "—"} tema={tema} />
-          <FilaEspejo etiqueta="Tarjetas am." valorLocal={puntualesL?.promedioAmarillas ?? "—"} valorVisitante={puntualesV?.promedioAmarillas ?? "—"} tema={tema} />
-          <FilaEspejo etiqueta="Faltas" valorLocal={puntualesL?.promedioFaltas ?? "—"} valorVisitante={puntualesV?.promedioFaltas ?? "—"} tema={tema} />
+          <FilaEspejo etiqueta={traducir("corners")} valorLocal={puntualesL?.promedioCorners ?? "—"} valorVisitante={puntualesV?.promedioCorners ?? "—"} tema={tema} />
+          <FilaEspejo etiqueta={traducir("tarjetasAm")} valorLocal={puntualesL?.promedioAmarillas ?? "—"} valorVisitante={puntualesV?.promedioAmarillas ?? "—"} tema={tema} />
+          <FilaEspejo etiqueta={traducir("faltas")} valorLocal={puntualesL?.promedioFaltas ?? "—"} valorVisitante={puntualesV?.promedioFaltas ?? "—"} tema={tema} />
         </>
       )}
     </div>
@@ -1960,9 +2041,9 @@ function SeccionEspejo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       </div>
 
       <CategoriaEspejo titulo="Como Local / Como Visitante" fixturesLocal={catLocal.local} fixturesVisitante={catVisitante.visitante} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
-      <CategoriaEspejo titulo="Liga actual" fixturesLocal={catLocal.liga} fixturesVisitante={catVisitante.liga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
-      <CategoriaEspejo titulo="No liga (copas)" fixturesLocal={catLocal.noLiga} fixturesVisitante={catVisitante.noLiga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
-      <CategoriaEspejo titulo="Forma reciente (5)" fixturesLocal={catLocal.forma} fixturesVisitante={catVisitante.forma} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
+      <CategoriaEspejo titulo={traducir("ligaActual")} fixturesLocal={catLocal.liga} fixturesVisitante={catVisitante.liga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
+      <CategoriaEspejo titulo={traducir("noLiga")} fixturesLocal={catLocal.noLiga} fixturesVisitante={catVisitante.noLiga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
+      <CategoriaEspejo titulo={traducir("formaReciente")} fixturesLocal={catLocal.forma} fixturesVisitante={catVisitante.forma} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
     </div>
   );
 }
@@ -2170,7 +2251,7 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
 
   return (
     <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 14, marginBottom: 18, fontSize: 12 }}>
-      <h4 style={{ margin: "0 0 8px", fontSize: 11, color: acentoMarca }}>📋 Datos generales del encuentro</h4>
+      <h4 style={{ margin: "0 0 8px", fontSize: 11, color: acentoMarca }}>📋 {traducir("datosGenerales")}</h4>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
         {venue?.name && (
@@ -2178,7 +2259,7 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
             🏟️ {venue.name}{venue.city ? `, ${venue.city}` : ""}{cubierto && " (cubierto)"}
           </div>
         )}
-        <div style={{ minWidth: 0, wordBreak: "break-word" }}>🧑‍⚖️ Árbitro: {arbitro || "Sin datos"}</div>
+        <div style={{ minWidth: 0, wordBreak: "break-word" }}>🧑‍⚖️ {traducir("arbitro")}: {arbitro || traducir("sinDatosCorto")}</div>
         {cargandoClima && <div style={{ color: tema.textoSuave }}>Cargando clima...</div>}
         {climaData && !cubierto && (
           <>
@@ -3359,11 +3440,11 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
       ) : (
         <>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 30 }}>
-            <SubPanel titulo="Como Local" fixtures={categorias.local} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.local} />
-            <SubPanel titulo="Como Visitante" fixtures={categorias.visitante} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
-            <SubPanel titulo="Liga actual" fixtures={categorias.liga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
-            <SubPanel titulo="No liga (copas)" fixtures={categorias.noLiga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
-            <SubPanel titulo="Forma reciente (5)" fixtures={categorias.forma} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
+            <SubPanel titulo={traducir("comoLocal")} fixtures={categorias.local} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.local} />
+            <SubPanel titulo={traducir("comoVisitante")} fixtures={categorias.visitante} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
+            <SubPanel titulo={traducir("ligaActual")} fixtures={categorias.liga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
+            <SubPanel titulo={traducir("noLiga")} fixtures={categorias.noLiga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
+            <SubPanel titulo={traducir("formaReciente")} fixtures={categorias.forma} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
           </div>
 
           <h3 style={{ fontSize: 15, marginBottom: 12 }}>📅 Próximos encuentros</h3>
@@ -3440,11 +3521,11 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
               if (!stats) return <p style={{ color: tema.textoSuave, fontSize: 12 }}>Sin datos.</p>;
               return (
                 <div style={{ fontSize: 13 }}>
-                  <FilaStat etiqueta="Récord (V-E-D)" valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
-                  <FilaStat etiqueta="Goles a favor (prom.)" valor={stats.promedioGolesFavor} />
-                  <FilaStat etiqueta="Goles en contra (prom.)" valor={stats.promedioGolesContra} />
-                  <FilaStat etiqueta="% Over 2.5" valor={`${stats.over25Pct}%`} />
-                  <FilaStat etiqueta="% BTTS" valor={`${stats.bttsPct}%`} />
+                  <FilaStat etiqueta={traducir("record")} valor={`${stats.victorias}-${stats.empates}-${stats.derrotas}`} />
+                  <FilaStat etiqueta={traducir("golesFavor")} valor={stats.promedioGolesFavor} />
+                  <FilaStat etiqueta={traducir("golesContra")} valor={stats.promedioGolesContra} />
+                  <FilaStat etiqueta={traducir("over25")} valor={`${stats.over25Pct}%`} />
+                  <FilaStat etiqueta={traducir("btts")} valor={`${stats.bttsPct}%`} />
                 </div>
               );
             })()}
@@ -3493,7 +3574,8 @@ export default function Home() {
 
   const [idiomaAbierto, setIdiomaAbierto] = useState(false);
   const [idioma, setIdioma] = useState("es");
-  const t = (clave) => TEXTOS[idioma]?.[clave] || TEXTOS.es[clave] || clave;
+  IDIOMA_ACTUAL = idioma; // se actualiza en cada render, antes de que los hijos usen traducir()
+  const t = traducir;
   const [notaProximamente, setNotaProximamente] = useState(false);
   const [tarjetaActivaMovil, setTarjetaActivaMovil] = useState("local");
   const [toqueInicioX, setToqueInicioX] = useState(null);
