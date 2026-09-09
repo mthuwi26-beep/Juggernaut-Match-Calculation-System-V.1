@@ -1256,11 +1256,34 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"
   );
   const yaNotificado = useRef(new Set());
+  const opcionesValorRef = useRef([]);
+  const infoPartidoRef = useRef({ nombreLocal: "", nombreVisitante: "", claveEncuentro: "" });
 
   function activarNotificaciones() {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     Notification.requestPermission().then((permiso) => setPermisoNotificaciones(permiso));
   }
+
+  // Este efecto va ANTES de cualquier "return" condicional de la función —
+  // en React, los hooks siempre deben llamarse en el mismo orden en cada render,
+  // sin importar si el partido está listo o no todavía.
+  useEffect(() => {
+    if (permisoNotificaciones !== "granted") return;
+    const { nombreLocal, nombreVisitante, claveEncuentro } = infoPartidoRef.current;
+    if (!claveEncuentro) return;
+    opcionesValorRef.current.forEach((o) => {
+      if (o.prob >= 0.7) {
+        const clave = `${claveEncuentro}-${o.etiqueta}`;
+        if (!yaNotificado.current.has(clave)) {
+          yaNotificado.current.add(clave);
+          new Notification("🟢 JMCS — Semáforo en verde", {
+            body: `${nombreLocal} vs ${nombreVisitante}\n${o.etiqueta}: ${Math.round(o.prob * 100)}%`,
+            icon: "/logo.png",
+          });
+        }
+      }
+    });
+  }, [permisoNotificaciones, equipoLocal?.team?.id, equipoVisitante?.team?.id, datosPuntualesListos]);
 
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
@@ -1342,23 +1365,15 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
     LINEAS_MERCADOS.faltas.forEach((l) => opcionesValor.push({ etiqueta: `Faltas Over ${l}`, prob: probabilidadOver(lambdaFaltasTotal, l) }));
   }
 
-  useEffect(() => {
-    if (permisoNotificaciones !== "granted") return;
-    const claveEncuentro = `${equipoLocal.team.id}-${equipoVisitante.team.id}`;
-    opcionesValor.forEach((o) => {
-      if (o.prob >= 0.7) {
-        const clave = `${claveEncuentro}-${o.etiqueta}`;
-        if (!yaNotificado.current.has(clave)) {
-          yaNotificado.current.add(clave);
-          new Notification("🟢 JMCS — Semáforo en verde", {
-            body: `${equipoLocal.team.name} vs ${equipoVisitante.team.name}\n${o.etiqueta}: ${Math.round(o.prob * 100)}%`,
-            icon: "/logo.png",
-          });
-        }
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permisoNotificaciones, equipoLocal?.team?.id, equipoVisitante?.team?.id, opcionesValor.length]);
+  // Guardamos esto en referencias (no en hooks) para que el useEffect de arriba
+  // —que corre siempre, antes de cualquier "return" de esta función— pueda leerlo
+  // cuando le toque ejecutarse, sin romper el orden de los hooks de React.
+  opcionesValorRef.current = opcionesValor;
+  infoPartidoRef.current = {
+    nombreLocal: equipoLocal.team.name,
+    nombreVisitante: equipoVisitante.team.name,
+    claveEncuentro: `${equipoLocal.team.id}-${equipoVisitante.team.id}`,
+  };
 
   return (
     <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
