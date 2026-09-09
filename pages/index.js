@@ -23,6 +23,29 @@ const TEMAS = {
 };
 
 const DORADO = "#D8A93B";
+
+// Banderas de los países que más aparecen en el fútbol mundial (nombres tal como los da la API).
+// Si un país no está aquí, simplemente no se le muestra bandera — no rompe nada.
+const BANDERAS_PAISES = {
+  Argentina: "🇦🇷", Brazil: "🇧🇷", Spain: "🇪🇸", England: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", Italy: "🇮🇹",
+  Germany: "🇩🇪", France: "🇫🇷", Portugal: "🇵🇹", Mexico: "🇲🇽", Colombia: "🇨🇴",
+  Chile: "🇨🇱", Uruguay: "🇺🇾", Peru: "🇵🇪", Ecuador: "🇪🇨", "United-States": "🇺🇸",
+  Netherlands: "🇳🇱", Belgium: "🇧🇪", Turkey: "🇹🇷", Japan: "🇯🇵", "South-Korea": "🇰🇷",
+  Paraguay: "🇵🇾", Bolivia: "🇧🇴", Venezuela: "🇻🇪", "Costa-Rica": "🇨🇷", Honduras: "🇭🇳",
+  Panama: "🇵🇦", Guatemala: "🇬🇹", Ecuador2: "🇪🇨", Russia: "🇷🇺", Ukraine: "🇺🇦",
+  Poland: "🇵🇱", Croatia: "🇭🇷", Serbia: "🇷🇸", Switzerland: "🇨🇭", Austria: "🇦🇹",
+  Scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", Wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", Ireland: "🇮🇪", Denmark: "🇩🇰", Sweden: "🇸🇪",
+  Norway: "🇳🇴", Greece: "🇬🇷", Egypt: "🇪🇬", Morocco: "🇲🇦", Nigeria: "🇳🇬",
+  Senegal: "🇸🇳", "Saudi-Arabia": "🇸🇦", Qatar: "🇶🇦", "United-Arab-Emirates": "🇦🇪",
+  China: "🇨🇳", India: "🇮🇳", Australia: "🇦🇺",
+};
+
+// Los países más "famosos" en fútbol — la fila de accesos rápidos de Inicio muestra estos primero
+const PAISES_POPULARES = [
+  "Argentina", "Brazil", "Spain", "England", "Italy", "Germany",
+  "France", "Portugal", "Mexico", "Colombia", "Chile", "Uruguay",
+];
+
 const VERDE_MARCA = "#1E5631";
 // Traducción del "esqueleto" de la app (menú, pestañas, botones principales).
 // Las etiquetas internas de estadísticas siguen en español por ahora (fase 2 de traducción).
@@ -1426,11 +1449,12 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
               key={pais}
               onClick={() => setPaisFiltro(pais === paisFiltro ? null : pais)}
               style={{
-                flexShrink: 0, padding: "5px 12px", fontSize: 11, borderRadius: 14, whiteSpace: "nowrap", cursor: "pointer",
+                flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", fontSize: 11, borderRadius: 14, whiteSpace: "nowrap", cursor: "pointer",
                 background: paisFiltro === pais ? acentoMarca : "transparent", color: paisFiltro === pais ? "#fff" : tema.texto,
                 border: `1px solid ${paisFiltro === pais ? acentoMarca : tema.borde}`,
               }}
             >
+              <span>{BANDERAS_PAISES[pais] || "🌍"}</span>
               {pais}
             </button>
           ))}
@@ -2651,6 +2675,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil 
   const [partidos, setPartidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [paisFiltro, setPaisFiltro] = useState(null);
 
   useEffect(() => {
     const hoy = new Date().toISOString().split("T")[0];
@@ -2665,20 +2690,55 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil 
       .finally(() => setLoading(false));
   }, []);
 
+  const partidosFiltrados = paisFiltro ? partidos.filter((p) => p.league?.country === paisFiltro) : partidos;
+
   const grupos = {};
-  partidos.forEach((p) => {
+  partidosFiltrados.forEach((p) => {
     const pais = p.league?.country || "Otros";
     if (!grupos[pais]) grupos[pais] = [];
     grupos[pais].push(p);
   });
   const paisesOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b));
 
+  // Solo mostramos en la fila de accesos rápidos los países populares que sí tienen partidos hoy
+  const paisesPopularesConPartidos = PAISES_POPULARES.filter((pais) => partidos.some((p) => p.league?.country === pais));
+
   return (
     <div>
-      <h3 style={{ fontSize: 15, marginBottom: 14 }}>⚽ Partidos de hoy</h3>
+      <h3 style={{ fontSize: 15, marginBottom: 10 }}>⚽ Partidos de hoy</h3>
+
+      {paisesPopularesConPartidos.length > 0 && (
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, marginBottom: 14 }}>
+          <button
+            onClick={() => setPaisFiltro(null)}
+            style={{
+              flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+              background: !paisFiltro ? acentoMarca : "transparent", color: !paisFiltro ? "#fff" : tema.texto,
+              border: `1px solid ${!paisFiltro ? acentoMarca : tema.borde}`,
+            }}
+          >
+            Todos
+          </button>
+          {paisesPopularesConPartidos.map((pais) => (
+            <button
+              key={pais}
+              onClick={() => setPaisFiltro(pais === paisFiltro ? null : pais)}
+              style={{
+                flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+                background: paisFiltro === pais ? acentoMarca : "transparent", color: paisFiltro === pais ? "#fff" : tema.texto,
+                border: `1px solid ${paisFiltro === pais ? acentoMarca : tema.borde}`,
+              }}
+            >
+              <span style={{ fontSize: 15 }}>{BANDERAS_PAISES[pais] || "🌍"}</span>
+              {pais}
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading && <p style={{ color: tema.textoSuave, fontSize: 13 }}>Cargando partidos...</p>}
       {error && <p style={{ color: "#e05555", fontSize: 13 }}>{error}</p>}
-      {!loading && !error && partidos.length === 0 && (
+      {!loading && !error && partidosFiltrados.length === 0 && (
         <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay partidos disponibles para hoy en este plan.</p>
       )}
       {paisesOrdenados.map((pais) => (
@@ -2687,7 +2747,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil 
             fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", color: acentoMarca,
             borderBottom: `2px solid ${acentoMarca}`, paddingBottom: 6, marginBottom: 12,
           }}>
-            🌍 {pais}
+            {BANDERAS_PAISES[pais] || "🌍"} {pais}
           </h4>
           <div className="jmcs-partidos-grid">
             {grupos[pais].map((p) => (
