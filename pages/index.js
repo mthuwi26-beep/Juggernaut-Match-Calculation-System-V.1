@@ -45,6 +45,41 @@ function banderaEquipo(pais) {
   return BANDERAS_PAISES[pais] || "";
 }
 
+// Códigos ISO de los mismos países de arriba, para pedirle la bandera como IMAGEN a flagcdn.com
+// (gratis, sin key, no ocupa espacio en nuestra base). Solo se usa cuando la API no nos manda
+// ya una URL de bandera propia (eso pasa con equipos, no con partidos/ligas).
+const CODIGOS_ISO_PAISES = {
+  Argentina: "ar", Brazil: "br", Spain: "es", England: "gb-eng", Italy: "it",
+  Germany: "de", France: "fr", Portugal: "pt", Mexico: "mx", Colombia: "co",
+  Chile: "cl", Uruguay: "uy", Peru: "pe", Ecuador: "ec", "United-States": "us",
+  Netherlands: "nl", Belgium: "be", Turkey: "tr", Japan: "jp", "South-Korea": "kr",
+  Paraguay: "py", Bolivia: "bo", Venezuela: "ve", "Costa-Rica": "cr", Honduras: "hn",
+  Panama: "pa", Guatemala: "gt", Russia: "ru", Ukraine: "ua", Poland: "pl",
+  Croatia: "hr", Serbia: "rs", Switzerland: "ch", Austria: "at", Scotland: "gb-sct",
+  Wales: "gb-wls", Ireland: "ie", Denmark: "dk", Sweden: "se", Norway: "no",
+  Greece: "gr", Egypt: "eg", Morocco: "ma", Nigeria: "ng", Senegal: "sn",
+  "Saudi-Arabia": "sa", Qatar: "qa", "United-Arab-Emirates": "ae", China: "cn",
+  India: "in", Australia: "au",
+};
+
+// Bandera como imagen real (reemplaza los emoji 🇦🇷 que en PC/Windows a veces se ven como texto "AR").
+// Prioridad: 1) la URL que ya nos manda la API en el partido (league.flag), 2) nuestro propio mapa por
+// código ISO vía flagcdn.com, 3) no muestra nada (mejor vacío que un ícono roto o equivocado).
+function BanderaPais({ pais, url, size = 16 }) {
+  const codigo = pais ? CODIGOS_ISO_PAISES[pais] : null;
+  const src = url || (codigo ? `https://flagcdn.com/w80/${codigo}.png` : null);
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      width={size}
+      style={{ height: "auto", borderRadius: 2, verticalAlign: "middle", display: "inline-block" }}
+      onError={(e) => { e.target.style.display = "none"; }}
+    />
+  );
+}
+
 // Los países más "famosos" en fútbol — la fila de accesos rápidos de Inicio muestra estos primero
 const PAISES_POPULARES = [
   "Argentina", "Brazil", "Spain", "England", "Italy", "Germany",
@@ -744,7 +779,7 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
               }}
             >
               <img src={corregirEscudo(f.team_logo)} alt={f.team_name} width={60} height={60} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
-              <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4 }}>{banderaEquipo(f.team_country)} {f.team_name}</div>
+              <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4 }}><BanderaPais pais={f.team_country} size={16} /> {f.team_name}</div>
               {f.team_country && <div style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 10 }}>{f.team_country}</div>}
               <button
                 onClick={(e) => { e.stopPropagation(); quitar(f.team_id); }}
@@ -947,7 +982,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
               title="Ver perfil completo del equipo"
             >
               <img src={corregirEscudo(selectedTeam.team.logo)} alt={selectedTeam.team.name} width={26} height={26} onError={manejarErrorEscudo} />
-              <strong style={{ color: colorMarca || tema.texto }}>{banderaEquipo(selectedTeam.team.country)} {selectedTeam.team.name}</strong>
+              <strong style={{ color: colorMarca || tema.texto }}><BanderaPais pais={selectedTeam.team.country} size={16} /> {selectedTeam.team.name}</strong>
             </div>
             <BotonFavorito equipo={selectedTeam} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
           </div>
@@ -1663,7 +1698,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
                 border: `1px solid ${paisFiltro === pais ? acentoMarca : tema.borde}`,
               }}
             >
-              <span>{BANDERAS_PAISES[pais] || "🌍"}</span>
+              <BanderaPais pais={pais} url={partidos.find((x) => x.league?.country === pais)?.league?.flag} size={14} />
               {pais}
             </button>
           ))}
@@ -1874,7 +1909,7 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, s
       </div>
       <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
         <span onClick={() => onAbrirPerfil && onAbrirPerfil(equipo.team)} style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}>
-          {banderaEquipo(equipo.team.country)} {equipo.team.name}
+          <BanderaPais pais={equipo.team.country} size={16} /> {equipo.team.name}
         </span>
         <BotonFavorito equipo={equipo} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
       </h4>
@@ -2538,7 +2573,7 @@ function TarjetaEquipoClima({ equipo, rol, ajustes, climaOficial, onCambiar, tem
     <div style={{ flex: 1, minWidth: 260, background: "#111", borderRadius: 8, padding: 14, borderTop: `3px solid ${colorMarca}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={26} height={26} onError={manejarErrorEscudo} />
-        <strong style={{ color: colorMarca, fontSize: 14 }}>{banderaEquipo(equipo.country)} {equipo.name}</strong>
+        <strong style={{ color: colorMarca, fontSize: 14 }}><BanderaPais pais={equipo.country} size={16} /> {equipo.name}</strong>
       </div>
       {["viento", "lluvia", "temperatura", "humedad"].map((v) => (
         <TimelineClima
@@ -3107,7 +3142,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
                 border: `1px solid ${paisFiltro === pais ? acentoMarca : tema.borde}`,
               }}
             >
-              <span style={{ fontSize: 15 }}>{BANDERAS_PAISES[pais] || "🌍"}</span>
+              <BanderaPais pais={pais} url={partidos.find((x) => x.league?.country === pais)?.league?.flag} size={16} />
               {pais}
             </button>
           ))}
@@ -3125,7 +3160,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
             fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", color: acentoMarca,
             borderBottom: `2px solid ${acentoMarca}`, paddingBottom: 6, marginBottom: 12,
           }}>
-            {BANDERAS_PAISES[pais] || "🌍"} {pais}
+            <BanderaPais pais={pais} url={grupos[pais]?.[0]?.league?.flag} size={18} /> {pais}
           </h4>
           <div className="jmcs-partidos-grid">
             {grupos[pais].map((p) => (
@@ -3604,7 +3639,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
       <div style={{ background: colorTenue(colorMarca), borderTop: `3px solid ${colorMarca}`, borderRadius: 8, padding: 20, marginBottom: 20, textAlign: "center" }}>
         <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={70} height={70} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <h2 style={{ margin: 0, color: colorMarca }}>{banderaEquipo(equipo.country)} {equipo.name}</h2>
+          <h2 style={{ margin: 0, color: colorMarca }}><BanderaPais pais={equipo.country} size={22} /> {equipo.name}</h2>
           <BotonFavorito equipo={{ team: equipo }} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
         </div>
         {equipo.country && <p style={{ margin: "4px 0 0", color: tema.textoSuave, fontSize: 12 }}>{equipo.country}</p>}
@@ -3634,6 +3669,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
 }
 
 function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey, paisDetectado, onBuscarEquipoPorNombre, mostrarToast, modoOscuro }) {
+  const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   return (
     <div>
       {paisDetectado && (
@@ -3646,7 +3682,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
             }}
             title={`Ver partidos de hoy de ${paisDetectado}`}
           >
-            <span style={{ fontSize: 32 }}>{BANDERAS_PAISES[paisDetectado] || "🌍"}</span>
+            <BanderaPais pais={paisDetectado} size={40} />
             <span style={{ fontSize: 26, fontWeight: "bold", color: acentoMarca }}>{paisDetectado}</span>
           </button>
 
@@ -3707,6 +3743,25 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
           </div>
         </div>
       )}
+
+      <div style={{ marginBottom: 24 }}>
+        <button
+          onClick={() => setCalendarioAbierto((v) => !v)}
+          style={{
+            display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "12px 14px",
+            background: tema.panel, color: acentoMarca, border: `1px solid ${tema.borde}`, borderRadius: 6,
+            cursor: "pointer", fontSize: 13, fontWeight: "bold", textAlign: "left",
+          }}
+        >
+          📅 Buscar partidos por fecha
+          <span style={{ marginLeft: "auto", fontSize: 11, color: tema.textoSuave }}>{calendarioAbierto ? "▲ Ocultar" : "▼ Mostrar"}</span>
+        </button>
+        {calendarioAbierto && (
+          <div style={{ marginTop: 10 }}>
+            <PanelCalendario tema={tema} onSeleccionarPartido={onSeleccionarPartido} acentoMarca={acentoMarca} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} />
+          </div>
+        )}
+      </div>
 
       <ListaPartidosInicio key={refrescarKey} tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} modoOscuro={modoOscuro} />
     </div>
@@ -4845,7 +4900,7 @@ export default function Home() {
                     onClick={elegirPaisVivo}
                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${tema.borde}`, background: colorTenue(acentoMarca) }}
                   >
-                    <span style={{ fontSize: 18 }}>{BANDERAS_PAISES[paisVivo] || "🌍"}</span>
+                    <BanderaPais pais={paisVivo} size={22} />
                     <strong style={{ fontSize: 13 }}>{paisVivo}</strong>
                     <span style={{ fontSize: 11, color: tema.textoSuave, marginLeft: "auto" }}>País →</span>
                   </div>
