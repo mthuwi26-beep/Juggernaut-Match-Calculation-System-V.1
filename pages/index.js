@@ -2308,6 +2308,7 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
   const [modo, setModo] = useState(modoInicial || "login"); // "login" | "registro" | "magico"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [cargandoGoogle, setCargandoGoogle] = useState(false);
@@ -2322,8 +2323,11 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
 
     try {
       if (modo === "registro") {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
+        if (data.user) {
+          await supabase.from("perfiles").insert({ user_id: data.user.id, username: username.trim() || null });
+        }
         setMensaje("✅ ¡Cuenta creada! Verifica tu cuenta desde tu bandeja de entrada (revisa spam si no la ves) para poder iniciar sesión.");
       } else if (modo === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -2413,6 +2417,18 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
         </div>
 
         <form onSubmit={manejarSubmit}>
+          {modo === "registro" && (
+            <input
+              type="text"
+              placeholder="Nombre de usuario"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              maxLength={24}
+              style={{ width: "100%", padding: 10, marginBottom: 10, fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+            />
+          )}
+
           <input
             type="email"
             placeholder="Correo electrónico"
@@ -2838,6 +2854,123 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
 }
 
 
+const AVATARES_PREDEFINIDOS = [
+  { id: "escudo-jmcs", src: "/avatars/escudo-jmcs.png" },
+  { id: "alas", src: "/avatars/alas.png" },
+  { id: "porteria", src: "/avatars/porteria.png" },
+];
+
+function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca }) {
+  const [username, setUsername] = useState(perfil?.username || "");
+  const [avatarSeleccionado, setAvatarSeleccionado] = useState(perfil?.avatar_url || "");
+  const [subiendo, setSubiendo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [error, setError] = useState("");
+
+  async function subirFoto(e) {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setError("");
+    setSubiendo(true);
+    try {
+      const extension = archivo.name.split(".").pop();
+      const ruta = `${sesion.user.id}/avatar-${Date.now()}.${extension}`;
+      const { error: errorSubida } = await supabase.storage.from("avatars").upload(ruta, archivo, { upsert: true });
+      if (errorSubida) throw errorSubida;
+      const { data } = supabase.storage.from("avatars").getPublicUrl(ruta);
+      setAvatarSeleccionado(data.publicUrl);
+    } catch (err) {
+      setError(err.message || "No se pudo subir la imagen");
+    }
+    setSubiendo(false);
+  }
+
+  async function guardar(e) {
+    e.preventDefault();
+    setMensaje("");
+    setError("");
+    setGuardando(true);
+    const { data, error: errorGuardar } = await supabase
+      .from("perfiles")
+      .update({ username: username.trim(), avatar_url: avatarSeleccionado || null, updated_at: new Date().toISOString() })
+      .eq("user_id", sesion.user.id)
+      .select()
+      .maybeSingle();
+    if (errorGuardar) {
+      setError(errorGuardar.message.includes("duplicate") ? "Ese nombre de usuario ya está en uso." : errorGuardar.message);
+    } else {
+      setMensaje("✅ Perfil actualizado.");
+      onPerfilActualizado(data);
+    }
+    setGuardando(false);
+  }
+
+  return (
+    <div style={{ maxWidth: 480, margin: "0 auto", padding: "0 12px" }}>
+      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center" }}>👤 Editar perfil</h3>
+
+      <form onSubmit={guardar}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <img
+            src={avatarSeleccionado || "/logo.png"}
+            alt="Tu avatar"
+            width={90}
+            height={90}
+            style={{ borderRadius: "50%", objectFit: "cover", border: `3px solid ${acentoMarca}`, marginBottom: 10 }}
+          />
+          <div>
+            <label style={{ fontSize: 12, color: acentoMarca, cursor: "pointer" }}>
+              {subiendo ? "Subiendo..." : "📷 Subir mi propia foto"}
+              <input type="file" accept="image/*" onChange={subirFoto} disabled={subiendo} style={{ display: "none" }} />
+            </label>
+          </div>
+        </div>
+
+        <p style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 8, textAlign: "center" }}>O elige un avatar:</p>
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 20 }}>
+          {AVATARES_PREDEFINIDOS.map((a) => (
+            <img
+              key={a.id}
+              src={a.src}
+              alt={a.id}
+              width={56}
+              height={56}
+              onClick={() => setAvatarSeleccionado(a.src)}
+              style={{
+                borderRadius: "50%", objectFit: "cover", cursor: "pointer",
+                border: avatarSeleccionado === a.src ? `3px solid ${acentoMarca}` : `1px solid ${tema.borde}`,
+                padding: 2,
+              }}
+            />
+          ))}
+        </div>
+
+        <label style={{ fontSize: 12, color: tema.textoSuave, display: "block", marginBottom: 6 }}>Nombre de usuario</label>
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          maxLength={24}
+          style={{ width: "100%", padding: 10, marginBottom: 14, fontSize: 14, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+        />
+
+        {mensaje && <p style={{ fontSize: 12, color: "#2e9e4f", marginBottom: 10 }}>{mensaje}</p>}
+        {error && <p style={{ fontSize: 12, color: "#e05555", marginBottom: 10 }}>⚠️ {error}</p>}
+
+        <button
+          type="submit"
+          disabled={guardando}
+          style={{ width: "100%", padding: 12, fontSize: 14, fontWeight: "bold", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+        >
+          {guardando ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
   const [predicciones, setPredicciones] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -3061,6 +3194,8 @@ export default function Home() {
   const [authModalModo, setAuthModalModo] = useState("login");
   const [esAdmin, setEsAdmin] = useState(false);
   const [esAdminPrincipal, setEsAdminPrincipal] = useState(false);
+  const [perfil, setPerfil] = useState(null);
+  const [vistaPerfilAbierta, setVistaPerfilAbierta] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -3074,6 +3209,30 @@ export default function Home() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!sesion) { setPerfil(null); return; }
+    supabase
+      .from("perfiles")
+      .select("*")
+      .eq("user_id", sesion.user.id)
+      .maybeSingle()
+      .then(async ({ data }) => {
+        if (data) {
+          setPerfil(data);
+        } else {
+          // Cuentas creadas por Google/enlace mágico no pasan por el formulario de registro —
+          // les creamos un perfil básico automáticamente para que todo funcione igual.
+          const nombrePorDefecto = sesion.user.email.split("@")[0];
+          const { data: nuevo } = await supabase
+            .from("perfiles")
+            .insert({ user_id: sesion.user.id, username: nombrePorDefecto })
+            .select()
+            .maybeSingle();
+          setPerfil(nuevo || { user_id: sesion.user.id, username: nombrePorDefecto, avatar_url: null });
+        }
+      });
+  }, [sesion]);
 
   useEffect(() => {
     if (!sesion) { setEsAdmin(false); setEsAdminPrincipal(false); return; }
@@ -3651,6 +3810,17 @@ export default function Home() {
           padding: 4px 6px;
         }
 
+        @media (max-width: 767px) {
+          .jmcs-menu-desplegable {
+            position: fixed !important;
+            top: auto !important;
+            bottom: 70px !important;
+            left: 12px !important;
+            right: 12px !important;
+            width: auto !important;
+          }
+        }
+
         .jmcs-partidos-grid {
           display: grid;
           grid-template-columns: 1fr;
@@ -3721,9 +3891,22 @@ export default function Home() {
 
             {sesion ? (
               <>
-                <span style={{ fontSize: 12, color: tema.textoSuave, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {sesion.user.email}
-                </span>
+                <div
+                  onClick={() => setVistaActual("perfil")}
+                  style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+                  title="Editar perfil"
+                >
+                  <img
+                    src={perfil?.avatar_url || "/logo.png"}
+                    alt=""
+                    width={26}
+                    height={26}
+                    style={{ borderRadius: "50%", objectFit: "cover", border: `1px solid ${tema.borde}` }}
+                  />
+                  <span style={{ fontSize: 12, color: tema.textoSuave, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {perfil?.username || sesion.user.email}
+                  </span>
+                </div>
                 <button
                   onClick={cerrarSesion}
                   style={{
@@ -3759,14 +3942,16 @@ export default function Home() {
 
             {menuAbierto && (
               <div
+                className="jmcs-menu-desplegable"
                 style={{
                   position: "absolute", top: "115%", left: 0, background: tema.panel,
-                  border: `1px solid ${tema.borde}`, borderRadius: 6, minWidth: 200, zIndex: 20,
+                  border: `1px solid ${tema.borde}`, borderRadius: 6, minWidth: 200, zIndex: 120,
                   boxShadow: "0 6px 16px rgba(0,0,0,0.25)", overflow: "hidden",
                 }}
               >
                 {[
                   { clave: "inicio", etiqueta: t("menuInicio") },
+                  { clave: "perfil", etiqueta: "👤 Editar perfil" },
                   { clave: "misEstudios", etiqueta: t("menuMisEstudios") },
                   { clave: "favoritos", etiqueta: t("menuFavoritos") },
                   { clave: "historial", etiqueta: t("menuHistorial") },
@@ -3780,6 +3965,8 @@ export default function Home() {
                         ? () => { setMenuAbierto(false); setVistaActual("inicio"); }
                         : item.clave === "admin"
                         ? () => { setMenuAbierto(false); setVistaActual("admin"); }
+                        : item.clave === "perfil"
+                        ? () => (sesion ? (() => { setMenuAbierto(false); setVistaActual("perfil"); })() : abrirLogin())
                         : () => accederOPedirCuenta(item.clave)
                     }
                     style={{ padding: "10px 14px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
@@ -3989,6 +4176,12 @@ export default function Home() {
       {vistaActual === "historial" && (
         <div style={{ margin: "20px auto" }}>
           <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} />
+        </div>
+      )}
+
+      {vistaActual === "perfil" && sesion && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaPerfil sesion={sesion} perfil={perfil} onPerfilActualizado={setPerfil} tema={tema} acentoMarca={acentoMarca} />
         </div>
       )}
 
