@@ -817,7 +817,7 @@ function PanelFavoritos({ sesion, tema, acentoMarca, onCerrar }) {
   );
 }
 
-function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca, sesion, onPedirLogin, onAbrirPerfil }) {
+function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca, sesion, onPedirLogin, onAbrirPerfil, mostrarToast }) {
   const [query, setQuery] = useState("");
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -843,12 +843,14 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+        mostrarToast && mostrarToast(data.error);
         setTeams([]);
       } else {
         setTeams(data);
       }
     } catch (err) {
       setError("Error al buscar equipos");
+      mostrarToast && mostrarToast("Error al buscar equipos");
     }
     setLoading(false);
   }
@@ -864,12 +866,14 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+        mostrarToast && mostrarToast(data.error);
       } else {
         setFixtures(data);
         onEquipoCargado && onEquipoCargado(team, data, !!esDelCalendario);
       }
     } catch (err) {
       setError("Error al traer los partidos");
+      mostrarToast && mostrarToast("Error al traer los partidos");
     }
     setLoading(false);
   }
@@ -1561,7 +1565,7 @@ function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos }) {
   );
 }
 
-function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfil }) {
+function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfil, mostrarToast }) {
   const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
   const [partidos, setPartidos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1582,11 +1586,13 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+        mostrarToast && mostrarToast(data.error);
       } else {
         setPartidos(data);
       }
     } catch (err) {
       setError("Error al buscar partidos");
+      mostrarToast && mostrarToast("Error al buscar partidos");
     }
     setLoading(false);
   }
@@ -2531,6 +2537,26 @@ function ModalEstudioClimatico({
 }
 
 
+function ContenedorToasts({ toasts }) {
+  return (
+    <div style={{ position: "fixed", bottom: 90, left: 12, zIndex: 500, display: "flex", flexDirection: "column", gap: 8, maxWidth: "calc(100vw - 24px)" }}>
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          style={{
+            background: "rgba(20,20,20,0.95)", color: "#fff", padding: "10px 16px", borderRadius: 8,
+            fontSize: 12, boxShadow: "0 4px 14px rgba(0,0,0,0.4)", borderLeft: "3px solid #e0a83a",
+            animation: t.saliendo ? "jmcsToastSalir 0.35s ease-in forwards" : "jmcsToastEntrar 0.35s ease-out",
+            maxWidth: 320,
+          }}
+        >
+          ⚠️ {t.mensaje}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
   const [modo, setModo] = useState(modoInicial || "login"); // "login" | "registro" | "magico"
   const [email, setEmail] = useState("");
@@ -2794,10 +2820,13 @@ function corregirEscudo(url) {
   return url;
 }
 
-function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) {
+function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil, modoOscuro }) {
   const fecha = new Date(p.fixture.date);
   const horaTexto = fecha.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const fechaTexto = fecha.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+  const estado = p.fixture?.status?.short;
+  const enVivo = ESTADOS_EN_VIVO.includes(estado);
+  const yaTermino = ["FT", "AET", "PEN"].includes(estado);
 
   function irAPerfil(e, equipo) {
     e.stopPropagation();
@@ -2809,8 +2838,11 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
       onClick={onClick}
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
-        padding: "16px 14px", background: tema.panel, borderRadius: 8, cursor: "pointer",
-        borderTop: `3px solid ${acentoMarca}`,
+        padding: "16px 14px",
+        background: yaTermino ? (modoOscuro ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)") : tema.panel,
+        borderRadius: 8, cursor: "pointer",
+        borderTop: `3px solid ${enVivo ? "#e05555" : acentoMarca}`,
+        opacity: yaTermino ? 0.72 : 1,
       }}
     >
       {/* Extremo izquierdo: equipo Local */}
@@ -2835,10 +2867,8 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
           {p.league.name}
         </div>
         {(() => {
-          const estado = p.fixture?.status?.short;
           const yaJugado = estado && estado !== "NS" && estado !== "TBD" && estado !== "PST" && estado !== "CANC";
           if (yaJugado && p.goals?.home !== null && p.goals?.home !== undefined) {
-            const enVivo = ESTADOS_EN_VIVO.includes(estado);
             return (
               <>
                 <div style={{ fontSize: 16, fontWeight: "bold", color: enVivo ? "#e05555" : acentoMarca }}>
@@ -2847,6 +2877,9 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
                 <div style={{ fontSize: 8, color: enVivo ? "#e05555" : tema.textoSuave, fontWeight: enVivo ? "bold" : "normal" }}>
                   {enVivo ? `${p.fixture.status.elapsed || ""}' EN VIVO` : (ETIQUETAS_ESTADO[estado] || estado)}
                 </div>
+                {enVivo && p.fixture?.venue?.name && (
+                  <div style={{ fontSize: 8, color: tema.textoSuave, marginTop: 2 }}>🏟️ {p.fixture.venue.name}</div>
+                )}
               </>
             );
           }
@@ -2874,7 +2907,7 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil }) 
   );
 }
 
-function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil }) {
+function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil, mostrarToast, modoOscuro }) {
   const [partidos, setPartidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -2886,20 +2919,31 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil 
     fetch(`/api/partidos-por-fecha?date=${hoy}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.error) setError(data.error);
+        if (data.error) { setError(data.error); mostrarToast && mostrarToast(data.error); }
         else setPartidos(data);
       })
-      .catch(() => setError("No se pudieron cargar los partidos"))
+      .catch(() => { setError("No se pudieron cargar los partidos"); mostrarToast && mostrarToast("No se pudieron cargar los partidos"); })
       .finally(() => setLoading(false));
   }, []);
 
   const partidosFiltrados = paisFiltro ? partidos.filter((p) => p.league?.country === paisFiltro) : partidos;
+
+  // Orden dentro de cada país: en vivo primero, luego por jugar, jugados al final
+  function prioridadPartido(p) {
+    const estado = p.fixture?.status?.short;
+    if (ESTADOS_EN_VIVO.includes(estado)) return 0;
+    if (["FT", "AET", "PEN"].includes(estado)) return 2;
+    return 1;
+  }
 
   const grupos = {};
   partidosFiltrados.forEach((p) => {
     const pais = p.league?.country || "Otros";
     if (!grupos[pais]) grupos[pais] = [];
     grupos[pais].push(p);
+  });
+  Object.keys(grupos).forEach((pais) => {
+    grupos[pais].sort((a, b) => prioridadPartido(a) - prioridadPartido(b));
   });
   const paisesOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b));
 
@@ -2954,7 +2998,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil 
           </h4>
           <div className="jmcs-partidos-grid">
             {grupos[pais].map((p) => (
-              <TarjetaPartidoInicio key={p.fixture.id} p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} onAbrirPerfil={onAbrirPerfil} />
+              <TarjetaPartidoInicio key={p.fixture.id} p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} onAbrirPerfil={onAbrirPerfil} modoOscuro={modoOscuro} />
             ))}
           </div>
         </div>
@@ -3458,7 +3502,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
   );
 }
 
-function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey, paisDetectado, onBuscarEquipoPorNombre }) {
+function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey, paisDetectado, onBuscarEquipoPorNombre, mostrarToast, modoOscuro }) {
   return (
     <div>
       {paisDetectado && (
@@ -3533,7 +3577,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
         </div>
       )}
 
-      <ListaPartidosInicio key={refrescarKey} tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} />
+      <ListaPartidosInicio key={refrescarKey} tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} modoOscuro={modoOscuro} />
     </div>
   );
 }
@@ -3575,6 +3619,16 @@ export default function Home() {
   const [idiomaAbierto, setIdiomaAbierto] = useState(false);
   const [idioma, setIdioma] = useState("es");
   IDIOMA_ACTUAL = idioma; // se actualiza en cada render, antes de que los hijos usen traducir()
+
+  const [toasts, setToasts] = useState([]);
+  function mostrarToast(mensaje) {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, mensaje, saliendo: false }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, saliendo: true } : t)));
+      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 350);
+    }, 2000);
+  }
   const t = traducir;
   const [notaProximamente, setNotaProximamente] = useState(false);
   const [tarjetaActivaMovil, setTarjetaActivaMovil] = useState("local");
@@ -3846,8 +3900,15 @@ export default function Home() {
     setCargandoClima(true);
     fetch(`/api/clima?ciudad=${encodeURIComponent(ciudad)}&fecha=${fecha}`)
       .then((r) => r.json())
-      .then((data) => setClimaData(data.error ? null : data))
-      .catch(() => setClimaData(null))
+      .then((data) => {
+        if (data.error) {
+          setClimaData(null);
+          mostrarToast(data.error);
+        } else {
+          setClimaData(data);
+        }
+      })
+      .catch(() => { setClimaData(null); mostrarToast("No se pudo cargar el clima"); })
       .finally(() => setCargandoClima(false));
   }, [partidoCalendario]);
 
@@ -4226,6 +4287,16 @@ export default function Home() {
           12% { transform: scale(1.06); }
           16% { transform: scale(1); }
           100% { transform: scale(1); }
+        }
+
+        @keyframes jmcsToastEntrar {
+          from { transform: translateX(-120%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes jmcsToastSalir {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(-120%); opacity: 0; }
         }
 
         .jmcs-chat-burbuja {
@@ -4685,6 +4756,8 @@ export default function Home() {
             refrescarKey={refrescarInicioKey}
             paisDetectado={paisDetectadoInicio}
             onBuscarEquipoPorNombre={buscarEquipoPorNombre}
+            mostrarToast={mostrarToast}
+            modoOscuro={modoOscuro}
           />
         </div>
       )}
@@ -4749,7 +4822,7 @@ export default function Home() {
       {vistaActual === "estudio" && (
       <div className="jmcs-grid" style={{ maxWidth: 2400, margin: "0 auto" }}>
         <div className="jmcs-calendario">
-          <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} />
+          <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
         </div>
 
         <div className="jmcs-ala-local">
@@ -4853,6 +4926,7 @@ export default function Home() {
                 sesion={sesion}
                 onPedirLogin={abrirLogin}
                 onAbrirPerfil={abrirPerfilEquipo}
+                mostrarToast={mostrarToast}
                 onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoLocal(team);
                   setFixturesLocal(fixtures || []);
@@ -4872,6 +4946,7 @@ export default function Home() {
                 sesion={sesion}
                 onPedirLogin={abrirLogin}
                 onAbrirPerfil={abrirPerfilEquipo}
+                mostrarToast={mostrarToast}
                 onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoVisitante(team);
                   setFixturesVisitante(fixtures || []);
@@ -5078,6 +5153,8 @@ export default function Home() {
           onCerrar={() => setFavoritosPanelAbierto(false)}
         />
       )}
+
+      <ContenedorToasts toasts={toasts} />
 
       <div className="jmcs-nav-movil">
         {[
