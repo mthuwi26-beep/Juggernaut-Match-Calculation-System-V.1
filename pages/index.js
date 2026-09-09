@@ -40,6 +40,11 @@ const BANDERAS_PAISES = {
   China: "🇨🇳", India: "🇮🇳", Australia: "🇦🇺",
 };
 
+// Bandera del país de un equipo (vacío si no lo tenemos mapeado, para no mostrar 🌍 en todos lados)
+function banderaEquipo(pais) {
+  return BANDERAS_PAISES[pais] || "";
+}
+
 // Los países más "famosos" en fútbol — la fila de accesos rápidos de Inicio muestra estos primero
 const PAISES_POPULARES = [
   "Argentina", "Brazil", "Spain", "England", "Italy", "Germany",
@@ -176,22 +181,13 @@ function procesarEstadisticasPartido(respuestaApi, homeTeamId) {
   const statsAway = respuestaApi.find((s) => s.team.id !== homeTeamId);
 
   return {
-    corners: {
-      home: extraerStat(statsHome, "Corner Kicks"),
-      away: extraerStat(statsAway, "Corner Kicks"),
-    },
-    amarillas: {
-      home: extraerStat(statsHome, "Yellow Cards"),
-      away: extraerStat(statsAway, "Yellow Cards"),
-    },
-    faltas: {
-      home: extraerStat(statsHome, "Fouls"),
-      away: extraerStat(statsAway, "Fouls"),
-    },
-    posesion: {
-      home: extraerStat(statsHome, "Ball Possession"),
-      away: extraerStat(statsAway, "Ball Possession"),
-    },
+    corners: { home: extraerStat(statsHome, "Corner Kicks"), away: extraerStat(statsAway, "Corner Kicks") },
+    amarillas: { home: extraerStat(statsHome, "Yellow Cards"), away: extraerStat(statsAway, "Yellow Cards") },
+    rojas: { home: extraerStat(statsHome, "Red Cards"), away: extraerStat(statsAway, "Red Cards") },
+    faltas: { home: extraerStat(statsHome, "Fouls"), away: extraerStat(statsAway, "Fouls") },
+    posesion: { home: extraerStat(statsHome, "Ball Possession"), away: extraerStat(statsAway, "Ball Possession") },
+    tirosTotales: { home: extraerStat(statsHome, "Total Shots"), away: extraerStat(statsAway, "Total Shots") },
+    tirosPuerta: { home: extraerStat(statsHome, "Shots on Goal"), away: extraerStat(statsAway, "Shots on Goal") },
   };
 }
 
@@ -748,7 +744,7 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
               }}
             >
               <img src={corregirEscudo(f.team_logo)} alt={f.team_name} width={60} height={60} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
-              <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4 }}>{f.team_name}</div>
+              <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4 }}>{banderaEquipo(f.team_country)} {f.team_name}</div>
               {f.team_country && <div style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 10 }}>{f.team_country}</div>}
               <button
                 onClick={(e) => { e.stopPropagation(); quitar(f.team_id); }}
@@ -951,7 +947,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
               title="Ver perfil completo del equipo"
             >
               <img src={corregirEscudo(selectedTeam.team.logo)} alt={selectedTeam.team.name} width={26} height={26} onError={manejarErrorEscudo} />
-              <strong style={{ color: colorMarca || tema.texto }}>{selectedTeam.team.name}</strong>
+              <strong style={{ color: colorMarca || tema.texto }}>{banderaEquipo(selectedTeam.team.country)} {selectedTeam.team.name}</strong>
             </div>
             <BotonFavorito equipo={selectedTeam} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
           </div>
@@ -1863,7 +1859,7 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, s
       </div>
       <h4 style={{ fontSize: 13, margin: "0 0 12px", color: acento, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
         <span onClick={() => onAbrirPerfil && onAbrirPerfil(equipo.team)} style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}>
-          {equipo.team.name}
+          {banderaEquipo(equipo.team.country)} {equipo.team.name}
         </span>
         <BotonFavorito equipo={equipo} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
       </h4>
@@ -2077,64 +2073,184 @@ const ETIQUETAS_ESTADO = {
   NS: "Aún no comienza", PST: "Pospuesto", CANC: "Cancelado",
 };
 
+function FilaEnfrentada({ etiqueta, valorLocal, valorVisitante, tema, destacar }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", padding: "7px 0", borderBottom: `1px solid ${tema.borde}` }}>
+      <div style={{ flex: 1, textAlign: "right", fontWeight: "bold", fontSize: destacar ? 15 : 13, color: destacar ? "#e05555" : tema.texto }}>
+        {valorLocal ?? "—"}
+      </div>
+      <div style={{ flex: 1.4, textAlign: "center", fontSize: 11, color: tema.textoSuave, padding: "0 6px" }}>
+        {etiqueta}
+      </div>
+      <div style={{ flex: 1, textAlign: "left", fontWeight: "bold", fontSize: destacar ? 15 : 13, color: destacar ? "#e05555" : tema.texto }}>
+        {valorVisitante ?? "—"}
+      </div>
+    </div>
+  );
+}
+
+function MiniCancha({ equipo, colorEquipo, invertido }) {
+  const ANCHO = 260;
+  const ALTO = 220;
+  const jugadores = equipo?.startXI || [];
+
+  // Agrupamos por fila del grid ("fila:columna") para repartir el ancho entre los de la misma línea
+  const porFila = {};
+  jugadores.forEach((j) => {
+    const grid = j.player?.grid;
+    if (!grid) return;
+    const [fila] = grid.split(":").map(Number);
+    if (!porFila[fila]) porFila[fila] = [];
+    porFila[fila].push(j);
+  });
+
+  const filas = Object.keys(porFila).map(Number).sort((a, b) => a - b);
+  const maxFila = filas.length > 0 ? Math.max(...filas) : 1;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <img src={corregirEscudo(equipo?.team?.logo)} alt="" width={18} height={18} onError={manejarErrorEscudo} />
+        <strong style={{ fontSize: 11 }}>{equipo?.team?.name}</strong>
+        <span style={{ fontSize: 10, color: "#9fc4ac" }}>({equipo?.formation || "—"})</span>
+      </div>
+      <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} width="100%" height={ALTO} style={{ background: "#1a4d2e", borderRadius: 6 }}>
+        <line x1="0" y1={ALTO / 2} x2={ANCHO} y2={ALTO / 2} stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+        <circle cx={ANCHO / 2} cy={ALTO / 2} r="24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+        {filas.map((fila) => {
+          const jugadoresFila = porFila[fila].sort((a, b) => {
+            const colA = Number(a.player.grid.split(":")[1]);
+            const colB = Number(b.player.grid.split(":")[1]);
+            return colA - colB;
+          });
+          const yBase = invertido
+            ? (fila / (maxFila + 1)) * ALTO
+            : ALTO - (fila / (maxFila + 1)) * ALTO;
+
+          return jugadoresFila.map((j, i) => {
+            const x = ((i + 1) / (jugadoresFila.length + 1)) * ANCHO;
+            return (
+              <g key={j.player.id}>
+                <circle cx={x} cy={yBase} r="11" fill={colorEquipo} stroke="#fff" strokeWidth="1.5" />
+                <text x={x} y={yBase + 4} textAnchor="middle" fontSize="9" fill="#fff" fontWeight="bold">
+                  {j.player.number ?? "-"}
+                </text>
+                <text x={x} y={yBase + 20} textAnchor="middle" fontSize="7" fill="#fff">
+                  {(j.player.name || "").split(" ").pop()}
+                </text>
+              </g>
+            );
+          });
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function AlineacionesPartido({ fixtureId, colorMarcaLocal, colorMarcaVisitante, tema, acentoMarca }) {
+  const [alineaciones, setAlineaciones] = useState(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    if (!fixtureId) { setAlineaciones(null); setCargando(false); return; }
+    let cancelado = false;
+    setCargando(true);
+    fetch(`/api/alineaciones?fixtureId=${fixtureId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelado) return;
+        setAlineaciones(!data.error && Array.isArray(data) ? data : null);
+        setCargando(false);
+      })
+      .catch(() => { if (!cancelado) setCargando(false); });
+    return () => { cancelado = true; };
+  }, [fixtureId]);
+
+  if (cargando || !alineaciones || alineaciones.length < 2) return null;
+
+  return (
+    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 14, marginBottom: 18 }}>
+      <h4 style={{ margin: "0 0 12px", fontSize: 11, color: acentoMarca }}>⚽ Alineaciones confirmadas</h4>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <MiniCancha equipo={alineaciones[0]} colorEquipo={colorMarcaLocal} invertido={false} />
+        </div>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <MiniCancha equipo={alineaciones[1]} colorEquipo={colorMarcaVisitante} invertido={true} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EstadisticasPartidoReal({ fixtureId, nombreLocal, nombreVisitante, tema, acentoMarca }) {
   const [stats, setStats] = useState(null);
+  const [enVivo, setEnVivo] = useState(false);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     if (!fixtureId) { setStats(null); setCargando(false); return; }
     let cancelado = false;
-    setCargando(true);
 
-    fetch(`/api/marcador-vivo?fixtureId=${fixtureId}`)
-      .then((r) => r.json())
-      .then(async (marcador) => {
+    async function actualizar() {
+      try {
+        const resMarcador = await fetch(`/api/marcador-vivo?fixtureId=${fixtureId}`);
+        const marcador = await resMarcador.json();
         if (cancelado) return;
+
+        const enCurso = !marcador.error && ESTADOS_EN_VIVO.includes(marcador.estadoCorto);
         const finalizado = !marcador.error && ["FT", "AET", "PEN"].includes(marcador.estadoCorto);
-        if (!finalizado) { setStats(null); setCargando(false); return; }
+        setEnVivo(enCurso);
+
+        if (!enCurso && !finalizado) { setStats(null); setCargando(false); return; }
 
         const res = await fetch(`/api/estadisticas-partido?fixtureId=${fixtureId}`);
         const data = await res.json();
         if (cancelado) return;
         if (!data.error) {
-          const procesado = procesarEstadisticasPartido(data, data?.[0]?.team?.id);
-          setStats(procesado);
+          setStats(procesarEstadisticasPartido(data, data?.[0]?.team?.id));
         }
         setCargando(false);
-      })
-      .catch(() => { if (!cancelado) setCargando(false); });
+      } catch {
+        if (!cancelado) setCargando(false);
+      }
+    }
 
-    return () => { cancelado = true; };
+    actualizar();
+    const intervalo = setInterval(actualizar, 20000);
+    return () => { cancelado = true; clearInterval(intervalo); };
   }, [fixtureId]);
 
   if (cargando || !stats) return null;
 
   return (
-    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 14, marginBottom: 18, fontSize: 12 }}>
-      <h4 style={{ margin: "0 0 10px", fontSize: 11, color: acentoMarca }}>📊 Estadísticas reales de este encuentro</h4>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr style={{ textAlign: "center" }}>
-            <th style={{ textAlign: "left", fontWeight: "normal", color: tema.textoSuave }}></th>
-            <th style={{ padding: 4 }}>{nombreLocal}</th>
-            <th style={{ padding: 4 }}>{nombreVisitante}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[
-            { etiqueta: "Córners", dato: stats.corners },
-            { etiqueta: "Tarjetas amarillas", dato: stats.amarillas },
-            { etiqueta: "Faltas", dato: stats.faltas },
-            { etiqueta: "Posesión", dato: stats.posesion },
-          ].map((fila) => (
-            <tr key={fila.etiqueta} style={{ borderTop: `1px solid ${tema.borde}`, textAlign: "center" }}>
-              <td style={{ padding: "6px 4px", textAlign: "left", color: tema.textoSuave }}>{fila.etiqueta}</td>
-              <td style={{ padding: "6px 4px", fontWeight: "bold" }}>{fila.dato.home ?? "—"}</td>
-              <td style={{ padding: "6px 4px", fontWeight: "bold" }}>{fila.dato.away ?? "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${enVivo ? "#e05555" : acentoMarca}`, padding: 14, marginBottom: 18, fontSize: 12 }}>
+      <h4 style={{ margin: "0 0 4px", fontSize: 11, color: enVivo ? "#e05555" : acentoMarca }}>
+        {enVivo ? "🔴 Estadísticas en vivo (se actualizan solas)" : "📊 Estadísticas reales de este encuentro"}
+      </h4>
+      <div style={{ display: "flex", marginBottom: 8 }}>
+        <div style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "bold" }}>{nombreLocal}</div>
+        <div style={{ flex: 1.4 }} />
+        <div style={{ flex: 1, textAlign: "left", fontSize: 11, fontWeight: "bold" }}>{nombreVisitante}</div>
+      </div>
+
+      <FilaEnfrentada etiqueta="🚩 Córners" valorLocal={stats.corners.home} valorVisitante={stats.corners.away} tema={tema} />
+      <FilaEnfrentada etiqueta="🟨 Amarillas" valorLocal={stats.amarillas.home} valorVisitante={stats.amarillas.away} tema={tema} />
+      {(stats.rojas.home || stats.rojas.away) && (
+        <FilaEnfrentada etiqueta="🟥 Rojas" valorLocal={stats.rojas.home} valorVisitante={stats.rojas.away} tema={tema} destacar />
+      )}
+      <FilaEnfrentada etiqueta="⚠️ Faltas" valorLocal={stats.faltas.home} valorVisitante={stats.faltas.away} tema={tema} />
+      <FilaEnfrentada etiqueta="⚽ Posesión" valorLocal={stats.posesion.home} valorVisitante={stats.posesion.away} tema={tema} />
+      {(stats.tirosTotales.home || stats.tirosTotales.away) && (
+        <FilaEnfrentada etiqueta="🎯 Tiros totales" valorLocal={stats.tirosTotales.home} valorVisitante={stats.tirosTotales.away} tema={tema} />
+      )}
+      {(stats.tirosPuerta.home || stats.tirosPuerta.away) && (
+        <FilaEnfrentada etiqueta="🥅 Tiros a puerta" valorLocal={stats.tirosPuerta.home} valorVisitante={stats.tirosPuerta.away} tema={tema} />
+      )}
+
+      <p style={{ fontSize: 9, color: tema.textoSuave, marginTop: 8, marginBottom: 0 }}>
+        Datos totales del partido — no siempre está disponible el desglose por tiempo, según la cobertura de la liga.
+      </p>
     </div>
   );
 }
@@ -2407,7 +2523,7 @@ function TarjetaEquipoClima({ equipo, rol, ajustes, climaOficial, onCambiar, tem
     <div style={{ flex: 1, minWidth: 260, background: "#111", borderRadius: 8, padding: 14, borderTop: `3px solid ${colorMarca}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={26} height={26} onError={manejarErrorEscudo} />
-        <strong style={{ color: colorMarca, fontSize: 14 }}>{equipo.name}</strong>
+        <strong style={{ color: colorMarca, fontSize: 14 }}>{banderaEquipo(equipo.country)} {equipo.name}</strong>
       </div>
       {["viento", "lluvia", "temperatura", "humedad"].map((v) => (
         <TimelineClima
@@ -3473,7 +3589,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
       <div style={{ background: colorTenue(colorMarca), borderTop: `3px solid ${colorMarca}`, borderRadius: 8, padding: 20, marginBottom: 20, textAlign: "center" }}>
         <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={70} height={70} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <h2 style={{ margin: 0, color: colorMarca }}>{equipo.name}</h2>
+          <h2 style={{ margin: 0, color: colorMarca }}>{banderaEquipo(equipo.country)} {equipo.name}</h2>
           <BotonFavorito equipo={{ team: equipo }} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
         </div>
         {equipo.country && <p style={{ margin: "4px 0 0", color: tema.textoSuave, fontSize: 12 }}>{equipo.country}</p>}
@@ -4846,6 +4962,13 @@ export default function Home() {
                   fixtureId={partidoCalendario?.fixture?.id}
                   nombreLocal={equipoLocal.team.name}
                   nombreVisitante={equipoVisitante.team.name}
+                  tema={tema}
+                  acentoMarca={acentoMarca}
+                />
+                <AlineacionesPartido
+                  fixtureId={partidoCalendario?.fixture?.id}
+                  colorMarcaLocal={colorMarcaLocal}
+                  colorMarcaVisitante={colorMarcaVisitante}
                   tema={tema}
                   acentoMarca={acentoMarca}
                 />
