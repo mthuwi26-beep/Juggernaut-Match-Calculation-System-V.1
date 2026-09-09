@@ -2345,6 +2345,7 @@ function ModalEstudioClimatico({
   lambdaGolesLocalReal, lambdaGolesVisitanteReal, factorLocal, factorVisitante,
   onRestaurar, onGuardar, guardando, guardado,
   tema, acentoMarca, colorMarcaLocal, colorMarcaVisitante, onCerrar,
+  tutorialesOcultos, onOcultarPermanente,
 }) {
   if (!ajustesClima || !climaOficial) return null;
 
@@ -2379,6 +2380,16 @@ function ModalEstudioClimatico({
         <p style={{ margin: "0 0 16px", fontSize: 11, color: "#b9d6c3", fontStyle: "italic" }}>
           Esto es tu estudio personal — no cambia el pronóstico oficial de JMCS, solo lo que ves aquí y en tu Estudio mientras esté activo.
         </p>
+
+        <TutorialFlotante
+          id="clima"
+          titulo="¿Cuánto pesa cada punto?"
+          texto="Cada punto de diferencia que muevas (0 a 10) equivale aproximadamente a un 1.5% de cambio en la probabilidad de ese equipo — es nuestra propia fórmula, no un dato científicamente validado. El punto de JMCS (fijo) siempre representa el clima real; el tuyo es tu propio criterio."
+          tema={tema}
+          acentoMarca={acentoMarca}
+          tutorialesOcultos={tutorialesOcultos}
+          onOcultarPermanente={onOcultarPermanente}
+        />
 
         <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18, padding: "8px 10px", background: "rgba(255,60,60,0.08)", borderRadius: 6, cursor: "pointer" }}>
           <input
@@ -3179,6 +3190,36 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
   );
 }
 
+function TutorialFlotante({ id, titulo, texto, tema, acentoMarca, tutorialesOcultos, onOcultarPermanente }) {
+  const [visible, setVisible] = useState(true);
+
+  if (!visible || (tutorialesOcultos || []).includes(id)) return null;
+
+  return (
+    <div style={{
+      background: "rgba(20, 20, 20, 0.85)", color: "#fff", borderRadius: 8, padding: 14,
+      marginBottom: 16, borderLeft: `4px solid ${acentoMarca}`, fontSize: 12, lineHeight: 1.5,
+    }}>
+      <strong style={{ display: "block", marginBottom: 4, color: acentoMarca }}>💡 {titulo}</strong>
+      <p style={{ margin: "0 0 10px" }}>{texto}</p>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button
+          onClick={() => setVisible(false)}
+          style={{ fontSize: 11, background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "#fff", borderRadius: 4, padding: "5px 10px", cursor: "pointer" }}
+        >
+          Cerrar
+        </button>
+        <button
+          onClick={() => { setVisible(false); onOcultarPermanente(id); }}
+          style={{ fontSize: 11, background: acentoMarca, border: "none", color: "#fff", borderRadius: 4, padding: "5px 10px", cursor: "pointer", fontWeight: "bold" }}
+        >
+          Entendido, no volver a mostrar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
   const [predicciones, setPredicciones] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -3464,6 +3505,26 @@ export default function Home() {
   const [esAdmin, setEsAdmin] = useState(false);
   const [esAdminPrincipal, setEsAdminPrincipal] = useState(false);
   const [perfil, setPerfil] = useState(null);
+  const [tutorialesOcultosLocal, setTutorialesOcultosLocal] = useState([]);
+
+  async function ocultarTutorialPermanente(id) {
+    if (!sesion) {
+      setTutorialesOcultosLocal((prev) => [...new Set([...prev, id])]);
+      return;
+    }
+    const actuales = perfil?.tutoriales_ocultos || [];
+    if (actuales.includes(id)) return;
+    const nuevos = [...actuales, id];
+    const { data } = await supabase
+      .from("perfiles")
+      .update({ tutoriales_ocultos: nuevos })
+      .eq("user_id", sesion.user.id)
+      .select()
+      .maybeSingle();
+    if (data) setPerfil(data);
+  }
+
+  const tutorialesOcultos = sesion ? (perfil?.tutoriales_ocultos || []) : tutorialesOcultosLocal;
   const [vistaPerfilAbierta, setVistaPerfilAbierta] = useState(false);
 
   useEffect(() => {
@@ -3603,6 +3664,70 @@ export default function Home() {
 
   const [busquedaInicio, setBusquedaInicio] = useState("");
   const [paisDetectadoInicio, setPaisDetectadoInicio] = useState(null);
+  const [resultadosVivos, setResultadosVivos] = useState([]);
+  const [paisVivo, setPaisVivo] = useState(null);
+  const [buscandoVivo, setBuscandoVivo] = useState(false);
+  const [dropdownAbierto, setDropdownAbierto] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function manejarClicAfueraDropdown(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownAbierto(false);
+      }
+    }
+    document.addEventListener("mousedown", manejarClicAfueraDropdown);
+    document.addEventListener("touchstart", manejarClicAfueraDropdown);
+    return () => {
+      document.removeEventListener("mousedown", manejarClicAfueraDropdown);
+      document.removeEventListener("touchstart", manejarClicAfueraDropdown);
+    };
+  }, []);
+
+  useEffect(() => {
+    const texto = busquedaInicio.trim();
+    if (texto.length < 3) {
+      setResultadosVivos([]);
+      setPaisVivo(null);
+      setDropdownAbierto(false);
+      return;
+    }
+
+    const textoNormalizado = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const paisCoincide = PAISES_ES_A_EN[textoNormalizado];
+    setPaisVivo(paisCoincide || null);
+
+    const idTimeout = setTimeout(() => {
+      setBuscandoVivo(true);
+      fetch(`/api/teams?name=${encodeURIComponent(texto)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setResultadosVivos(!data.error && Array.isArray(data) ? data.slice(0, 6) : []);
+          setDropdownAbierto(true);
+        })
+        .catch(() => setResultadosVivos([]))
+        .finally(() => setBuscandoVivo(false));
+    }, 400);
+
+    return () => clearTimeout(idTimeout);
+  }, [busquedaInicio]);
+
+  function elegirResultadoVivo(equipo) {
+    setEquipoInicio(equipo);
+    setPaisDetectadoInicio(null);
+    setDropdownAbierto(false);
+    fetch(`/api/fixtures?teamId=${equipo.team.id}`)
+      .then((r) => r.json())
+      .then((data) => { if (!data.error) setFixturesInicio(data); });
+  }
+
+  function elegirPaisVivo() {
+    setPaisDetectadoInicio(paisVivo);
+    setEquipoInicio(null);
+    setFixturesInicio([]);
+    setDropdownAbierto(false);
+  }
+
   const [refrescarInicioKey, setRefrescarInicioKey] = useState(0);
   const [jalando, setJalando] = useState(false);
   const [jaladoSuficiente, setJaladoSuficiente] = useState(false);
@@ -4385,31 +4510,81 @@ export default function Home() {
             setToqueJalarY(null);
           }}
         >
+          <TutorialFlotante
+            id="inicio"
+            titulo="Bienvenido a Inicio"
+            texto="Aquí ves los partidos del día agrupados por país. Busca un equipo o un país arriba (aparecen resultados mientras escribes), o toca cualquier tarjeta de partido para abrir su Estudio completo."
+            tema={tema}
+            acentoMarca={acentoMarca}
+            tutorialesOcultos={tutorialesOcultos}
+            onOcultarPermanente={ocultarTutorialPermanente}
+          />
+
           {jalando && (
             <p style={{ textAlign: "center", fontSize: 12, color: acentoMarca, marginBottom: 8 }}>
               {jaladoSuficiente ? "🔄 Suelta para actualizar" : "↓ Jala para actualizar"}
             </p>
           )}
-          <form
-            onSubmit={buscarEquipoInicio}
-            className="jmcs-datos-sticky"
-            style={{ display: "flex", gap: 8, marginBottom: 20, maxWidth: 800, background: tema.fondo, paddingTop: 4, paddingBottom: 4 }}
-          >
-            <input
-              type="text"
-              value={busquedaInicio}
-              onChange={(e) => setBusquedaInicio(e.target.value)}
-              placeholder={t("buscarEquipoPlaceholder")}
-              style={{ flex: 1, padding: 12, fontSize: 15, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6 }}
-            />
-            <button
-              type="submit"
-              disabled={buscandoInicio}
-              style={{ padding: "12px 20px", fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+          <div ref={dropdownRef} className="jmcs-datos-sticky" style={{ position: "relative", maxWidth: 800, background: tema.fondo, paddingTop: 4, paddingBottom: 4 }}>
+            <form
+              onSubmit={buscarEquipoInicio}
+              style={{ display: "flex", gap: 8, marginBottom: dropdownAbierto ? 0 : 20 }}
             >
-              {buscandoInicio ? "..." : "Buscar"}
-            </button>
-          </form>
+              <input
+                type="text"
+                value={busquedaInicio}
+                onChange={(e) => setBusquedaInicio(e.target.value)}
+                onFocus={() => { if (resultadosVivos.length > 0 || paisVivo) setDropdownAbierto(true); }}
+                placeholder={t("buscarEquipoPlaceholder")}
+                autoComplete="off"
+                style={{ flex: 1, padding: 12, fontSize: 15, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 6 }}
+              />
+              <button
+                type="submit"
+                disabled={buscandoInicio}
+                style={{ padding: "12px 20px", fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+              >
+                {buscandoInicio ? "..." : "Buscar"}
+              </button>
+            </form>
+
+            {dropdownAbierto && (paisVivo || resultadosVivos.length > 0 || buscandoVivo) && (
+              <div style={{
+                position: "absolute", top: "100%", left: 0, right: 90, marginTop: 4, background: tema.panel,
+                border: `1px solid ${tema.borde}`, borderRadius: 6, zIndex: 50, boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+                maxHeight: 320, overflowY: "auto",
+              }}>
+                {buscandoVivo && <p style={{ padding: 12, fontSize: 12, color: tema.textoSuave, margin: 0 }}>Buscando...</p>}
+
+                {paisVivo && (
+                  <div
+                    onClick={elegirPaisVivo}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${tema.borde}`, background: colorTenue(acentoMarca) }}
+                  >
+                    <span style={{ fontSize: 18 }}>{BANDERAS_PAISES[paisVivo] || "🌍"}</span>
+                    <strong style={{ fontSize: 13 }}>{paisVivo}</strong>
+                    <span style={{ fontSize: 11, color: tema.textoSuave, marginLeft: "auto" }}>País →</span>
+                  </div>
+                )}
+
+                {resultadosVivos.map((equipo) => (
+                  <div
+                    key={equipo.team.id}
+                    onClick={() => elegirResultadoVivo(equipo)}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
+                  >
+                    <img src={corregirEscudo(equipo.team.logo)} alt="" width={22} height={22} onError={manejarErrorEscudo} />
+                    <span style={{ fontSize: 13 }}>{equipo.team.name}</span>
+                    {equipo.team.country && <span style={{ fontSize: 11, color: tema.textoSuave, marginLeft: "auto" }}>{equipo.team.country}</span>}
+                  </div>
+                ))}
+
+                {!buscandoVivo && !paisVivo && resultadosVivos.length === 0 && (
+                  <p style={{ padding: 12, fontSize: 12, color: tema.textoSuave, margin: 0 }}>Sin resultados.</p>
+                )}
+              </div>
+            )}
+          </div>
 
           <VistaInicio
             tema={tema}
@@ -4434,6 +4609,15 @@ export default function Home() {
 
       {vistaActual === "favoritos" && (
         <div style={{ maxWidth: 900, margin: "20px auto", padding: "0 12px" }}>
+          <TutorialFlotante
+            id="favoritos"
+            titulo="Tus equipos favoritos"
+            texto="Guarda cualquier equipo tocando la estrella ⭐ junto a su nombre, en cualquier parte de la app. Aquí los verás todos juntos — toca uno para ver su perfil completo."
+            tema={tema}
+            acentoMarca={acentoMarca}
+            tutorialesOcultos={tutorialesOcultos}
+            onOcultarPermanente={ocultarTutorialPermanente}
+          />
           {sesion ? (
             <PanelFavoritosPagina sesion={sesion} tema={tema} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} />
           ) : (
@@ -4491,6 +4675,15 @@ export default function Home() {
         </div>
 
         <div className="jmcs-centro">
+          <TutorialFlotante
+            id="estudio"
+            titulo="Cómo funciona Estudio"
+            texto="Elige un partido del calendario a la izquierda, o busca Local y Visitante a mano abajo. Comparamos sus estadísticas reales y calculamos un semáforo de probabilidades — verde es más probable, rojo menos."
+            tema={tema}
+            acentoMarca={acentoMarca}
+            tutorialesOcultos={tutorialesOcultos}
+            onOcultarPermanente={ocultarTutorialPermanente}
+          />
           <div className="jmcs-datos-sticky">
             {equipoLocal?.team && equipoVisitante?.team && (
               <>
@@ -4868,6 +5061,8 @@ export default function Home() {
           colorMarcaLocal={colorMarcaLocal}
           colorMarcaVisitante={colorMarcaVisitante}
           onCerrar={() => setEstudioClimaticoAbierto(false)}
+          tutorialesOcultos={tutorialesOcultos}
+          onOcultarPermanente={ocultarTutorialPermanente}
         />
       )}
     </div>
