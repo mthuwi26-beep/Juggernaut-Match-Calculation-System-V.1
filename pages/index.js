@@ -4577,15 +4577,9 @@ export default function Home() {
           gap: 12px;
         }
 
-        @media (min-width: 768px) {
+        @media (min-width: 600px) {
           .jmcs-partidos-grid {
-            grid-template-columns: 1fr 1fr;
-          }
-        }
-
-        @media (min-width: 1200px) {
-          .jmcs-partidos-grid {
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           }
         }
 
@@ -4829,7 +4823,7 @@ export default function Home() {
 
       {vistaActual === "inicio" && (
         <div
-          style={{ maxWidth: 1400, margin: "20px auto", padding: "0 20px" }}
+          style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box", margin: "20px auto", padding: "0 24px" }}
           onTouchStart={(e) => {
             if (window.scrollY === 0) setToqueJalarY(e.touches[0].clientY);
           }}
