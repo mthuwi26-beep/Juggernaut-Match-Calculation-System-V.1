@@ -3881,6 +3881,7 @@ export default function Home() {
             <button
               onClick={() => { setMenuAbierto(!menuAbierto); setIdiomaAbierto(false); }}
               aria-label="Menú"
+              className="jmcs-nav-pc"
               style={{
                 fontSize: 20, background: "transparent", border: `1px solid ${tema.borde}`,
                 borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: tema.texto,
