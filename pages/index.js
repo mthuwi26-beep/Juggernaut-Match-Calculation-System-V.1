@@ -1353,6 +1353,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
   const [error, setError] = useState("");
   const [buscado, setBuscado] = useState(false);
   const [seleccionado, setSeleccionado] = useState(null);
+  const [paisFiltro, setPaisFiltro] = useState(null);
 
   async function buscarPartidos() {
     setLoading(true);
@@ -1360,6 +1361,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
     setPartidos([]);
     setSeleccionado(null);
     setBuscado(true);
+    setPaisFiltro(null);
     try {
       const res = await fetch(`/api/partidos-por-fecha?date=${fecha}`);
       const data = await res.json();
@@ -1378,6 +1380,9 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
     setSeleccionado(p.fixture.id);
     onSeleccionarPartido(p);
   }
+
+  const paisesDisponibles = [...new Set(partidos.map((p) => p.league?.country).filter(Boolean))].sort();
+  const partidosFiltrados = paisFiltro ? partidos.filter((p) => p.league?.country === paisFiltro) : partidos;
 
   return (
     <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 16 }}>
@@ -1404,6 +1409,34 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
         {loading ? "Buscando..." : "Ver partidos"}
       </button>
 
+      {paisesDisponibles.length > 1 && (
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 8, marginBottom: 10 }}>
+          <button
+            onClick={() => setPaisFiltro(null)}
+            style={{
+              flexShrink: 0, padding: "5px 12px", fontSize: 11, borderRadius: 14, whiteSpace: "nowrap", cursor: "pointer",
+              background: !paisFiltro ? acentoMarca : "transparent", color: !paisFiltro ? "#fff" : tema.texto,
+              border: `1px solid ${!paisFiltro ? acentoMarca : tema.borde}`,
+            }}
+          >
+            Todos
+          </button>
+          {paisesDisponibles.map((pais) => (
+            <button
+              key={pais}
+              onClick={() => setPaisFiltro(pais === paisFiltro ? null : pais)}
+              style={{
+                flexShrink: 0, padding: "5px 12px", fontSize: 11, borderRadius: 14, whiteSpace: "nowrap", cursor: "pointer",
+                background: paisFiltro === pais ? acentoMarca : "transparent", color: paisFiltro === pais ? "#fff" : tema.texto,
+                border: `1px solid ${paisFiltro === pais ? acentoMarca : tema.borde}`,
+              }}
+            >
+              {pais}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && (
         <p style={{ fontSize: 11, color: "#e08a8a", lineHeight: 1.4 }}>{error}</p>
       )}
@@ -1412,7 +1445,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
       )}
 
       <div style={{ maxHeight: 600, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
-        {partidos.map((p) => {
+        {partidosFiltrados.map((p) => {
           const activo = seleccionado === p.fixture.id;
           return (
             <div
@@ -2616,6 +2649,14 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil 
       .finally(() => setLoading(false));
   }, []);
 
+  const grupos = {};
+  partidos.forEach((p) => {
+    const pais = p.league?.country || "Otros";
+    if (!grupos[pais]) grupos[pais] = [];
+    grupos[pais].push(p);
+  });
+  const paisesOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b));
+
   return (
     <div>
       <h3 style={{ fontSize: 15, marginBottom: 14 }}>⚽ Partidos de hoy</h3>
@@ -2624,11 +2665,21 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil 
       {!loading && !error && partidos.length === 0 && (
         <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay partidos disponibles para hoy en este plan.</p>
       )}
-      <div className="jmcs-partidos-grid">
-      {partidos.map((p) => (
-        <TarjetaPartidoInicio key={p.fixture.id} p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} onAbrirPerfil={onAbrirPerfil} />
+      {paisesOrdenados.map((pais) => (
+        <div key={pais} style={{ marginBottom: 24 }}>
+          <h4 style={{
+            fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", color: acentoMarca,
+            borderBottom: `2px solid ${acentoMarca}`, paddingBottom: 6, marginBottom: 12,
+          }}>
+            🌍 {pais}
+          </h4>
+          <div className="jmcs-partidos-grid">
+            {grupos[pais].map((p) => (
+              <TarjetaPartidoInicio key={p.fixture.id} p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} onAbrirPerfil={onAbrirPerfil} />
+            ))}
+          </div>
+        </div>
       ))}
-      </div>
     </div>
   );
 }
