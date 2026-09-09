@@ -3181,6 +3181,26 @@ export default function Home() {
   const [coberturaPuntuales, setCoberturaPuntuales] = useState(null);
   const [esPartidoLiga, setEsPartidoLiga] = useState(true);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const menuRef = useRef(null);
+  const masBtnRef = useRef(null);
+
+  useEffect(() => {
+    function manejarClicAfuera(e) {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target) &&
+        (!masBtnRef.current || !masBtnRef.current.contains(e.target))
+      ) {
+        setMenuAbierto(false);
+      }
+    }
+    document.addEventListener("mousedown", manejarClicAfuera);
+    document.addEventListener("touchstart", manejarClicAfuera);
+    return () => {
+      document.removeEventListener("mousedown", manejarClicAfuera);
+      document.removeEventListener("touchstart", manejarClicAfuera);
+    };
+  }, []);
+
   const [idiomaAbierto, setIdiomaAbierto] = useState(false);
   const [idioma, setIdioma] = useState("es");
   const t = (clave) => TEXTOS[idioma]?.[clave] || TEXTOS.es[clave] || clave;
@@ -3877,7 +3897,7 @@ export default function Home() {
           }}
         >
           {/* Zona izquierda: menú hamburguesa + registro/login */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
+          <div ref={menuRef} style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
             <button
               onClick={() => { setMenuAbierto(!menuAbierto); setIdiomaAbierto(false); }}
               aria-label="Menú"
@@ -4045,7 +4065,7 @@ export default function Home() {
           </p>
         )}
 
-        <div className="jmcs-nav-pc" style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
+        <div className="jmcs-nav-pc" style={{ gap: 8, justifyContent: "center", marginTop: 14 }}>
           {[
             { id: "inicio", etiqueta: t("inicio") },
             { id: "estudio", etiqueta: t("estudio") },
@@ -4533,6 +4553,7 @@ export default function Home() {
           </button>
         ))}
         <button
+          ref={masBtnRef}
           className="jmcs-nav-movil-item"
           onClick={() => setMenuAbierto(!menuAbierto)}
           style={{ color: tema.textoSuave }}
