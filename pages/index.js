@@ -46,6 +46,32 @@ const PAISES_POPULARES = [
   "France", "Portugal", "Mexico", "Colombia", "Chile", "Uruguay",
 ];
 
+// El usuario busca en español; la API guarda el país en inglés — esta tabla los conecta
+const PAISES_ES_A_EN = {
+  colombia: "Colombia", argentina: "Argentina", brasil: "Brazil", brazil: "Brazil",
+  españa: "Spain", espana: "Spain", spain: "Spain", inglaterra: "England", england: "England",
+  italia: "Italy", italy: "Italy", alemania: "Germany", germany: "Germany",
+  francia: "France", france: "France", portugal: "Portugal", mexico: "Mexico", méxico: "Mexico",
+  chile: "Chile", uruguay: "Uruguay",
+};
+
+// Equipos famosos por país — lista curada a mano (la API no ofrece esto como dato),
+// solo cubre los países populares de arriba.
+const EQUIPOS_FAMOSOS_POR_PAIS = {
+  Argentina: ["River Plate", "Boca Juniors", "Racing Club", "Independiente"],
+  Brazil: ["Flamengo", "Palmeiras", "Corinthians", "Sao Paulo"],
+  Spain: ["Real Madrid", "Barcelona", "Atletico Madrid", "Sevilla"],
+  England: ["Manchester United", "Liverpool", "Arsenal", "Chelsea"],
+  Italy: ["Juventus", "AC Milan", "Inter", "AS Roma"],
+  Germany: ["Bayern Munich", "Borussia Dortmund", "RB Leipzig", "Bayer Leverkusen"],
+  France: ["Paris Saint Germain", "Marseille", "Lyon", "Monaco"],
+  Portugal: ["Benfica", "Porto", "Sporting CP"],
+  Mexico: ["America", "Chivas", "Cruz Azul", "Pumas UNAM"],
+  Colombia: ["Millonarios", "Atletico Nacional", "America de Cali", "Junior"],
+  Chile: ["Colo-Colo", "Universidad de Chile", "Universidad Catolica"],
+  Uruguay: ["Penarol", "Nacional"],
+};
+
 const VERDE_MARCA = "#1E5631";
 // Traducción del "esqueleto" de la app (menú, pestañas, botones principales).
 // Las etiquetas internas de estadísticas siguen en español por ahora (fase 2 de traducción).
@@ -1135,7 +1161,61 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertencia
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin }) {
+function CalculadoraValor({ opciones, tema, acento }) {
+  const [opcionIndex, setOpcionIndex] = useState(0);
+  const [cuota, setCuota] = useState("");
+
+  const opcion = opciones[opcionIndex];
+  const cuotaNum = parseFloat(cuota);
+  const probImplicita = cuotaNum > 1 ? (1 / cuotaNum) * 100 : null;
+  const nuestraProb = opcion ? Math.round(opcion.prob * 100) : null;
+  const hayValor = probImplicita !== null && nuestraProb !== null && nuestraProb > probImplicita;
+
+  return (
+    <div style={{ marginTop: 20, padding: 14, background: "#111", borderRadius: 8 }}>
+      <h4 style={{ margin: "0 0 4px", fontSize: 13 }}>🎰 Calculadora de valor</h4>
+      <p style={{ fontSize: 10, color: "#9fc4ac", margin: "0 0 12px" }}>
+        Compara la cuota de tu casa de apuestas contra nuestra probabilidad — es tan buena como nuestro propio modelo, no una garantía.
+      </p>
+
+      <select
+        value={opcionIndex}
+        onChange={(e) => setOpcionIndex(Number(e.target.value))}
+        style={{ width: "100%", padding: 9, marginBottom: 10, fontSize: 13, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+      >
+        {opciones.map((o, i) => (
+          <option key={i} value={i}>{o.etiqueta} — nuestra prob.: {Math.round(o.prob * 100)}%</option>
+        ))}
+      </select>
+
+      <input
+        type="number"
+        step="0.01"
+        min="1.01"
+        placeholder="Cuota de tu casa de apuestas (ej: 2.10)"
+        value={cuota}
+        onChange={(e) => setCuota(e.target.value)}
+        style={{ width: "100%", padding: 9, marginBottom: 10, fontSize: 13, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+      />
+
+      {probImplicita !== null && (
+        <div style={{ fontSize: 12, color: tema.texto }}>
+          <div>Probabilidad implícita de esa cuota: <strong>{probImplicita.toFixed(1)}%</strong></div>
+          <div>Nuestra probabilidad: <strong>{nuestraProb}%</strong></div>
+          <div style={{
+            marginTop: 8, padding: "8px 12px", borderRadius: 6, fontWeight: "bold",
+            background: hayValor ? "#2e9e4f" : "#e05555", color: "#fff", display: "inline-block",
+          }}>
+            {hayValor ? "✅ Podría tener valor" : "⚠️ No parece tener valor"}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos }) {
+  const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
   const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
@@ -1195,6 +1275,27 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
     }
   }
 
+  // Opciones disponibles para la calculadora de valor (solo mercados con datos reales)
+  const opcionesValor = [];
+  if (prob1X2) {
+    opcionesValor.push({ etiqueta: `Gana ${equipoLocal.team.name}`, prob: prob1X2.pLocal });
+    opcionesValor.push({ etiqueta: "Empate", prob: prob1X2.pEmpate });
+    opcionesValor.push({ etiqueta: `Gana ${equipoVisitante.team.name}`, prob: prob1X2.pVisitante });
+  }
+  if (probBTTS !== null) opcionesValor.push({ etiqueta: "Ambos anotan (BTTS)", prob: probBTTS });
+  if (lambdaGolesTotal !== null) {
+    LINEAS_MERCADOS.goles.forEach((l) => opcionesValor.push({ etiqueta: `Goles Over ${l}`, prob: probabilidadOver(lambdaGolesTotal, l) }));
+  }
+  if (lambdaCornersTotal !== null) {
+    LINEAS_MERCADOS.corners.forEach((l) => opcionesValor.push({ etiqueta: `Córners Over ${l}`, prob: probabilidadOver(lambdaCornersTotal, l) }));
+  }
+  if (lambdaAmarillasTotal !== null) {
+    LINEAS_MERCADOS.amarillas.forEach((l) => opcionesValor.push({ etiqueta: `Tarjetas Over ${l}`, prob: probabilidadOver(lambdaAmarillasTotal, l) }));
+  }
+  if (lambdaFaltasTotal !== null) {
+    LINEAS_MERCADOS.faltas.forEach((l) => opcionesValor.push({ etiqueta: `Faltas Over ${l}`, prob: probabilidadOver(lambdaFaltasTotal, l) }));
+  }
+
   return (
     <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
       <h3 style={{ marginTop: 0 }}>🚦 Pronóstico y semáforo</h3>
@@ -1208,7 +1309,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </label>
       </div>
 
-      {prob1X2 && (
+      {prob1X2 && mostrarMercado("ganador") && (
         <div style={{ marginBottom: 18 }}>
           <h4 style={{ marginBottom: 8, fontSize: 14 }}>Ganador del partido</h4>
           <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
@@ -1263,9 +1364,11 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </div>
       )}
 
-      <FilaMercado nombre="Goles totales del partido" lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
+      {mostrarMercado("goles") && (
+        <FilaMercado nombre="Goles totales del partido" lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
+      )}
 
-      {probBTTS !== null && (
+      {probBTTS !== null && mostrarMercado("btts") && (
         <div style={{ marginBottom: 18 }}>
           <h4 style={{ marginBottom: 8, fontSize: 14 }}>Ambos anotan (BTTS)</h4>
           {(() => {
@@ -1293,9 +1396,15 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </div>
       )}
 
-      <FilaMercado nombre="Córners totales del partido" lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
-      <FilaMercado nombre="Tarjetas amarillas totales" lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
-      <FilaMercado nombre="Faltas totales del partido" lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+      {mostrarMercado("corners") && (
+        <FilaMercado nombre="Córners totales del partido" lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+      )}
+      {mostrarMercado("amarillas") && (
+        <FilaMercado nombre="Tarjetas amarillas totales" lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+      )}
+      {mostrarMercado("faltas") && (
+        <FilaMercado nombre="Faltas totales del partido" lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+      )}
 
       {!datosPuntualesListos && (
         <p style={{ color: tema.textoSuave, fontSize: 12, marginTop: -8, marginBottom: 18 }}>
@@ -1306,6 +1415,8 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       <p style={{ fontSize: 11, color: tema.textoSuave, marginTop: 16 }}>
         Esto es un modelo estadístico de tendencias, no una certeza. No contempla lesiones, sanciones, clima ni decisiones arbitrales puntuales.
       </p>
+
+      {mostrarMercado("valor") && opcionesValor.length > 0 && <CalculadoraValor opciones={opcionesValor} tema={tema} acento={acento} />}
 
       <BotonGuardarPronostico
         sesion={sesion}
@@ -2742,7 +2853,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil 
         <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay partidos disponibles para hoy en este plan.</p>
       )}
       {paisesOrdenados.map((pais) => (
-        <div key={pais} style={{ marginBottom: 24 }}>
+        <div key={pais} id={`pais-${pais}`} style={{ marginBottom: 24 }}>
           <h4 style={{
             fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", color: acentoMarca,
             borderBottom: `2px solid ${acentoMarca}`, paddingBottom: 6, marginBottom: 12,
@@ -2923,10 +3034,15 @@ const AVATARES_PREDEFINIDOS = [
 function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca }) {
   const [username, setUsername] = useState(perfil?.username || "");
   const [avatarSeleccionado, setAvatarSeleccionado] = useState(perfil?.avatar_url || "");
+  const [mercadosPreferidos, setMercadosPreferidos] = useState(perfil?.mercados_preferidos || []);
   const [subiendo, setSubiendo] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
+
+  function alternarMercado(id) {
+    setMercadosPreferidos((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
+  }
 
   async function subirFoto(e) {
     const archivo = e.target.files?.[0];
@@ -2953,7 +3069,11 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
     setGuardando(true);
     const { data, error: errorGuardar } = await supabase
       .from("perfiles")
-      .update({ username: username.trim(), avatar_url: avatarSeleccionado || null, updated_at: new Date().toISOString() })
+      .update({
+        username: username.trim(), avatar_url: avatarSeleccionado || null,
+        mercados_preferidos: mercadosPreferidos.length > 0 ? mercadosPreferidos : null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("user_id", sesion.user.id)
       .select()
       .maybeSingle();
@@ -3013,8 +3133,36 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
           onChange={(e) => setUsername(e.target.value)}
           required
           maxLength={24}
-          style={{ width: "100%", padding: 10, marginBottom: 14, fontSize: 14, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+          style={{ width: "100%", padding: 10, marginBottom: 20, fontSize: 14, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
         />
+
+        <label style={{ fontSize: 12, color: tema.textoSuave, display: "block", marginBottom: 6 }}>
+          Mercados que me interesan (deja todos sin marcar para ver todos, como hoy)
+        </label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+          {[
+            { id: "goles", etiqueta: "⚽ Goles" },
+            { id: "btts", etiqueta: "🤝 Ambos anotan" },
+            { id: "ganador", etiqueta: "🏆 Ganador" },
+            { id: "corners", etiqueta: "🚩 Córners" },
+            { id: "amarillas", etiqueta: "🟨 Tarjetas" },
+            { id: "faltas", etiqueta: "⚠️ Faltas" },
+          ].map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => alternarMercado(m.id)}
+              style={{
+                padding: "8px 14px", fontSize: 12, borderRadius: 16, cursor: "pointer",
+                background: mercadosPreferidos.includes(m.id) ? acentoMarca : "transparent",
+                color: mercadosPreferidos.includes(m.id) ? "#fff" : tema.texto,
+                border: `1px solid ${mercadosPreferidos.includes(m.id) ? acentoMarca : tema.borde}`,
+              }}
+            >
+              {m.etiqueta}
+            </button>
+          ))}
+        </div>
 
         {mensaje && <p style={{ fontSize: 12, color: "#2e9e4f", marginBottom: 10 }}>{mensaje}</p>}
         {error && <p style={{ fontSize: 12, color: "#e05555", marginBottom: 10 }}>⚠️ {error}</p>}
@@ -3188,9 +3336,50 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
   );
 }
 
-function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey }) {
+function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey, paisDetectado, onBuscarEquipoPorNombre }) {
   return (
     <div>
+      {paisDetectado && (
+        <div style={{ marginBottom: 24, background: colorTenue(acentoMarca), borderTop: `3px solid ${acentoMarca}`, borderRadius: 8, padding: 18 }}>
+          <button
+            onClick={() => document.getElementById(`pais-${paisDetectado}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            style={{
+              display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none",
+              cursor: "pointer", padding: 0, marginBottom: 16,
+            }}
+            title={`Ver partidos de hoy de ${paisDetectado}`}
+          >
+            <span style={{ fontSize: 32 }}>{BANDERAS_PAISES[paisDetectado] || "🌍"}</span>
+            <span style={{ fontSize: 26, fontWeight: "bold", color: acentoMarca }}>{paisDetectado}</span>
+          </button>
+
+          <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>Selección nacional:</p>
+          <button
+            onClick={() => onBuscarEquipoPorNombre(paisDetectado)}
+            style={{ padding: "8px 14px", fontSize: 13, fontWeight: "bold", background: acentoMarca, color: "#fff", border: "none", borderRadius: 14, cursor: "pointer", marginBottom: 16 }}
+          >
+            🏆 Selección {paisDetectado}
+          </button>
+
+          {EQUIPOS_FAMOSOS_POR_PAIS[paisDetectado] && (
+            <>
+              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 8px" }}>Equipos más famosos:</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {EQUIPOS_FAMOSOS_POR_PAIS[paisDetectado].map((nombre) => (
+                  <button
+                    key={nombre}
+                    onClick={() => onBuscarEquipoPorNombre(nombre)}
+                    style={{ padding: "6px 12px", fontSize: 12, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 14, cursor: "pointer" }}
+                  >
+                    {nombre}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {equipoInicio?.team && (
         <div style={{ marginBottom: 24 }}>
           <div
@@ -3413,6 +3602,7 @@ export default function Home() {
   }, [vistaActual, sesion]);
 
   const [busquedaInicio, setBusquedaInicio] = useState("");
+  const [paisDetectadoInicio, setPaisDetectadoInicio] = useState(null);
   const [refrescarInicioKey, setRefrescarInicioKey] = useState(0);
   const [jalando, setJalando] = useState(false);
   const [jaladoSuficiente, setJaladoSuficiente] = useState(false);
@@ -3547,14 +3737,13 @@ export default function Home() {
   const colorMarcaInicio = useColorDeEscudo(equipoInicio?.team?.logo, DORADO);
   const [partidoTocadoInicio, setPartidoTocadoInicio] = useState(null);
 
-  async function buscarEquipoInicio(e) {
-    e.preventDefault();
-    if (busquedaInicio.trim().length < 3) return;
+  async function buscarEquipoPorNombre(nombre) {
+    setPaisDetectadoInicio(null);
     setBuscandoInicio(true);
     setEquipoInicio(null);
     setFixturesInicio([]);
     try {
-      const res = await fetch(`/api/teams?name=${encodeURIComponent(busquedaInicio)}`);
+      const res = await fetch(`/api/teams?name=${encodeURIComponent(nombre)}`);
       const data = await res.json();
       if (!data.error && data.length > 0) {
         const equipo = data[0];
@@ -3565,6 +3754,23 @@ export default function Home() {
       }
     } catch (err) {}
     setBuscandoInicio(false);
+  }
+
+  async function buscarEquipoInicio(e) {
+    e.preventDefault();
+    const textoNormalizado = busquedaInicio.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const paisDetectado = PAISES_ES_A_EN[textoNormalizado];
+
+    if (paisDetectado) {
+      setPaisDetectadoInicio(paisDetectado);
+      setEquipoInicio(null);
+      setFixturesInicio([]);
+      return;
+    }
+    setPaisDetectadoInicio(null);
+
+    if (busquedaInicio.trim().length < 3) return;
+    await buscarEquipoPorNombre(busquedaInicio);
   }
 
   // ===== Estudio Climático Personalizado =====
@@ -4220,6 +4426,8 @@ export default function Home() {
             partidoTocado={partidoTocadoInicio}
             onAbrirPerfil={abrirPerfilEquipo}
             refrescarKey={refrescarInicioKey}
+            paisDetectado={paisDetectadoInicio}
+            onBuscarEquipoPorNombre={buscarEquipoPorNombre}
           />
         </div>
       )}
@@ -4506,6 +4714,7 @@ export default function Home() {
             coberturaPuntuales={coberturaPuntuales}
             sesion={sesion}
             onPedirLogin={abrirLogin}
+            mercadosPreferidos={perfil?.mercados_preferidos}
           />
         </div>
 
