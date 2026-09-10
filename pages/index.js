@@ -24,27 +24,6 @@ const TEMAS = {
 
 const DORADO = "#D8A93B";
 
-// Banderas de los países que más aparecen en el fútbol mundial (nombres tal como los da la API).
-// Si un país no está aquí, simplemente no se le muestra bandera — no rompe nada.
-const BANDERAS_PAISES = {
-  Argentina: "🇦🇷", Brazil: "🇧🇷", Spain: "🇪🇸", England: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", Italy: "🇮🇹",
-  Germany: "🇩🇪", France: "🇫🇷", Portugal: "🇵🇹", Mexico: "🇲🇽", Colombia: "🇨🇴",
-  Chile: "🇨🇱", Uruguay: "🇺🇾", Peru: "🇵🇪", Ecuador: "🇪🇨", "United-States": "🇺🇸",
-  Netherlands: "🇳🇱", Belgium: "🇧🇪", Turkey: "🇹🇷", Japan: "🇯🇵", "South-Korea": "🇰🇷",
-  Paraguay: "🇵🇾", Bolivia: "🇧🇴", Venezuela: "🇻🇪", "Costa-Rica": "🇨🇷", Honduras: "🇭🇳",
-  Panama: "🇵🇦", Guatemala: "🇬🇹", Ecuador2: "🇪🇨", Russia: "🇷🇺", Ukraine: "🇺🇦",
-  Poland: "🇵🇱", Croatia: "🇭🇷", Serbia: "🇷🇸", Switzerland: "🇨🇭", Austria: "🇦🇹",
-  Scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", Wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", Ireland: "🇮🇪", Denmark: "🇩🇰", Sweden: "🇸🇪",
-  Norway: "🇳🇴", Greece: "🇬🇷", Egypt: "🇪🇬", Morocco: "🇲🇦", Nigeria: "🇳🇬",
-  Senegal: "🇸🇳", "Saudi-Arabia": "🇸🇦", Qatar: "🇶🇦", "United-Arab-Emirates": "🇦🇪",
-  China: "🇨🇳", India: "🇮🇳", Australia: "🇦🇺",
-};
-
-// Bandera del país de un equipo (vacío si no lo tenemos mapeado, para no mostrar 🌍 en todos lados)
-function banderaEquipo(pais) {
-  return BANDERAS_PAISES[pais] || "";
-}
-
 // Códigos ISO de los mismos países de arriba, para pedirle la bandera como IMAGEN a flagcdn.com
 // (gratis, sin key, no ocupa espacio en nuestra base). Solo se usa cuando la API no nos manda
 // ya una URL de bandera propia (eso pasa con equipos, no con partidos/ligas).
@@ -77,6 +56,71 @@ function BanderaPais({ pais, url, size = 16 }) {
       style={{ height: "auto", borderRadius: 2, verticalAlign: "middle", display: "inline-block" }}
       onError={(e) => { e.target.style.display = "none"; }}
     />
+  );
+}
+
+// Íconos propios en SVG (línea fina, estilo consistente) para reemplazar los emoji sueltos.
+// La idea: mismo significado, pero con un trazo propio de la marca en vez del emoji del sistema operativo.
+const ICONOS_SVG = {
+  hogar: <><path d="M3 10.5L12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9.5 21v-6h5v6" /></>,
+  barras: <><rect x="3.5" y="12" width="4" height="8.5" /><rect x="10" y="7" width="4" height="13.5" /><rect x="16.5" y="3" width="4" height="17.5" /></>,
+  estrella: <path d="M12 2.5l3 6.2 6.7.9-4.9 4.7 1.2 6.7-6-3.2-6 3.2 1.2-6.7-4.9-4.7 6.7-.9z" />,
+  calendario: <><rect x="3" y="5" width="18" height="16" rx="2" /><line x1="16" y1="3" x2="16" y2="7" /><line x1="8" y1="3" x2="8" y2="7" /><line x1="3" y1="10" x2="21" y2="10" /></>,
+  balon: <><circle cx="12" cy="12" r="9" /><path d="M12 7.3l3 2.2-1.1 3.6h-3.8l-1.1-3.6z" /><path d="M12 3v4.3M5 7.8l2.5 1.6M5 16.2l2.9-.8M19 7.8l-2.5 1.6M19 16.2l-2.9-.8M12 21v-4" /></>,
+  trofeo: <><path d="M7 4h10v4a5 5 0 0 1-10 0z" /><path d="M7 5H4a3 3 0 0 0 3 4" /><path d="M17 5h3a3 3 0 0 1-3 4" /><line x1="12" y1="13" x2="12" y2="17" /><line x1="8" y1="20" x2="16" y2="20" /><line x1="9" y1="17" x2="15" y2="17" /></>,
+  campana: <><path d="M6 9a6 6 0 0 1 12 0c0 6 2 8 2 8H4s2-2 2-8" /><path d="M10 20a2 2 0 0 0 4 0" /></>,
+  campanaTachada: <><path d="M6 9a6 6 0 0 1 10.5-4" /><path d="M18 9c0 6 2 8 2 8H7" /><path d="M4 17s1.2-1.2 1.7-3.3" /><path d="M10 20a2 2 0 0 0 4 0" /><line x1="3" y1="3" x2="21" y2="21" /></>,
+  disquete: <><path d="M5 3h11l3 3v15H5z" /><rect x="8" y="3" width="7" height="5" /><rect x="7.5" y="13" width="9" height="7" /></>,
+  banderin: <><line x1="5" y1="3" x2="5" y2="21" /><path d="M5 4h12l-3.2 4L17 12H5" /></>,
+  tarjeta: <rect x="6" y="3" width="12" height="18" rx="2" />,
+  semaforo: <><rect x="8.5" y="2" width="7" height="19" rx="3.5" /><circle cx="12" cy="6.3" r="1.4" /><circle cx="12" cy="11.5" r="1.4" /><circle cx="12" cy="16.7" r="1.4" /></>,
+  chat: <path d="M4 4h16v12.5H9L4 20.5z" />,
+  cerrar: <><line x1="5.5" y1="5.5" x2="18.5" y2="18.5" /><line x1="18.5" y1="5.5" x2="5.5" y2="18.5" /></>,
+  objetivo: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" /></>,
+  porteria: <><rect x="4" y="5" width="16" height="11" /><line x1="8.6" y1="5" x2="8.6" y2="16" /><line x1="13.2" y1="5" x2="13.2" y2="16" /><line x1="17.8" y1="5" x2="17.8" y2="16" /><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="12.5" x2="20" y2="12.5" /></>,
+  portapapeles: <><rect x="6" y="4" width="12" height="17" rx="2" /><rect x="9" y="2" width="6" height="4" rx="1" /><line x1="9" y1="11.5" x2="15" y2="11.5" /><line x1="9" y1="15.5" x2="15" y2="15.5" /></>,
+  estadio: <><path d="M12 21s7-7.4 7-12.2A7 7 0 0 0 5 8.8C5 13.6 12 21 12 21z" /><circle cx="12" cy="8.8" r="2.6" /></>,
+  balanza: <><line x1="12" y1="3" x2="12" y2="21" /><line x1="5" y1="7" x2="19" y2="7" /><path d="M5 7l-3 6a3 3 0 0 0 6 0z" /><path d="M19 7l-3 6a3 3 0 0 0 6 0z" /></>,
+  termometro: <path d="M12 3.5a2 2 0 0 0-2 2v9.3a4 4 0 1 0 4 0V5.5a2 2 0 0 0-2-2z" />,
+  lluvia: <><path d="M6.5 15a4 4 0 0 1 .6-7.9 5.3 5.3 0 0 1 10.2 1.6A3.6 3.6 0 0 1 17 15z" /><line x1="9" y1="18" x2="9" y2="21.5" /><line x1="13" y1="18" x2="13" y2="21.5" /><line x1="17" y1="18" x2="17" y2="21.5" /></>,
+  viento: <><path d="M3 8h11.5a2.5 2.5 0 1 0-2.5-2.5" /><path d="M3 12.5h15.5a2.5 2.5 0 1 1-2.5 2.5" /><path d="M3 17h9.5" /></>,
+  gota: <path d="M12 3s6.2 7.2 6.2 11.2a6.2 6.2 0 1 1-12.4 0C5.8 10.2 12 3 12 3z" />,
+  llave: <><circle cx="7.5" cy="15" r="4" /><line x1="10.8" y1="11.7" x2="20" y2="2.5" /><line x1="15.3" y1="7.2" x2="18.3" y2="10.2" /><line x1="12.3" y1="10.2" x2="15.3" y2="13.2" /></>,
+  camara: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8.5 7l1.7-2.7h3.6L15.5 7" /><circle cx="12" cy="13.3" r="3.7" /></>,
+  apreton: <><circle cx="7" cy="12" r="4" /><circle cx="17" cy="12" r="4" /><line x1="11" y1="12" x2="13" y2="12" /></>,
+  foco: <><path d="M9.3 18h5.4" /><path d="M10 21h4" /><path d="M12 3.5a6.2 6.2 0 0 0-4 11c.7.6 1 1.3 1 2.4h6c0-1.1.3-1.8 1-2.4a6.2 6.2 0 0 0-4-11z" /></>,
+  grafico: <><polyline points="3 17 9 11 13 15 21 6" /><polyline points="15 6 21 6 21 12" /></>,
+  check: <polyline points="4 12.5 9 17.5 20 6" />,
+  sol: <><circle cx="12" cy="12" r="4" /><line x1="12" y1="2.5" x2="12" y2="5.3" /><line x1="12" y1="18.7" x2="12" y2="21.5" /><line x1="2.5" y1="12" x2="5.3" y2="12" /><line x1="18.7" y1="12" x2="21.5" y2="12" /><line x1="4.9" y1="4.9" x2="6.9" y2="6.9" /><line x1="17.1" y1="17.1" x2="19.1" y2="19.1" /><line x1="4.9" y1="19.1" x2="6.9" y2="17.1" /><line x1="17.1" y1="6.9" x2="19.1" y2="4.9" /></>,
+  luna: <path d="M20.5 13.2A8.8 8.8 0 1 1 10.8 3.5a7 7 0 0 0 9.7 9.7z" />,
+  refrescar: <><path d="M20.5 12a8.5 8.5 0 1 1-2.8-6.3" /><polyline points="20.5 3 20.5 8.5 15 8.5" /></>,
+  exclamacion: <><path d="M12 3.5l9.5 16.5H2.5z" /><line x1="12" y1="9.3" x2="12" y2="14" /><circle cx="12" cy="17.2" r="0.9" fill="currentColor" stroke="none" /></>,
+  flecha: <><line x1="4" y1="12" x2="19" y2="12" /><polyline points="13.5 6 19.5 12 13.5 18" /></>,
+  corona: <><path d="M3.5 8.3l3.6 2.7L12 4.5l4.9 6.5 3.6-2.7L19 18.3H5z" /><line x1="5" y1="18.3" x2="19" y2="18.3" /></>,
+  persona: <><circle cx="12" cy="8" r="4" /><path d="M4.3 20.5c0-4.1 3.9-6.3 7.7-6.3s7.7 2.2 7.7 6.3" /></>,
+  menu: <><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" /></>,
+  candado: <><rect x="5.5" y="11" width="13" height="9.5" rx="2" /><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" /></>,
+  moneda: <><circle cx="12" cy="12" r="9" /><line x1="12" y1="6.5" x2="12" y2="17.5" /><path d="M15 9.3c0-1.3-1.3-2.3-3-2.3s-3 1-3 2.3 1.3 1.8 3 2.3 3 1 3 2.3-1.3 2.3-3 2.3-3-1-3-2.3" /></>,
+  puntoLleno: <circle cx="12" cy="12" r="6.5" fill="currentColor" stroke="none" />,
+};
+
+function Icono({ tipo, size = 15, color = "currentColor", style }) {
+  const contenido = ICONOS_SVG[tipo];
+  if (!contenido) return null;
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ verticalAlign: "middle", flexShrink: 0, ...style }}
+    >
+      {contenido}
+    </svg>
   );
 }
 
@@ -117,7 +161,7 @@ const VERDE_MARCA = "#1E5631";
 // Las etiquetas internas de estadísticas siguen en español por ahora (fase 2 de traducción).
 const TEXTOS = {
   es: {
-    inicio: "🏠 Inicio", estudio: "📊 Estudio", favoritos: "⭐ Favoritos",
+    inicio: "Inicio", estudio: "Estudio", favoritos: "Favoritos",
     registrarse: "Registrarse", iniciarSesion: "Iniciar sesión", cerrarSesion: "Cerrar sesión",
     buscar: "Buscar", local: "Local", visitante: "Visitante",
     menuInicio: "Inicio", menuMisEstudios: "Mis estudios", menuFavoritos: "Favoritos",
@@ -138,9 +182,26 @@ const TEXTOS = {
     empate: "Empate", datosGenerales: "Datos generales del encuentro", arbitro: "Árbitro",
     sinDatosCorto: "Sin datos", guardarPronostico: "Guardar este pronóstico en mi historial",
     pronosticoGuardado: "Pronóstico guardado en tu historial",
+    // Fase 2 de traducción — pantallas más visibles
+    partidosDeHoy: "Partidos de hoy", buscarPorFecha: "Buscar partidos por fecha",
+    calendarioPartidos: "Calendario de partidos", todos: "Todos",
+    misFavoritos: "Mis favoritos", sinFavoritosTexto: "Aún no tienes equipos favoritos. Toca la estrella junto al nombre de un equipo para guardarlo aquí.",
+    editarPerfil: "Editar perfil", panelAdmin: "Panel de administrador",
+    historialAciertos: "Historial de aciertos", pronosticoYSemaforo: "Pronóstico y semáforo",
+    calculadoraValor: "Calculadora de valor", valorSi: "Podría tener valor", valorNo: "No parece tener valor",
+    guardado: "Guardado", guardando: "Guardando...", guardarEnHistorial: "Guardar en mi Historial",
+    estudioClimatico: "Estudio Climático Personalizado", conEstudioClimatico: "Con mi Estudio Climático:",
+    avisarSemaforoVerde: "Avisarme cuando haya semáforo verde",
+    seleccionNacionalLabel: "Selección nacional:", equiposFamosos: "Equipos más famosos:",
+    alineacionesConfirmadas: "Alineaciones confirmadas", statsEnVivo: "Estadísticas en vivo (se actualizan solas)",
+    statsReales: "Estadísticas reales de este encuentro",
+    cornersCorto: "Córners", amarillasCorto: "Amarillas", rojasCorto: "Rojas",
+    faltasCorto: "Faltas", posesionCorto: "Posesión", tirosTotalesCorto: "Tiros totales", tirosPuertaCorto: "Tiros a puerta",
+    goles: "Goles", ambosAnotanChip: "Ambos anotan", ganadorChip: "Ganador",
+    subirFoto: "Subir mi propia foto", perfilActualizado: "Perfil actualizado.",
   },
   en: {
-    inicio: "🏠 Home", estudio: "📊 Study", favoritos: "⭐ Favorites",
+    inicio: "Home", estudio: "Study", favoritos: "Favorites",
     registrarse: "Sign up", iniciarSesion: "Log in", cerrarSesion: "Log out",
     buscar: "Search", local: "Home", visitante: "Away",
     menuInicio: "Home", menuMisEstudios: "My studies", menuFavoritos: "Favorites",
@@ -159,6 +220,23 @@ const TEXTOS = {
     empate: "Draw", datosGenerales: "Match general info", arbitro: "Referee",
     sinDatosCorto: "No data", guardarPronostico: "Save this prediction to my history",
     pronosticoGuardado: "Prediction saved to your history",
+    // Phase 2 translation — most visible screens
+    partidosDeHoy: "Today's matches", buscarPorFecha: "Search matches by date",
+    calendarioPartidos: "Match calendar", todos: "All",
+    misFavoritos: "My favorites", sinFavoritosTexto: "You don't have any favorite teams yet. Tap the star next to a team's name to save it here.",
+    editarPerfil: "Edit profile", panelAdmin: "Admin panel",
+    historialAciertos: "Track record", pronosticoYSemaforo: "Prediction and traffic light",
+    calculadoraValor: "Value calculator", valorSi: "Could have value", valorNo: "Doesn't seem to have value",
+    guardado: "Saved", guardando: "Saving...", guardarEnHistorial: "Save to my History",
+    estudioClimatico: "Personalized Weather Study", conEstudioClimatico: "With my Weather Study:",
+    avisarSemaforoVerde: "Notify me when it hits green light",
+    seleccionNacionalLabel: "National team:", equiposFamosos: "Most famous teams:",
+    alineacionesConfirmadas: "Confirmed lineups", statsEnVivo: "Live stats (auto-updating)",
+    statsReales: "Real stats for this match",
+    cornersCorto: "Corners", amarillasCorto: "Yellow cards", rojasCorto: "Red cards",
+    faltasCorto: "Fouls", posesionCorto: "Possession", tirosTotalesCorto: "Total shots", tirosPuertaCorto: "Shots on target",
+    goles: "Goals", ambosAnotanChip: "Both teams score", ganadorChip: "Winner",
+    subirFoto: "Upload my own photo", perfilActualizado: "Profile updated.",
   },
 };
 
@@ -613,7 +691,7 @@ function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento, idioma = "
   );
 }
 
-function BotonFavorito({ equipo, sesion, tema, onPedirLogin }) {
+function BotonFavorito({ equipo, sesion, tema, onPedirLogin, mostrarToast }) {
   const [esFavorito, setEsFavorito] = useState(false);
   const [cargando, setCargando] = useState(false);
 
@@ -642,18 +720,24 @@ function BotonFavorito({ equipo, sesion, tema, onPedirLogin }) {
       return;
     }
     setCargando(true);
-    if (esFavorito) {
-      await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", equipo.team.id);
-      setEsFavorito(false);
-    } else {
-      await supabase.from("favoritos").insert({
-        user_id: sesion.user.id,
-        team_id: equipo.team.id,
-        team_name: equipo.team.name,
-        team_logo: equipo.team.logo,
-        team_country: equipo.team.country,
-      });
-      setEsFavorito(true);
+    try {
+      if (esFavorito) {
+        const { error } = await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", equipo.team.id);
+        if (error) throw error;
+        setEsFavorito(false);
+      } else {
+        const { error } = await supabase.from("favoritos").insert({
+          user_id: sesion.user.id,
+          team_id: equipo.team.id,
+          team_name: equipo.team.name,
+          team_logo: equipo.team.logo,
+          team_country: equipo.team.country,
+        });
+        if (error) throw error;
+        setEsFavorito(true);
+      }
+    } catch (err) {
+      mostrarToast && mostrarToast("No se pudo guardar el favorito. Intenta de nuevo.");
     }
     setCargando(false);
   }
@@ -759,7 +843,7 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
 
   return (
     <div>
-      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center" }}>⭐ Mis favoritos</h3>
+      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}><Icono tipo="estrella" size={16} /> {traducir("misFavoritos")}</h3>
 
       {cargando ? (
         <p style={{ color: tema.textoSuave, textAlign: "center" }}>Cargando...</p>
@@ -826,15 +910,15 @@ function PanelFavoritos({ sesion, tema, acentoMarca, onCerrar }) {
         style={{ background: tema.fondo, borderRadius: 12, padding: 24, width: 640, maxWidth: "100%", maxHeight: "80vh", overflowY: "auto", borderTop: `3px solid ${acentoMarca}` }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h3 style={{ margin: 0 }}>⭐ Mis favoritos</h3>
-          <button onClick={onCerrar} style={{ background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}>✕</button>
+          <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: 7 }}><Icono tipo="estrella" size={15} /> {traducir("misFavoritos")}</h3>
+          <button onClick={onCerrar} style={{ background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}><Icono tipo="cerrar" size={16} /></button>
         </div>
 
         {cargando ? (
           <p style={{ color: tema.textoSuave }}>Cargando...</p>
         ) : favoritos.length === 0 ? (
           <p style={{ color: tema.textoSuave, fontSize: 13 }}>
-            Aún no tienes equipos favoritos. Toca la estrella ⭐ junto al nombre de un equipo para guardarlo aquí.
+            {traducir("sinFavoritosTexto")}
           </p>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
@@ -984,7 +1068,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
               <img src={corregirEscudo(selectedTeam.team.logo)} alt={selectedTeam.team.name} width={26} height={26} onError={manejarErrorEscudo} />
               <strong style={{ color: colorMarca || tema.texto }}><BanderaPais pais={selectedTeam.team.country} size={16} /> {selectedTeam.team.name}</strong>
             </div>
-            <BotonFavorito equipo={selectedTeam} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+            <BotonFavorito equipo={selectedTeam} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} mostrarToast={mostrarToast} />
           </div>
 
           <div className="jmcs-subpaneles-individual" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -1170,7 +1254,7 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertencia
       </h4>
 
       {advertenciaMuestra && !sinDatos && (
-        <p style={{ fontSize: 11, color: "#c9a227", margin: "0 0 6px" }}>⚠️ {advertenciaMuestra}</p>
+        <p style={{ fontSize: 11, color: "#c9a227", margin: "0 0 6px", display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} color="#c9a227" /> {advertenciaMuestra}</p>
       )}
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -1207,7 +1291,7 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertencia
       {lambdaAjustado !== null && lambdaAjustado !== undefined && (
         <div style={{ marginTop: 8 }}>
           <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>
-            🌦️ Con estimación de clima — esperado: {lambdaAjustado.toFixed(2)}
+            <Icono tipo="lluvia" size={13} /> Con estimación de clima — esperado: {lambdaAjustado.toFixed(2)}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {lineas.map((linea) => {
@@ -1244,7 +1328,7 @@ function CalculadoraValor({ opciones, tema, acento }) {
 
   return (
     <div style={{ marginTop: 20, padding: 14, background: "#111", borderRadius: 8 }}>
-      <h4 style={{ margin: "0 0 4px", fontSize: 13 }}>🎰 Calculadora de valor</h4>
+      <h4 style={{ margin: "0 0 4px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="moneda" size={14} /> {traducir("calculadoraValor")}</h4>
       <p style={{ fontSize: 10, color: "#9fc4ac", margin: "0 0 12px" }}>
         Compara la cuota de tu casa de apuestas contra nuestra probabilidad — es tan buena como nuestro propio modelo, no una garantía.
       </p>
@@ -1277,7 +1361,9 @@ function CalculadoraValor({ opciones, tema, acento }) {
             marginTop: 8, padding: "8px 12px", borderRadius: 6, fontWeight: "bold",
             background: hayValor ? "#2e9e4f" : "#e05555", color: "#fff", display: "inline-block",
           }}>
-            {hayValor ? "✅ Podría tener valor" : "⚠️ No parece tener valor"}
+            {hayValor
+              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icono tipo="check" size={13} color="#2e9e4f" /> {traducir("valorSi")}</span>
+              : <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} /> {traducir("valorNo")}</span>}
           </div>
         </div>
       )}
@@ -1285,7 +1371,7 @@ function CalculadoraValor({ opciones, tema, acento }) {
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast }) {
   const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
   const [permisoNotificaciones, setPermisoNotificaciones] = useState(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"
@@ -1311,7 +1397,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         const clave = `${claveEncuentro}-${o.etiqueta}`;
         if (!yaNotificado.current.has(clave)) {
           yaNotificado.current.add(clave);
-          new Notification("🟢 JMCS — Semáforo en verde", {
+          new Notification("JMCS — Semáforo en verde", {
             body: `${nombreLocal} vs ${nombreVisitante}\n${o.etiqueta}: ${Math.round(o.prob * 100)}%`,
             icon: "/logo.png",
           });
@@ -1412,20 +1498,20 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
   return (
     <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
-      <h3 style={{ marginTop: 0 }}>🚦 Pronóstico y semáforo</h3>
+      <h3 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 7 }}><Icono tipo="semaforo" size={16} /> {traducir("pronosticoYSemaforo")}</h3>
 
       {permisoNotificaciones !== "unsupported" && (
         <div style={{ marginBottom: 16 }}>
           {permisoNotificaciones === "granted" ? (
-            <span style={{ fontSize: 11, color: "#2e9e4f" }}>🔔 Te avisaremos si algo aquí llega a semáforo verde (mientras esta pestaña esté abierta).</span>
+            <span style={{ fontSize: 11, color: "#2e9e4f", display: "inline-flex", alignItems: "center", gap: 4 }}><Icono tipo="campana" size={12} color="#2e9e4f" /> Te avisaremos si algo aquí llega a semáforo verde (mientras esta pestaña esté abierta).</span>
           ) : permisoNotificaciones === "denied" ? (
-            <span style={{ fontSize: 11, color: tema.textoSuave }}>🔕 Notificaciones bloqueadas — actívalas desde la configuración de tu navegador si quieres recibirlas.</span>
+            <span style={{ fontSize: 11, color: tema.textoSuave, display: "inline-flex", alignItems: "center", gap: 4 }}><Icono tipo="campanaTachada" size={12} /> Notificaciones bloqueadas — actívalas desde la configuración de tu navegador si quieres recibirlas.</span>
           ) : (
             <button
               onClick={activarNotificaciones}
               style={{ fontSize: 11, padding: "6px 12px", background: "transparent", border: `1px solid ${acento}`, color: acento, borderRadius: 14, cursor: "pointer" }}
             >
-              🔔 Avisarme cuando haya semáforo verde
+              <Icono tipo="campana" size={13} /> {traducir("avisarSemaforoVerde")}
             </button>
           )}
         </div>
@@ -1469,7 +1555,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
           {prob1X2Ajustado && (
             <div style={{ marginTop: 8 }}>
-              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>🌦️ Con mi Estudio Climático:</p>
+              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px", display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="lluvia" size={13} /> {traducir("conEstudioClimatico")}</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {[
                   { etiqueta: equipoLocal.team.name, prob: prob1X2Ajustado.pLocal },
@@ -1513,7 +1599,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
           {probBTTSAjustado !== null && (
             <div style={{ marginTop: 8 }}>
-              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>🌦️ Con mi Estudio Climático:</p>
+              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px", display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="lluvia" size={13} /> {traducir("conEstudioClimatico")}</p>
               {(() => {
                 const { color } = colorSemaforo(probBTTSAjustado);
                 return (
@@ -1554,6 +1640,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         onPedirLogin={onPedirLogin}
         tema={tema}
         acento={acento}
+        mostrarToast={mostrarToast}
         datos={{
           equipo_local: equipoLocal.team.name,
           equipo_visitante: equipoVisitante.team.name,
@@ -1573,7 +1660,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   );
 }
 
-function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos }) {
+function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos, mostrarToast }) {
   const [guardado, setGuardado] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
@@ -1592,7 +1679,11 @@ function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos }) {
       prob_btts: datos.prob_btts,
       pick_1x2: datos.pick_1x2,
     });
-    if (!error) setGuardado(true);
+    if (!error) {
+      setGuardado(true);
+    } else {
+      mostrarToast && mostrarToast("No se pudo guardar el pronóstico. Intenta de nuevo.");
+    }
     setGuardando(false);
   }
 
@@ -1606,7 +1697,9 @@ function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos }) {
         borderRadius: 6, cursor: guardado ? "default" : "pointer",
       }}
     >
-      {guardado ? "✅ Pronóstico guardado en tu historial" : guardando ? "Guardando..." : "💾 Guardar este pronóstico en mi historial"}
+      {guardado
+        ? <><Icono tipo="check" size={13} /> {traducir("pronosticoGuardado")}</>
+        : guardando ? traducir("guardando") : <><Icono tipo="disquete" size={13} /> {traducir("guardarPronostico")}</>}
     </button>
   );
 }
@@ -1653,7 +1746,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
 
   return (
     <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 16 }}>
-      <h3 style={{ fontSize: 13, marginTop: 0, marginBottom: 14, color: acentoMarca }}>📅 Calendario de partidos</h3>
+      <h3 style={{ fontSize: 13, marginTop: 0, marginBottom: 14, color: acentoMarca, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="calendario" size={14} /> {traducir("calendarioPartidos")}</h3>
 
       <input
         type="date"
@@ -1686,7 +1779,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
               border: `1px solid ${!paisFiltro ? acentoMarca : tema.borde}`,
             }}
           >
-            Todos
+            {traducir("todos")}
           </button>
           {paisesDisponibles.map((pais) => (
             <button
@@ -1830,10 +1923,10 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h3 style={{ margin: 0, fontSize: 13 }}>💬 {tituloOverride || "IA sobre este partido"}</h3>
+        <h3 style={{ margin: 0, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="chat" size={14} /> {tituloOverride || "IA sobre este partido"}</h3>
         {onCerrar && (
           <button onClick={onCerrar} style={{ background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}>
-            ✕
+            <Icono tipo="cerrar" size={16} />
           </button>
         )}
       </div>
@@ -1893,7 +1986,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   );
 }
 
-function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, sesion, onPedirLogin, onAbrirPerfil }) {
+function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, sesion, onPedirLogin, onAbrirPerfil, mostrarToast }) {
   if (!equipo?.team) return null;
 
   const ultimos5 = (fixtures || []).slice(0, 5);
@@ -1911,7 +2004,7 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, s
         <span onClick={() => onAbrirPerfil && onAbrirPerfil(equipo.team)} style={{ cursor: onAbrirPerfil ? "pointer" : "default" }}>
           <BanderaPais pais={equipo.team.country} size={16} /> {equipo.team.name}
         </span>
-        <BotonFavorito equipo={equipo} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+        <BotonFavorito equipo={equipo} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} mostrarToast={mostrarToast} />
       </h4>
 
       {stats ? (
@@ -2123,14 +2216,14 @@ const ETIQUETAS_ESTADO = {
   NS: "Aún no comienza", PST: "Pospuesto", CANC: "Cancelado",
 };
 
-function FilaEnfrentada({ etiqueta, valorLocal, valorVisitante, tema, destacar }) {
+function FilaEnfrentada({ etiqueta, icono, valorLocal, valorVisitante, tema, destacar }) {
   return (
     <div style={{ display: "flex", alignItems: "center", padding: "7px 0", borderBottom: `1px solid ${tema.borde}` }}>
       <div style={{ flex: 1, textAlign: "right", fontWeight: "bold", fontSize: destacar ? 15 : 13, color: destacar ? "#e05555" : tema.texto }}>
         {valorLocal ?? "—"}
       </div>
-      <div style={{ flex: 1.4, textAlign: "center", fontSize: 11, color: tema.textoSuave, padding: "0 6px" }}>
-        {etiqueta}
+      <div style={{ flex: 1.4, textAlign: "center", fontSize: 11, color: tema.textoSuave, padding: "0 6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+        {icono && <Icono tipo={icono} size={12} />} {etiqueta}
       </div>
       <div style={{ flex: 1, textAlign: "left", fontWeight: "bold", fontSize: destacar ? 15 : 13, color: destacar ? "#e05555" : tema.texto }}>
         {valorVisitante ?? "—"}
@@ -2220,7 +2313,7 @@ function AlineacionesPartido({ fixtureId, colorMarcaLocal, colorMarcaVisitante, 
 
   return (
     <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 14, marginBottom: 18 }}>
-      <h4 style={{ margin: "0 0 12px", fontSize: 11, color: acentoMarca }}>⚽ Alineaciones confirmadas</h4>
+      <h4 style={{ margin: "0 0 12px", fontSize: 11, color: acentoMarca, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="balon" size={13} /> {traducir("alineacionesConfirmadas")}</h4>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 240 }}>
           <MiniCancha equipo={alineaciones[0]} colorEquipo={colorMarcaLocal} invertido={false} />
@@ -2276,7 +2369,9 @@ function EstadisticasPartidoReal({ fixtureId, nombreLocal, nombreVisitante, tema
   return (
     <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${enVivo ? "#e05555" : acentoMarca}`, padding: 14, marginBottom: 18, fontSize: 12 }}>
       <h4 style={{ margin: "0 0 4px", fontSize: 11, color: enVivo ? "#e05555" : acentoMarca }}>
-        {enVivo ? "🔴 Estadísticas en vivo (se actualizan solas)" : "📊 Estadísticas reales de este encuentro"}
+        {enVivo
+          ? <><Icono tipo="puntoLleno" size={9} color="#e05555" /> {traducir("statsEnVivo")}</>
+          : <><Icono tipo="barras" size={12} /> {traducir("statsReales")}</>}
       </h4>
       <div style={{ display: "flex", marginBottom: 8 }}>
         <div style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "bold" }}>{nombreLocal}</div>
@@ -2284,18 +2379,18 @@ function EstadisticasPartidoReal({ fixtureId, nombreLocal, nombreVisitante, tema
         <div style={{ flex: 1, textAlign: "left", fontSize: 11, fontWeight: "bold" }}>{nombreVisitante}</div>
       </div>
 
-      <FilaEnfrentada etiqueta="🚩 Córners" valorLocal={stats.corners.home} valorVisitante={stats.corners.away} tema={tema} />
-      <FilaEnfrentada etiqueta="🟨 Amarillas" valorLocal={stats.amarillas.home} valorVisitante={stats.amarillas.away} tema={tema} />
+      <FilaEnfrentada icono="banderin" etiqueta={traducir("cornersCorto")} valorLocal={stats.corners.home} valorVisitante={stats.corners.away} tema={tema} />
+      <FilaEnfrentada icono="tarjeta" etiqueta={traducir("amarillasCorto")} valorLocal={stats.amarillas.home} valorVisitante={stats.amarillas.away} tema={tema} />
       {(stats.rojas.home || stats.rojas.away) && (
-        <FilaEnfrentada etiqueta="🟥 Rojas" valorLocal={stats.rojas.home} valorVisitante={stats.rojas.away} tema={tema} destacar />
+        <FilaEnfrentada icono="tarjeta" etiqueta={traducir("rojasCorto")} valorLocal={stats.rojas.home} valorVisitante={stats.rojas.away} tema={tema} destacar />
       )}
-      <FilaEnfrentada etiqueta="⚠️ Faltas" valorLocal={stats.faltas.home} valorVisitante={stats.faltas.away} tema={tema} />
-      <FilaEnfrentada etiqueta="⚽ Posesión" valorLocal={stats.posesion.home} valorVisitante={stats.posesion.away} tema={tema} />
+      <FilaEnfrentada icono="exclamacion" etiqueta={traducir("faltasCorto")} valorLocal={stats.faltas.home} valorVisitante={stats.faltas.away} tema={tema} />
+      <FilaEnfrentada icono="balon" etiqueta={traducir("posesionCorto")} valorLocal={stats.posesion.home} valorVisitante={stats.posesion.away} tema={tema} />
       {(stats.tirosTotales.home || stats.tirosTotales.away) && (
-        <FilaEnfrentada etiqueta="🎯 Tiros totales" valorLocal={stats.tirosTotales.home} valorVisitante={stats.tirosTotales.away} tema={tema} />
+        <FilaEnfrentada icono="objetivo" etiqueta={traducir("tirosTotalesCorto")} valorLocal={stats.tirosTotales.home} valorVisitante={stats.tirosTotales.away} tema={tema} />
       )}
       {(stats.tirosPuerta.home || stats.tirosPuerta.away) && (
-        <FilaEnfrentada etiqueta="🥅 Tiros a puerta" valorLocal={stats.tirosPuerta.home} valorVisitante={stats.tirosPuerta.away} tema={tema} />
+        <FilaEnfrentada icono="porteria" etiqueta={traducir("tirosPuertaCorto")} valorLocal={stats.tirosPuerta.home} valorVisitante={stats.tirosPuerta.away} tema={tema} />
       )}
 
       <p style={{ fontSize: 9, color: tema.textoSuave, marginTop: 8, marginBottom: 0 }}>
@@ -2423,23 +2518,23 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
 
   return (
     <div style={{ background: tema.panel, borderRadius: 6, borderTop: `3px solid ${acentoMarca}`, padding: 14, marginBottom: 18, fontSize: 12 }}>
-      <h4 style={{ margin: "0 0 8px", fontSize: 11, color: acentoMarca }}>📋 {traducir("datosGenerales")}</h4>
+      <h4 style={{ margin: "0 0 8px", fontSize: 11, color: acentoMarca, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={13} /> {traducir("datosGenerales")}</h4>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
         {venue?.name && (
           <div style={{ minWidth: 0, wordBreak: "break-word" }}>
-            🏟️ {venue.name}{venue.city ? `, ${venue.city}` : ""}{cubierto && " (cubierto)"}
+            <Icono tipo="estadio" size={12} /> {venue.name}{venue.city ? `, ${venue.city}` : ""}{cubierto && " (cubierto)"}
           </div>
         )}
-        <div style={{ minWidth: 0, wordBreak: "break-word" }}>🧑‍⚖️ {traducir("arbitro")}: {arbitro || traducir("sinDatosCorto")}</div>
+        <div style={{ minWidth: 0, wordBreak: "break-word", display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="balanza" size={12} /> {traducir("arbitro")}: {arbitro || traducir("sinDatosCorto")}</div>
         {cargandoClima && <div style={{ color: tema.textoSuave }}>Cargando clima...</div>}
         {climaData && !cubierto && (
           <>
-            <div style={{ minWidth: 0 }}>🌡️ {climaData.temperaturaMin}° – {climaData.temperaturaMax}°C</div>
-            <div style={{ minWidth: 0 }}>🌧️ {climaData.precipitacionMm} mm lluvia</div>
-            <div style={{ minWidth: 0 }}>💨 Viento máx. {climaData.vientoMaxKmh} km/h</div>
+            <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="termometro" size={12} /> {climaData.temperaturaMin}° – {climaData.temperaturaMax}°C</div>
+            <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="lluvia" size={12} /> {climaData.precipitacionMm} mm lluvia</div>
+            <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="viento" size={12} /> Viento máx. {climaData.vientoMaxKmh} km/h</div>
             {climaData.humedadPct !== null && climaData.humedadPct !== undefined && (
-              <div style={{ minWidth: 0 }}>💧 Humedad {Math.round(climaData.humedadPct)}%</div>
+              <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="gota" size={12} /> Humedad {Math.round(climaData.humedadPct)}%</div>
             )}
           </>
         )}
@@ -2453,7 +2548,7 @@ function DatosGeneralesEncuentro({ partidoCalendario, climaData, cargandoClima, 
             background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer",
           }}
         >
-          🌦️ Estudio Climático Personalizado
+          <Icono tipo="lluvia" size={14} /> {traducir("estudioClimatico")}
         </button>
       )}
       {climaData && cubierto && (
@@ -2624,11 +2719,11 @@ function ModalEstudioClimatico({
               boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
             }}
           >
-            ✕
+            <Icono tipo="cerrar" size={16} />
           </button>
         </div>
 
-        <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>🌦️ Estudio Climático Personalizado</h3>
+        <h3 style={{ margin: "0 0 4px", fontSize: 16, display: "flex", alignItems: "center", gap: 7 }}><Icono tipo="lluvia" size={17} /> {traducir("estudioClimatico")}</h3>
         <p style={{ margin: "0 0 4px", fontSize: 12, color: "#b9d6c3" }}>{equipoLocal.team.name} vs {equipoVisitante.team.name}</p>
         <p style={{ margin: "0 0 16px", fontSize: 11, color: "#b9d6c3", fontStyle: "italic" }}>
           Esto es tu estudio personal — no cambia el pronóstico oficial de JMCS, solo lo que ves aquí y en tu Estudio mientras esté activo.
@@ -2672,7 +2767,9 @@ function ModalEstudioClimatico({
             ↺ Restaurar a lo oficial
           </button>
           <button onClick={onGuardar} disabled={guardando || guardado} style={{ flex: 1, padding: 10, fontSize: 13, fontWeight: "bold", background: guardado ? "#2e9e4f" : acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
-            {guardado ? "✅ Guardado" : guardando ? "Guardando..." : "💾 Guardar en mi Historial"}
+            {guardado
+              ? <><Icono tipo="check" size={13} /> {traducir("guardado")}</>
+              : guardando ? traducir("guardando") : <><Icono tipo="disquete" size={13} /> {traducir("guardarEnHistorial")}</>}
           </button>
         </div>
         <p style={{ fontSize: 10, color: "#9fc4ac", marginTop: 6, textAlign: "center" }}>
@@ -2716,7 +2813,7 @@ function ContenedorToasts({ toasts }) {
             maxWidth: 320,
           }}
         >
-          ⚠️ {t.mensaje}
+          <Icono tipo="exclamacion" size={13} /> {t.mensaje}
         </div>
       ))}
     </div>
@@ -2747,7 +2844,7 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
         if (data.user) {
           await supabase.from("perfiles").insert({ user_id: data.user.id, username: username.trim() || null });
         }
-        setMensaje("✅ ¡Cuenta creada! Verifica tu cuenta desde tu bandeja de entrada (revisa spam si no la ves) para poder iniciar sesión.");
+        setMensaje("¡Cuenta creada! Verifica tu cuenta desde tu bandeja de entrada (revisa spam si no la ves) para poder iniciar sesión.");
       } else if (modo === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -2755,7 +2852,7 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
       } else if (modo === "magico") {
         const { error } = await supabase.auth.signInWithOtp({ email });
         if (error) throw error;
-        setMensaje("✅ Te enviamos un enlace mágico a tu correo. Ábrelo desde este mismo dispositivo.");
+        setMensaje("Te enviamos un enlace mágico a tu correo. Ábrelo desde este mismo dispositivo.");
       }
     } catch (err) {
       setError(err.message || "Ocurrió un error");
@@ -2794,7 +2891,7 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
           onClick={onCerrar}
           style={{ position: "absolute", top: 14, right: 14, background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}
         >
-          ✕
+          <Icono tipo="cerrar" size={16} />
         </button>
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 18 }}>
@@ -3044,7 +3141,7 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil, mo
                   {enVivo ? `${p.fixture.status.elapsed || ""}' EN VIVO` : (ETIQUETAS_ESTADO[estado] || estado)}
                 </div>
                 {enVivo && p.fixture?.venue?.name && (
-                  <div style={{ fontSize: 8, color: tema.textoSuave, marginTop: 2 }}>🏟️ {p.fixture.venue.name}</div>
+                  <div style={{ fontSize: 8, color: tema.textoSuave, marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}><Icono tipo="estadio" size={9} /> {p.fixture.venue.name}</div>
                 )}
               </>
             );
@@ -3118,7 +3215,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
 
   return (
     <div>
-      <h3 style={{ fontSize: 15, marginBottom: 10 }}>⚽ Partidos de hoy</h3>
+      <h3 style={{ fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}><Icono tipo="balon" size={16} /> {traducir("partidosDeHoy")}</h3>
 
       {paisesPopularesConPartidos.length > 0 && (
         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, marginBottom: 14 }}>
@@ -3130,7 +3227,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
               border: `1px solid ${!paisFiltro ? acentoMarca : tema.borde}`,
             }}
           >
-            Todos
+            {traducir("todos")}
           </button>
           {paisesPopularesConPartidos.map((pais) => (
             <button
@@ -3230,7 +3327,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
     if (error) {
       setErrorAdmin(error.message);
     } else {
-      setMensajeAdmin(`✅ ${nuevoEmail} ahora es administrador.`);
+      setMensajeAdmin(`${nuevoEmail} ahora es administrador.`);
       setNuevoEmail("");
       cargarTodo();
     }
@@ -3244,7 +3341,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
   }
 
   if (cargando) return <p style={{ textAlign: "center", color: tema.textoSuave }}>Cargando panel...</p>;
-  if (error) return <p style={{ textAlign: "center", color: "#e05555" }}>⚠️ {error}</p>;
+  if (error) return <p style={{ textAlign: "center", color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} /> {error}</p>;
   if (!stats) return null;
 
   const resueltas = stats.aciertos + stats.fallos;
@@ -3252,7 +3349,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 12px" }}>
-      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center" }}>👑 Panel de administrador</h3>
+      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Icono tipo="corona" size={18} /> {traducir("panelAdmin")}</h3>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 24 }}>
         {[
@@ -3269,7 +3366,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
       </div>
 
       <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <h4 style={{ margin: "0 0 10px", fontSize: 13 }}>⭐ Equipos más marcados como favoritos</h4>
+        <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="estrella" size={14} /> Equipos más marcados como favoritos</h4>
         {stats.equiposFavoritosTop.length === 0 ? (
           <p style={{ fontSize: 12, color: tema.textoSuave }}>Todavía no hay suficientes datos.</p>
         ) : (
@@ -3286,7 +3383,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
 
       {esAdminPrincipal && (
         <div style={{ background: tema.panel, borderRadius: 8, padding: 16 }}>
-          <h4 style={{ margin: "0 0 10px", fontSize: 13 }}>🔑 Gestión de administradores</h4>
+          <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="llave" size={14} /> Gestión de administradores</h4>
 
           <form onSubmit={agregarAdmin} style={{ display: "flex", gap: 8, marginBottom: 14 }}>
             <input
@@ -3303,7 +3400,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
           </form>
 
           {mensajeAdmin && <p style={{ fontSize: 12, color: "#2e9e4f", marginBottom: 10 }}>{mensajeAdmin}</p>}
-          {errorAdmin && <p style={{ fontSize: 12, color: "#e05555", marginBottom: 10 }}>⚠️ {errorAdmin}</p>}
+          {errorAdmin && <p style={{ fontSize: 12, color: "#e05555", marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} /> {errorAdmin}</p>}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {admins.map((a) => (
@@ -3382,7 +3479,7 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
     if (errorGuardar) {
       setError(errorGuardar.message.includes("duplicate") ? "Ese nombre de usuario ya está en uso." : errorGuardar.message);
     } else {
-      setMensaje("✅ Perfil actualizado.");
+      setMensaje(traducir("perfilActualizado"));
       onPerfilActualizado(data);
     }
     setGuardando(false);
@@ -3390,7 +3487,7 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
 
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", padding: "0 12px" }}>
-      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center" }}>👤 Editar perfil</h3>
+      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Icono tipo="persona" size={18} /> {traducir("editarPerfil")}</h3>
 
       <form onSubmit={guardar}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
@@ -3403,7 +3500,7 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
           />
           <div>
             <label style={{ fontSize: 12, color: acentoMarca, cursor: "pointer" }}>
-              {subiendo ? "Subiendo..." : "📷 Subir mi propia foto"}
+              {subiendo ? traducir("guardando") : <><Icono tipo="camara" size={13} /> {traducir("subirFoto")}</>}
               <input type="file" accept="image/*" onChange={subirFoto} disabled={subiendo} style={{ display: "none" }} />
             </label>
           </div>
@@ -3443,31 +3540,33 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
         </label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
           {[
-            { id: "goles", etiqueta: "⚽ Goles" },
-            { id: "btts", etiqueta: "🤝 Ambos anotan" },
-            { id: "ganador", etiqueta: "🏆 Ganador" },
-            { id: "corners", etiqueta: "🚩 Córners" },
-            { id: "amarillas", etiqueta: "🟨 Tarjetas" },
-            { id: "faltas", etiqueta: "⚠️ Faltas" },
+            { id: "goles", icono: "balon", etiqueta: traducir("goles") },
+            { id: "btts", icono: "apreton", etiqueta: traducir("ambosAnotanChip") },
+            { id: "ganador", icono: "trofeo", etiqueta: traducir("ganadorChip") },
+            { id: "corners", icono: "banderin", etiqueta: traducir("cornersCorto") },
+            { id: "amarillas", icono: "tarjeta", etiqueta: traducir("tarjetasAm") },
+            { id: "faltas", icono: "exclamacion", etiqueta: traducir("faltasCorto") },
           ].map((m) => (
             <button
               key={m.id}
               type="button"
               onClick={() => alternarMercado(m.id)}
               style={{
+                display: "flex", alignItems: "center", gap: 6,
                 padding: "8px 14px", fontSize: 12, borderRadius: 16, cursor: "pointer",
                 background: mercadosPreferidos.includes(m.id) ? acentoMarca : "transparent",
                 color: mercadosPreferidos.includes(m.id) ? "#fff" : tema.texto,
                 border: `1px solid ${mercadosPreferidos.includes(m.id) ? acentoMarca : tema.borde}`,
               }}
             >
+              <Icono tipo={m.icono} size={13} />
               {m.etiqueta}
             </button>
           ))}
         </div>
 
         {mensaje && <p style={{ fontSize: 12, color: "#2e9e4f", marginBottom: 10 }}>{mensaje}</p>}
-        {error && <p style={{ fontSize: 12, color: "#e05555", marginBottom: 10 }}>⚠️ {error}</p>}
+        {error && <p style={{ fontSize: 12, color: "#e05555", marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} /> {error}</p>}
 
         <button
           type="submit"
@@ -3491,7 +3590,7 @@ function TutorialFlotante({ id, titulo, texto, tema, acentoMarca, tutorialesOcul
       background: "rgba(20, 20, 20, 0.85)", color: "#fff", borderRadius: 8, padding: 14,
       marginBottom: 16, borderLeft: `4px solid ${acentoMarca}`, fontSize: 12, lineHeight: 1.5,
     }}>
-      <strong style={{ display: "block", marginBottom: 4, color: acentoMarca }}>💡 {titulo}</strong>
+      <strong style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, color: acentoMarca }}><Icono tipo="foco" size={14} /> {titulo}</strong>
       <p style={{ margin: "0 0 10px" }}>{texto}</p>
       <div style={{ display: "flex", gap: 10 }}>
         <button
@@ -3549,7 +3648,7 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 12px" }}>
-      <h3 style={{ fontSize: 18, marginBottom: 6, textAlign: "center" }}>📈 Historial de aciertos</h3>
+      <h3 style={{ fontSize: 18, marginBottom: 6, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Icono tipo="grafico" size={18} /> {traducir("historialAciertos")}</h3>
       {porcentaje !== null && (
         <p style={{ textAlign: "center", color: acentoMarca, fontWeight: "bold", marginBottom: 20 }}>
           {aciertos}/{resueltas.length} aciertos verificados — {porcentaje}%
@@ -3585,7 +3684,7 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
                       color: p.resultado === r ? "#fff" : tema.texto,
                     }}
                   >
-                    {r === "pendiente" ? "Pendiente" : r === "acierto" ? "✓ Acertó" : "✗ Falló"}
+                    {r === "pendiente" ? "Pendiente" : r === "acierto" ? <><Icono tipo="check" size={12} color="#2e9e4f" /> Acertó</> : <><Icono tipo="cerrar" size={12} color="#e05555" /> Falló</>}
                   </button>
                 ))}
               </div>
@@ -3597,7 +3696,7 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
   );
 }
 
-function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
+function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mostrarToast }) {
   const [fixtures, setFixtures] = useState([]);
   const [proximos, setProximos] = useState([]);
   const [errorProximos, setErrorProximos] = useState("");
@@ -3640,7 +3739,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
         <img src={corregirEscudo(equipo.logo)} alt={equipo.name} width={70} height={70} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
           <h2 style={{ margin: 0, color: colorMarca }}><BanderaPais pais={equipo.country} size={22} /> {equipo.name}</h2>
-          <BotonFavorito equipo={{ team: equipo }} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+          <BotonFavorito equipo={{ team: equipo }} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} mostrarToast={mostrarToast} />
         </div>
         {equipo.country && <p style={{ margin: "4px 0 0", color: tema.textoSuave, fontSize: 12 }}>{equipo.country}</p>}
       </div>
@@ -3657,9 +3756,9 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
             <SubPanel titulo={traducir("formaReciente")} fixtures={categorias.forma} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
           </div>
 
-          <h3 style={{ fontSize: 15, marginBottom: 12 }}>📅 Próximos encuentros</h3>
+          <h3 style={{ fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="calendario" size={16} /> Próximos encuentros</h3>
           {errorProximos && (
-            <p style={{ color: "#e05555", fontSize: 12, marginBottom: 10 }}>⚠️ {errorProximos}</p>
+            <p style={{ color: "#e05555", fontSize: 12, marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} /> {errorProximos}</p>
           )}
           <TablaProximosEncuentros partidos={proximos} tema={tema} />
         </>
@@ -3687,17 +3786,17 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
             <span style={{ fontSize: 26, fontWeight: "bold", color: acentoMarca }}>{paisDetectado}</span>
           </button>
 
-          <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>Selección nacional:</p>
+          <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 6px" }}>{traducir("seleccionNacionalLabel")}</p>
           <button
             onClick={() => onBuscarEquipoPorNombre(paisDetectado)}
             style={{ padding: "8px 14px", fontSize: 13, fontWeight: "bold", background: acentoMarca, color: "#fff", border: "none", borderRadius: 14, cursor: "pointer", marginBottom: 16 }}
           >
-            🏆 Selección {paisDetectado}
+            <Icono tipo="trofeo" size={14} /> Selección {paisDetectado}
           </button>
 
           {EQUIPOS_FAMOSOS_POR_PAIS[paisDetectado] && (
             <>
-              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 8px" }}>Equipos más famosos:</p>
+              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 8px" }}>{traducir("equiposFamosos")}</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {EQUIPOS_FAMOSOS_POR_PAIS[paisDetectado].map((nombre) => (
                   <button
@@ -3724,7 +3823,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
               <img src={corregirEscudo(equipoInicio.team.logo)} alt={equipoInicio.team.name} width={30} height={30} onError={manejarErrorEscudo} />
               <strong style={{ color: colorMarcaInicio, fontSize: 16 }}>{equipoInicio.team.name}</strong>
               <span onClick={(e) => e.stopPropagation()}>
-                <BotonFavorito equipo={equipoInicio} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} />
+                <BotonFavorito equipo={equipoInicio} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} mostrarToast={mostrarToast} />
               </span>
               <span style={{ marginLeft: "auto", fontSize: 11, color: tema.textoSuave }}>Toca para ver todo →</span>
             </div>
@@ -3758,7 +3857,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
             cursor: "pointer", fontSize: 13, fontWeight: "bold", textAlign: "left", marginBottom: 10,
           }}
         >
-          📅 Buscar partidos por fecha
+          <Icono tipo="calendario" size={15} /> {traducir("buscarPorFecha")}
           <span style={{ marginLeft: "auto", fontSize: 11, color: tema.textoSuave }}>{calendarioAbierto ? "▲ Ocultar" : "▼ Mostrar"}</span>
         </button>
         <div className="jmcs-calendario-body" style={{ display: calendarioAbierto ? "block" : "none" }}>
@@ -4206,8 +4305,12 @@ export default function Home() {
         const resFix = await fetch(`/api/fixtures?teamId=${equipo.team.id}`);
         const fixturesData = await resFix.json();
         if (!fixturesData.error) setFixturesInicio(fixturesData);
+      } else {
+        mostrarToast(`No encontramos "${nombre}". Prueba con otro nombre.`);
       }
-    } catch (err) {}
+    } catch (err) {
+      mostrarToast("No se pudo buscar ese equipo. Intenta de nuevo.");
+    }
     setBuscandoInicio(false);
   }
 
@@ -4241,7 +4344,7 @@ export default function Home() {
   async function guardarEstudioClimatico() {
     if (!sesion) { abrirLogin(); return; }
     setGuardandoClima(true);
-    await supabase.from("predicciones").insert({
+    const { error } = await supabase.from("predicciones").insert({
       user_id: sesion.user.id,
       equipo_local: equipoLocal?.team?.name || "",
       equipo_visitante: equipoVisitante?.team?.name || "",
@@ -4253,8 +4356,12 @@ export default function Home() {
       },
     });
     setGuardandoClima(false);
-    setGuardadoClima(true);
-    setTimeout(() => setGuardadoClima(false), 2500);
+    if (error) {
+      mostrarToast("No se pudo guardar tu Estudio Climático. Intenta de nuevo.");
+    } else {
+      setGuardadoClima(true);
+      setTimeout(() => setGuardadoClima(false), 2500);
+    }
   }
 
   const climaOficialNorm = normalizarClima(climaData);
@@ -4660,7 +4767,7 @@ export default function Home() {
                 borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: tema.texto,
               }}
             >
-              ☰
+              <Icono tipo="menu" size={18} />
             </button>
 
             {sesion ? (
@@ -4725,12 +4832,12 @@ export default function Home() {
               >
                 {[
                   { clave: "inicio", etiqueta: t("menuInicio") },
-                  { clave: "perfil", etiqueta: "👤 Editar perfil" },
+                  { clave: "perfil", etiqueta: "Editar perfil" },
                   { clave: "misEstudios", etiqueta: t("menuMisEstudios") },
                   { clave: "favoritos", etiqueta: t("menuFavoritos") },
                   { clave: "historial", etiqueta: t("menuHistorial") },
                   { clave: "ajustes", etiqueta: t("menuAjustes") },
-                  ...(esAdmin ? [{ clave: "admin", etiqueta: "👑 Panel de administrador" }] : []),
+                  ...(esAdmin ? [{ clave: "admin", etiqueta: "Panel de administrador" }] : []),
                 ].map((item) => (
                   <div
                     key={item.clave}
@@ -4777,7 +4884,7 @@ export default function Home() {
                 borderRadius: 6, padding: "5px 9px", cursor: "pointer",
               }}
             >
-              {idioma === "es" ? "🇪🇸" : "🇺🇸"}
+              <BanderaPais pais={idioma === "es" ? "Spain" : "United-States"} size={20} />
             </button>
 
             {idiomaAbierto && (
@@ -4788,8 +4895,8 @@ export default function Home() {
                   boxShadow: "0 6px 16px rgba(0,0,0,0.25)", overflow: "hidden",
                 }}
               >
-                <div onClick={() => { setIdioma("es"); setIdiomaAbierto(false); }} style={{ padding: "8px 14px", fontSize: 18, cursor: "pointer" }}>🇪🇸</div>
-                <div onClick={() => { setIdioma("en"); setIdiomaAbierto(false); }} style={{ padding: "8px 14px", fontSize: 18, cursor: "pointer" }}>🇺🇸</div>
+                <div onClick={() => { setIdioma("es"); setIdiomaAbierto(false); }} style={{ padding: "8px 14px", cursor: "pointer" }}><BanderaPais pais="Spain" size={20} /></div>
+                <div onClick={() => { setIdioma("en"); setIdiomaAbierto(false); }} style={{ padding: "8px 14px", cursor: "pointer" }}><BanderaPais pais="United-States" size={20} /></div>
               </div>
             )}
 
@@ -4801,14 +4908,14 @@ export default function Home() {
                 borderRadius: 20, cursor: "pointer",
               }}
             >
-              {modoOscuro ? "☀️" : "🌙"}
+              <Icono tipo={modoOscuro ? "sol" : "luna"} size={16} />
             </button>
           </div>
         </div>
 
         {notaProximamente && (
           <p style={{ textAlign: "center", color: acentoMarca, fontSize: 12, margin: "4px 0 0" }}>
-            🔒 Esta función estará disponible pronto.
+            <Icono tipo="candado" size={13} /> Esta función estará disponible pronto.
           </p>
         )}
 
@@ -4820,14 +4927,15 @@ export default function Home() {
 
         <div className="jmcs-nav-pc" style={{ gap: 8, justifyContent: "center", marginTop: 14 }}>
           {[
-            { id: "inicio", etiqueta: t("inicio") },
-            { id: "estudio", etiqueta: t("estudio") },
-            { id: "favoritos", etiqueta: t("favoritos") },
+            { id: "inicio", icono: "hogar", etiqueta: t("inicio") },
+            { id: "estudio", icono: "barras", etiqueta: t("estudio") },
+            { id: "favoritos", icono: "estrella", etiqueta: t("favoritos") },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setVistaActual(tab.id)}
               style={{
+                display: "flex", alignItems: "center", gap: 6,
                 padding: "8px 18px", fontSize: 13, borderRadius: 20, cursor: "pointer",
                 background: vistaActual === tab.id ? acentoMarca : "transparent",
                 color: vistaActual === tab.id ? "#fff" : tema.texto,
@@ -4835,6 +4943,7 @@ export default function Home() {
                 fontWeight: vistaActual === tab.id ? "bold" : "normal",
               }}
             >
+              <Icono tipo={tab.icono} size={14} />
               {tab.etiqueta}
             </button>
           ))}
@@ -4884,7 +4993,7 @@ export default function Home() {
 
           {jalando && (
             <p style={{ textAlign: "center", fontSize: 12, color: acentoMarca, marginBottom: 8 }}>
-              {jaladoSuficiente ? "🔄 Suelta para actualizar" : "↓ Jala para actualizar"}
+              {jaladoSuficiente ? <><Icono tipo="refrescar" size={13} /> Suelta para actualizar</> : "↓ Jala para actualizar"}
             </p>
           )}
           <div ref={dropdownRef} className="jmcs-datos-sticky" style={{ position: "relative", maxWidth: 800, background: tema.fondo, paddingTop: 4, paddingBottom: 4 }}>
@@ -4976,7 +5085,7 @@ export default function Home() {
           <TutorialFlotante
             id="favoritos"
             titulo="Tus equipos favoritos"
-            texto="Guarda cualquier equipo tocando la estrella ⭐ junto a su nombre, en cualquier parte de la app. Aquí los verás todos juntos — toca uno para ver su perfil completo."
+            texto="Guarda cualquier equipo tocando la estrella junto a su nombre, en cualquier parte de la app. Aquí los verás todos juntos — toca uno para ver su perfil completo."
             tema={tema}
             acentoMarca={acentoMarca}
             tutorialesOcultos={tutorialesOcultos}
@@ -5006,6 +5115,7 @@ export default function Home() {
             sesion={sesion}
             onPedirLogin={abrirLogin}
             onVolver={() => setVistaActual(vistaAnterior)}
+            mostrarToast={mostrarToast}
           />
         </div>
       )}
@@ -5035,7 +5145,7 @@ export default function Home() {
         </div>
 
         <div className="jmcs-ala-local">
-          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} />
+          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
         </div>
 
         <div className="jmcs-centro">
@@ -5085,7 +5195,7 @@ export default function Home() {
                     border: "none", fontWeight: "bold", fontSize: 14, cursor: "pointer",
                   }}
                 >
-                  ❗
+                  <Icono tipo="exclamacion" size={13} color="#fff" />
                 </button>
                 {indicadorClimaAbierto && (
                   <div style={{
@@ -5191,7 +5301,7 @@ export default function Home() {
             />
           </div>
           <p className="jmcs-carrusel-nav" style={{ justifyContent: "center", fontSize: 11, color: tema.textoSuave, marginTop: 4 }}>
-            👉 Desliza para ver {tarjetaActivaMovil === "local" ? "el Visitante" : "el Local"}
+            <Icono tipo="flecha" size={12} /> Desliza para ver {tarjetaActivaMovil === "local" ? "el Visitante" : "el Local"}
           </p>
 
           <div className="jmcs-espejo-desktop" style={{ marginTop: 20 }}>
@@ -5217,13 +5327,13 @@ export default function Home() {
             >
               {cargandoPuntuales
                 ? progreso
-                : `📊 Cargar datos puntuales (córners, tarjetas, faltas) — ${equipoLocal.team.name} y ${equipoVisitante.team.name}`}
+                : <><Icono tipo="barras" size={13} /> {`Cargar datos puntuales (córners, tarjetas, faltas) — ${equipoLocal.team.name} y ${equipoVisitante.team.name}`}</>}
             </button>
           )}
 
           {datosPuntualesListos && (
             <p style={{ textAlign: "center", marginTop: 20, color: "#2e9e4f", fontWeight: "bold" }}>
-              ✅ Datos puntuales cargados para este encuentro
+              <Icono tipo="check" size={14} color="#2e9e4f" /> Datos puntuales cargados para este encuentro
               {resumenCarga && (
                 <span style={{ display: "block", fontWeight: "normal", fontSize: 12, color: tema.textoSuave, marginTop: 4 }}>
                   ({resumenCarga})
@@ -5281,11 +5391,12 @@ export default function Home() {
             sesion={sesion}
             onPedirLogin={abrirLogin}
             mercadosPreferidos={perfil?.mercados_preferidos}
+            mostrarToast={mostrarToast}
           />
         </div>
 
         <div className="jmcs-ala-visitante">
-          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} />
+          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
         </div>
       </div>
       )}
@@ -5374,10 +5485,10 @@ export default function Home() {
 
       <div className="jmcs-nav-movil">
         {[
-          { id: "inicio", icono: "🏠", etiqueta: t("inicio").replace(/^\S+\s/, "") },
-          { id: "estudio", icono: "📊", etiqueta: t("estudio").replace(/^\S+\s/, "") },
-          { id: "favoritos", icono: "⭐", etiqueta: t("favoritos").replace(/^\S+\s/, "") },
-          { id: "historial", icono: "📈", etiqueta: "Historial" },
+          { id: "inicio", icono: "hogar", etiqueta: t("inicio") },
+          { id: "estudio", icono: "barras", etiqueta: t("estudio") },
+          { id: "favoritos", icono: "estrella", etiqueta: t("favoritos") },
+          { id: "historial", icono: "grafico", etiqueta: "Historial" },
         ].map((item) => (
           <button
             key={item.id}
@@ -5385,7 +5496,7 @@ export default function Home() {
             onClick={() => (item.id === "inicio" ? setVistaActual("inicio") : accederOPedirCuenta(item.id))}
             style={{ color: vistaActual === item.id ? acentoMarca : tema.textoSuave, fontWeight: vistaActual === item.id ? "bold" : "normal" }}
           >
-            <span style={{ fontSize: 18 }}>{item.icono}</span>
+            <Icono tipo={item.icono} size={18} />
             {item.etiqueta}
           </button>
         ))}
@@ -5395,7 +5506,7 @@ export default function Home() {
           onClick={() => setMenuAbierto(!menuAbierto)}
           style={{ color: tema.textoSuave }}
         >
-          <span style={{ fontSize: 18 }}>☰</span>
+          <Icono tipo="menu" size={18} />
           Más
         </button>
       </div>
