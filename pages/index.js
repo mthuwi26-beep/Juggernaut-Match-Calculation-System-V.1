@@ -3671,7 +3671,8 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver }) {
 function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey, paisDetectado, onBuscarEquipoPorNombre, mostrarToast, modoOscuro }) {
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   return (
-    <div>
+    <div className="jmcs-inicio-grid">
+      <div className="jmcs-inicio-principal">
       {paisDetectado && (
         <div style={{ marginBottom: 24, background: colorTenue(acentoMarca), borderTop: `3px solid ${acentoMarca}`, borderRadius: 8, padding: 18 }}>
           <button
@@ -3744,26 +3745,26 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
         </div>
       )}
 
-      <div style={{ marginBottom: 24 }}>
+      <ListaPartidosInicio key={refrescarKey} tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} modoOscuro={modoOscuro} />
+      </div>
+
+      <div className="jmcs-inicio-calendario-col">
         <button
+          className="jmcs-calendario-toggle-btn"
           onClick={() => setCalendarioAbierto((v) => !v)}
           style={{
             display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "12px 14px",
             background: tema.panel, color: acentoMarca, border: `1px solid ${tema.borde}`, borderRadius: 6,
-            cursor: "pointer", fontSize: 13, fontWeight: "bold", textAlign: "left",
+            cursor: "pointer", fontSize: 13, fontWeight: "bold", textAlign: "left", marginBottom: 10,
           }}
         >
           📅 Buscar partidos por fecha
           <span style={{ marginLeft: "auto", fontSize: 11, color: tema.textoSuave }}>{calendarioAbierto ? "▲ Ocultar" : "▼ Mostrar"}</span>
         </button>
-        {calendarioAbierto && (
-          <div style={{ marginTop: 10 }}>
-            <PanelCalendario tema={tema} onSeleccionarPartido={onSeleccionarPartido} acentoMarca={acentoMarca} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} />
-          </div>
-        )}
+        <div className="jmcs-calendario-body" style={{ display: calendarioAbierto ? "block" : "none" }}>
+          <PanelCalendario tema={tema} onSeleccionarPartido={onSeleccionarPartido} acentoMarca={acentoMarca} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} />
+        </div>
       </div>
-
-      <ListaPartidosInicio key={refrescarKey} tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} modoOscuro={modoOscuro} />
     </div>
   );
 }
@@ -4568,6 +4569,34 @@ export default function Home() {
             left: 12px !important;
             right: 12px !important;
             width: auto !important;
+          }
+        }
+
+        .jmcs-inicio-grid {
+          display: block;
+        }
+        .jmcs-inicio-calendario-col {
+          margin-bottom: 24px;
+        }
+
+        @media (min-width: 1024px) {
+          .jmcs-inicio-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+            align-items: start;
+          }
+          .jmcs-inicio-calendario-col {
+            position: sticky;
+            top: 90px;
+            margin-bottom: 0;
+          }
+          /* En PC el calendario ya va desplegado a la derecha, sin necesidad de tocar el botón */
+          .jmcs-calendario-toggle-btn {
+            display: none;
+          }
+          .jmcs-calendario-body {
+            display: block !important;
           }
         }
 
