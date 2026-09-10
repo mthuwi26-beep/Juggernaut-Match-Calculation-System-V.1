@@ -4593,7 +4593,7 @@ export default function Home() {
           }
           /* En PC el calendario ya va desplegado a la derecha, sin necesidad de tocar el botón */
           .jmcs-calendario-toggle-btn {
-            display: none;
+            display: none !important;
           }
           .jmcs-calendario-body {
             display: block !important;
