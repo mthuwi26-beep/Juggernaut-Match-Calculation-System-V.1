@@ -3761,7 +3761,7 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
   );
 }
 
-function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
+function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast }) {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -3769,6 +3769,10 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
   const [nuevoEmail, setNuevoEmail] = useState("");
   const [mensajeAdmin, setMensajeAdmin] = useState("");
   const [errorAdmin, setErrorAdmin] = useState("");
+  const [errores, setErrores] = useState([]);
+  const [erroresAbiertos, setErroresAbiertos] = useState({});
+  const [mantenimientoActivo, setMantenimientoActivo] = useState(false);
+  const [mensajeMantenimiento, setMensajeMantenimiento] = useState("");
 
   function cargarTodo() {
     setCargando(true);
@@ -3780,9 +3784,38 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
     supabase.rpc("listar_admins").then(({ data }) => {
       if (data) setAdmins(data);
     });
+    supabase.rpc("listar_errores_cliente").then(({ data }) => {
+      if (data) setErrores(data);
+    });
+    supabase
+      .from("configuracion_app")
+      .select("mantenimiento, mensaje_mantenimiento")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        setMantenimientoActivo(!!data?.mantenimiento);
+        setMensajeMantenimiento(data?.mensaje_mantenimiento || "");
+      });
   }
 
   useEffect(() => { cargarTodo(); }, []); // eslint-disable-line
+
+  async function corregirError() {
+    const { error } = await supabase.rpc("activar_mantenimiento", { mensaje: null });
+    if (error) mostrarToast && mostrarToast("No se pudo activar el modo mantenimiento.");
+    else { setMantenimientoActivo(true); mostrarToast && mostrarToast("Modo mantenimiento activado — los usuarios ya lo están viendo."); }
+  }
+
+  async function desactivarMantenimiento() {
+    const { error } = await supabase.rpc("desactivar_mantenimiento");
+    if (error) mostrarToast && mostrarToast("No se pudo desactivar.");
+    else { setMantenimientoActivo(false); mostrarToast && mostrarToast("Modo mantenimiento desactivado."); }
+  }
+
+  async function borrarError(id) {
+    const { error } = await supabase.rpc("borrar_error_cliente", { error_id: id });
+    if (!error) setErrores((prev) => prev.filter((e) => e.id !== id));
+  }
 
   async function agregarAdmin(e) {
     e.preventDefault();
@@ -3830,16 +3863,106 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
         ))}
       </div>
 
-      <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="estrella" size={14} /> Equipos más marcados como favoritos</h4>
-        {stats.equiposFavoritosTop.length === 0 ? (
-          <p style={{ fontSize: 12, color: tema.textoSuave }}>Todavía no hay suficientes datos.</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 24 }}>
+        <div style={{ flex: "1 1 320px", background: tema.panel, borderRadius: 8, padding: 16 }}>
+          <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="estrella" size={14} /> Equipos más marcados como favoritos</h4>
+          {stats.equiposFavoritosTop.length === 0 ? (
+            <p style={{ fontSize: 12, color: tema.textoSuave }}>Todavía no hay suficientes datos.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {(() => {
+                const max = Math.max(...stats.equiposFavoritosTop.map((e) => e.veces));
+                return stats.equiposFavoritosTop.map((e) => (
+                  <div key={e.team_name}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 2 }}>
+                      <span>{e.team_name}</span>
+                      <strong>{e.veces}</strong>
+                    </div>
+                    <div style={{ background: tema.fondo, borderRadius: 4, height: 8, overflow: "hidden" }}>
+                      <div style={{ width: `${(e.veces / max) * 100}%`, background: acentoMarca, height: "100%", borderRadius: 4 }} />
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: "1 1 220px", background: tema.panel, borderRadius: 8, padding: 16 }}>
+          <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="grafico" size={14} /> Aciertos vs fallos verificados</h4>
+          {resueltas === 0 ? (
+            <p style={{ fontSize: 12, color: tema.textoSuave }}>Todavía no hay pronósticos verificados.</p>
+          ) : (
+            <>
+              <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", height: 18, marginBottom: 8 }}>
+                <div style={{ width: `${(stats.aciertos / resueltas) * 100}%`, background: "#2e9e4f" }} />
+                <div style={{ width: `${(stats.fallos / resueltas) * 100}%`, background: "#e05555" }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: tema.textoSuave }}>
+                <span><span style={{ color: "#2e9e4f", fontWeight: "bold" }}>●</span> Aciertos: {stats.aciertos}</span>
+                <span><span style={{ color: "#e05555", fontWeight: "bold" }}>●</span> Fallos: {stats.fallos}</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24, border: mantenimientoActivo ? "2px solid #e05555" : `1px solid ${tema.borde}` }}>
+        <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="exclamacion" size={14} /> Errores reportados por la app {errores.length > 0 && `(${errores.length})`}
+        </h4>
+
+        {mantenimientoActivo && (
+          <div style={{ background: "#e05555", color: "#fff", borderRadius: 6, padding: "8px 12px", fontSize: 12, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <span>Modo mantenimiento ACTIVO — los usuarios (que no sean admin) están viendo la pantalla de mantenimiento ahora mismo.</span>
+            <button
+              onClick={desactivarMantenimiento}
+              style={{ fontSize: 11, background: "#fff", color: "#e05555", border: "none", borderRadius: 4, padding: "5px 10px", cursor: "pointer", fontWeight: "bold", whiteSpace: "nowrap" }}
+            >
+              Desactivar
+            </button>
+          </div>
+        )}
+
+        {errores.length === 0 ? (
+          <p style={{ fontSize: 12, color: tema.textoSuave }}>No hay errores reportados. Buena señal.</p>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {stats.equiposFavoritosTop.map((e, i) => (
-              <div key={e.team_name} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", borderBottom: `1px solid ${tema.borde}` }}>
-                <span>{i + 1}. {e.team_name}</span>
-                <strong>{e.veces}</strong>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {errores.map((e) => (
+              <div key={e.id} style={{ background: tema.fondo, borderRadius: 6, padding: 10, fontSize: 12 }}>
+                <div
+                  onClick={() => setErroresAbiertos((prev) => ({ ...prev, [e.id]: !prev[e.id] }))}
+                  style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10 }}
+                >
+                  <span style={{ fontWeight: "bold" }}>{e.mensaje}</span>
+                  <span style={{ color: tema.textoSuave, fontSize: 10, whiteSpace: "nowrap" }}>{new Date(e.creado_en).toLocaleString()}</span>
+                </div>
+                {e.ruta && <div style={{ color: tema.textoSuave, fontSize: 10, marginTop: 2 }}>Ruta: {e.ruta}</div>}
+
+                {erroresAbiertos[e.id] && e.stack && (
+                  <pre style={{ whiteSpace: "pre-wrap", fontSize: 10, color: tema.textoSuave, marginTop: 8, maxHeight: 200, overflowY: "auto" }}>
+                    {e.stack}
+                  </pre>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button
+                    onClick={corregirError}
+                    disabled={mantenimientoActivo}
+                    style={{
+                      fontSize: 11, background: mantenimientoActivo ? tema.borde : "#e05555", color: "#fff", border: "none",
+                      borderRadius: 4, padding: "5px 10px", cursor: mantenimientoActivo ? "default" : "pointer", fontWeight: "bold",
+                    }}
+                  >
+                    {mantenimientoActivo ? "Mantenimiento activo" : "CORREGIR ERROR"}
+                  </button>
+                  <button
+                    onClick={() => borrarError(e.id)}
+                    style={{ fontSize: 11, background: "transparent", border: `1px solid ${tema.borde}`, color: tema.textoSuave, borderRadius: 4, padding: "5px 10px", cursor: "pointer" }}
+                  >
+                    Borrar
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -4336,6 +4459,27 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
   );
 }
 
+function PantallaMantenimiento({ mensaje, onIniciarSesion }) {
+  return (
+    <div style={{
+      minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      background: "#0f1f14", color: "#fff", padding: 24, textAlign: "center",
+    }}>
+      <img src="/logo.png" alt="JMCS" style={{ width: 90, height: 90, marginBottom: 20 }} />
+      <h1 style={{ fontSize: 20, marginBottom: 10 }}>JMCS está en mantenimiento</h1>
+      <p style={{ fontSize: 14, color: "#c8d6cc", maxWidth: 420, lineHeight: 1.5 }}>
+        {mensaje || "Ya estamos trabajando en solucionarlo — volvemos enseguida."}
+      </p>
+      <button
+        onClick={onIniciarSesion}
+        style={{ marginTop: 24, fontSize: 12, background: "transparent", border: "1px solid #3a4f3f", color: "#8fae97", borderRadius: 6, padding: "8px 14px", cursor: "pointer" }}
+      >
+        Soy administrador, iniciar sesión
+      </button>
+    </div>
+  );
+}
+
 function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
@@ -4395,6 +4539,7 @@ function Home() {
   const [authModalModo, setAuthModalModo] = useState("login");
   const [esAdmin, setEsAdmin] = useState(false);
   const [esAdminPrincipal, setEsAdminPrincipal] = useState(false);
+  const [cargandoChequeoAdmin, setCargandoChequeoAdmin] = useState(true);
   const [perfil, setPerfil] = useState(null);
   const [tutorialesOcultosLocal, setTutorialesOcultosLocal] = useState([]);
 
@@ -4456,7 +4601,7 @@ function Home() {
   }, [sesion]);
 
   useEffect(() => {
-    if (!sesion) { setEsAdmin(false); setEsAdminPrincipal(false); return; }
+    if (!sesion) { setEsAdmin(false); setEsAdminPrincipal(false); setCargandoChequeoAdmin(false); return; }
     supabase
       .from("admins")
       .select("es_principal")
@@ -4465,8 +4610,21 @@ function Home() {
       .then(({ data }) => {
         setEsAdmin(!!data);
         setEsAdminPrincipal(!!data?.es_principal);
+        setCargandoChequeoAdmin(false);
       });
   }, [sesion]);
+
+  // Modo mantenimiento: lo puede leer cualquiera, incluso sin sesión. Si está activo
+  // y quien mira NO es admin, se le muestra la pantalla de mantenimiento en vez de la app.
+  const [configApp, setConfigApp] = useState(null);
+  useEffect(() => {
+    supabase
+      .from("configuracion_app")
+      .select("mantenimiento, mensaje_mantenimiento")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => setConfigApp(data));
+  }, []);
 
   function abrirLogin() {
     setAuthModalModo("login");
@@ -4963,6 +5121,24 @@ function Home() {
     lambdaGolesVisitanteReal = calcularValorEsperado(motorGolesVisitante, esPartidoLiga);
   }
 
+  // Mientras todavía no sabemos si el usuario es admin (o no), no mostramos nada
+  // de mantenimiento todavía, para no hacerle un flash de esa pantalla a un admin
+  // que sí tiene acceso — apenas termina de revisar, ahí sí se decide.
+  if (configApp?.mantenimiento && !cargandoChequeoAdmin && !esAdmin) {
+    return (
+      <>
+        <PantallaMantenimiento mensaje={configApp.mensaje_mantenimiento} onIniciarSesion={abrirLogin} />
+        {authModalAbierto && (
+          <AuthModal
+            tema={tema}
+            acentoMarca={acentoMarca}
+            modoInicial={authModalModo}
+            onCerrar={() => setAuthModalAbierto(false)}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <div
@@ -5662,7 +5838,7 @@ function Home() {
 
       {vistaActual === "admin" && esAdmin && (
         <div style={{ margin: "20px auto" }}>
-          <VistaAdmin sesion={sesion} esAdminPrincipal={esAdminPrincipal} tema={tema} acentoMarca={acentoMarca} />
+          <VistaAdmin sesion={sesion} esAdminPrincipal={esAdminPrincipal} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
         </div>
       )}
 
@@ -6112,6 +6288,26 @@ class TrampaDeErrores extends React.Component {
   }
   componentDidCatch(error, info) {
     this.setState({ info });
+    // Reportamos el error solo, para que quede en el panel de admin y les llegue
+    // el aviso push — si esto falla, no hacemos nada más, ya bastante tiene el
+    // usuario con la pantalla rota como para que le salga otro error encima.
+    try {
+      supabase.auth.getSession().then(({ data }) => {
+        fetch("/api/registrar-error", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mensaje: String(error?.message || error),
+            stack: error?.stack || "",
+            componentStack: info?.componentStack || "",
+            ruta: typeof window !== "undefined" ? window.location.pathname : "",
+            userId: data?.session?.user?.id || null,
+          }),
+        }).catch(() => {});
+      });
+    } catch {
+      // silencioso a propósito
+    }
   }
   render() {
     if (this.state.error) {
