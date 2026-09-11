@@ -1,10 +1,18 @@
 // Trae el clima de una ciudad en una fecha específica, usando Open-Meteo (gratis, sin key)
+import { obtenerCache, guardarCache, CACHE_3_HORAS } from "../../lib/cacheApi";
+
 export default async function handler(req, res) {
   const { ciudad, fecha } = req.query;
 
   if (!ciudad || !fecha) {
     return res.status(400).json({ error: "Faltan ciudad o fecha" });
   }
+
+  // Nota aparte: esto no gasta cuota de API-Football (Open-Meteo es gratis y sin key),
+  // pero igual lo cacheamos — menos vueltas, respuesta más rápida para el usuario.
+  const clave = `clima:${ciudad.trim().toLowerCase()}:${fecha}`;
+  const cacheado = await obtenerCache(clave);
+  if (cacheado) return res.status(200).json(cacheado);
 
   try {
     // Paso 1: geocodificar la ciudad a coordenadas
@@ -29,13 +37,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ error: "No hay pronóstico disponible para esa fecha (puede estar muy lejos en el futuro o en el pasado)" });
     }
 
-    res.status(200).json({
+    const resultado = {
       temperaturaMax: climaData.daily.temperature_2m_max[0],
       temperaturaMin: climaData.daily.temperature_2m_min[0],
       precipitacionMm: climaData.daily.precipitation_sum[0],
       vientoMaxKmh: climaData.daily.wind_speed_10m_max[0],
       humedadPct: climaData.daily.relative_humidity_2m_mean ? climaData.daily.relative_humidity_2m_mean[0] : null,
-    });
+    };
+
+    await guardarCache(clave, resultado, CACHE_3_HORAS);
+    res.status(200).json(resultado);
   } catch (error) {
     res.status(500).json({ error: "No se pudo conectar con el servicio de clima" });
   }
