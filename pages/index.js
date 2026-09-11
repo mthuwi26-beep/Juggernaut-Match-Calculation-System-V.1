@@ -1510,10 +1510,23 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         const clave = `${claveEncuentro}-${o.etiqueta}`;
         if (!yaNotificado.current.has(clave)) {
           yaNotificado.current.add(clave);
-          new Notification("JMCS — Semáforo en verde", {
+          const titulo = "JMCS — Semáforo en verde";
+          const opciones = {
             body: `${nombreLocal} vs ${nombreVisitante}\n${o.etiqueta}: ${Math.round(o.prob * 100)}%`,
             icon: "/logo.png",
-          });
+          };
+          // Si hay un Service Worker activo (se registra al activar las notificaciones push),
+          // el navegador EXIGE mostrar la notificación a través de él — usar "new Notification"
+          // directo revienta con "Illegal constructor". Si no hay Service Worker, seguimos
+          // usando el constructor viejo, que funciona igual de bien en ese caso.
+          if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistration().then((registro) => {
+              if (registro) registro.showNotification(titulo, opciones);
+              else new Notification(titulo, opciones);
+            });
+          } else {
+            new Notification(titulo, opciones);
+          }
         }
       }
     });
