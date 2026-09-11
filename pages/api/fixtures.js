@@ -1,3 +1,5 @@
+import { obtenerCache, guardarCache, CACHE_PARA_SIEMPRE } from "../../lib/cacheApi";
+
 export default async function handler(req, res) {
   const { teamId, season } = req.query;
 
@@ -12,7 +14,14 @@ export default async function handler(req, res) {
   // >>> CUANDO PASES AL PLAN PAGADO <
   // Solo cambia la línea de abajo por: const temporada = season || new Date().getFullYear();
   // y ya podrás traer la temporada actual en vivo, sin tocar nada más del código.
+  // OJO: si haces ese cambio, la temporada actual ya NO se debe cachear "para siempre"
+  // como las de abajo, porque todavía se están jugando partidos — avísame cuando llegue ese
+  // momento y le bajamos el tiempo de caché a esta ruta para esa temporada en curso.
   const temporada = season || 2024;
+
+  const clave = `fixtures:${teamId}:${temporada}`;
+  const cacheado = await obtenerCache(clave);
+  if (cacheado) return res.status(200).json(cacheado);
 
   try {
     const response = await fetch(
@@ -37,6 +46,7 @@ export default async function handler(req, res) {
       .sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date))
       .slice(0, 10);
 
+    await guardarCache(clave, jugados, CACHE_PARA_SIEMPRE);
     res.status(200).json(jugados);
   } catch (error) {
     res.status(500).json({ error: "No se pudo traer los partidos del equipo" });
