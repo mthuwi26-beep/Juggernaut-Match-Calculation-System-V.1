@@ -3396,7 +3396,24 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   Object.keys(grupos).forEach((pais) => {
     grupos[pais].sort((a, b) => prioridadPartido(a) - prioridadPartido(b));
   });
-  const paisesOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b));
+
+  // El minuto más alto entre los partidos en vivo de un país (-1 si no tiene ninguno en vivo)
+  function minutoMasAltoEnVivo(partidosPais) {
+    const enVivo = partidosPais.filter((p) => ESTADOS_EN_VIVO.includes(p.fixture?.status?.short));
+    if (enVivo.length === 0) return -1;
+    return Math.max(...enVivo.map((p) => p.fixture?.status?.elapsed || 0));
+  }
+
+  // Países con partidos en vivo van primero (el que tenga el minuto más alto, arriba de todo).
+  // Los países sin nada en vivo quedan después, ordenados alfabéticamente como antes.
+  const paisesOrdenados = Object.keys(grupos).sort((a, b) => {
+    const minutoA = minutoMasAltoEnVivo(grupos[a]);
+    const minutoB = minutoMasAltoEnVivo(grupos[b]);
+    if (minutoA >= 0 && minutoB < 0) return -1;
+    if (minutoA < 0 && minutoB >= 0) return 1;
+    if (minutoA >= 0 && minutoB >= 0) return minutoB - minutoA;
+    return a.localeCompare(b);
+  });
 
   // Solo mostramos en la fila de accesos rápidos los países populares que sí tienen partidos hoy
   const paisesPopularesConPartidos = PAISES_POPULARES.filter((pais) => partidos.some((p) => p.league?.country === pais));
