@@ -898,9 +898,10 @@ function TarjetaFavorito({ favorito, tema, acento, onQuitar }) {
   );
 }
 
-function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
+function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil, mostrarToast }) {
   const [favoritos, setFavoritos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [notifActivadas, setNotifActivadas] = useState(false);
 
   useEffect(() => {
     supabase
@@ -912,11 +913,29 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
         setFavoritos(data || []);
         setCargando(false);
       });
+    supabase
+      .from("perfiles")
+      .select("notif_activadas")
+      .eq("user_id", sesion.user.id)
+      .maybeSingle()
+      .then(({ data }) => setNotifActivadas(!!data?.notif_activadas));
   }, [sesion]);
 
   async function quitar(teamId) {
     await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", teamId);
     setFavoritos((prev) => prev.filter((f) => f.team_id !== teamId));
+  }
+
+  async function alternarNotificar(teamId, valorActual) {
+    if (!valorActual && !notifActivadas) {
+      mostrarToast && mostrarToast("Primero activá las notificaciones en Ajustes > Preferencias de notificaciones.");
+      return;
+    }
+    setFavoritos((prev) => prev.map((f) => (f.team_id === teamId ? { ...f, notificar: !valorActual } : f)));
+    const { error } = await supabase.from("favoritos").update({ notificar: !valorActual }).eq("user_id", sesion.user.id).eq("team_id", teamId);
+    if (error) {
+      setFavoritos((prev) => prev.map((f) => (f.team_id === teamId ? { ...f, notificar: valorActual } : f)));
+    }
   }
 
   return (
@@ -943,12 +962,25 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil }) {
               <img src={corregirEscudo(f.team_logo)} alt={f.team_name} width={60} height={60} style={{ marginBottom: 10 }} onError={manejarErrorEscudo} />
               <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4 }}><BanderaPais pais={f.team_country} size={16} /> {f.team_name}</div>
               {f.team_country && <div style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 10 }}>{f.team_country}</div>}
-              <button
-                onClick={(e) => { e.stopPropagation(); quitar(f.team_id); }}
-                style={{ fontSize: 11, background: "transparent", border: `1px solid ${tema.borde}`, color: tema.textoSuave, borderRadius: 4, padding: "4px 8px", cursor: "pointer" }}
-              >
-                Quitar
-              </button>
+              <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); alternarNotificar(f.team_id, f.notificar); }}
+                  title={f.notificar ? "Dejar de avisarme de este equipo" : "Avisarme de este equipo"}
+                  style={{
+                    fontSize: 11, background: "transparent", border: `1px solid ${f.notificar ? acentoMarca : tema.borde}`,
+                    color: f.notificar ? acentoMarca : tema.textoSuave, borderRadius: 4, padding: "4px 8px", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 4,
+                  }}
+                >
+                  <Icono tipo={f.notificar ? "campana" : "campanaTachada"} size={12} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); quitar(f.team_id); }}
+                  style={{ fontSize: 11, background: "transparent", border: `1px solid ${tema.borde}`, color: tema.textoSuave, borderRadius: 4, padding: "4px 8px", cursor: "pointer" }}
+                >
+                  Quitar
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -3501,6 +3533,157 @@ function TablaProximosEncuentros({ partidos, tema }) {
   );
 }
 
+// Convierte la clave pública VAPID (texto) al formato que pide el navegador para suscribirse a push
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarca, mostrarToast }) {
+  const [procesando, setProcesando] = useState(false);
+  const activadas = !!perfil?.notif_activadas;
+  const soportado = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
+
+  async function activarNotificaciones() {
+    if (!soportado) {
+      mostrarToast("Tu navegador no soporta notificaciones push. Probá desde Chrome o Firefox en Android, o instalando la app en la pantalla de inicio en iPhone (Safari 16.4+).");
+      return;
+    }
+    setProcesando(true);
+    try {
+      const permiso = await Notification.requestPermission();
+      if (permiso !== "granted") {
+        mostrarToast("No diste permiso de notificaciones — no vamos a poder avisarte.");
+        setProcesando(false);
+        return;
+      }
+      const registro = await navigator.serviceWorker.register("/sw.js");
+      const suscripcion = await registro.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY),
+      });
+      const json = suscripcion.toJSON();
+      await supabase.from("push_subscriptions").upsert(
+        {
+          user_id: sesion.user.id,
+          endpoint: json.endpoint,
+          p256dh: json.keys.p256dh,
+          auth_key: json.keys.auth,
+        },
+        { onConflict: "endpoint" }
+      );
+      const { data } = await supabase
+        .from("perfiles")
+        .update({ notif_activadas: true })
+        .eq("user_id", sesion.user.id)
+        .select()
+        .maybeSingle();
+      if (data) onPerfilActualizado(data);
+      mostrarToast("Notificaciones activadas.");
+    } catch (err) {
+      mostrarToast("No se pudieron activar las notificaciones. Intenta de nuevo.");
+    }
+    setProcesando(false);
+  }
+
+  async function desactivarNotificaciones() {
+    setProcesando(true);
+    try {
+      if (soportado) {
+        const registro = await navigator.serviceWorker.getRegistration("/sw.js");
+        const suscripcion = await registro?.pushManager.getSubscription();
+        if (suscripcion) {
+          await supabase.from("push_subscriptions").delete().eq("endpoint", suscripcion.endpoint);
+          await suscripcion.unsubscribe();
+        }
+      }
+      const { data } = await supabase
+        .from("perfiles")
+        .update({ notif_activadas: false })
+        .eq("user_id", sesion.user.id)
+        .select()
+        .maybeSingle();
+      if (data) onPerfilActualizado(data);
+      mostrarToast("Notificaciones desactivadas.");
+    } catch (err) {
+      mostrarToast("No se pudo desactivar. Intenta de nuevo.");
+    }
+    setProcesando(false);
+  }
+
+  async function alternarTipo(campo, valorActual) {
+    const { data } = await supabase
+      .from("perfiles")
+      .update({ [campo]: !valorActual })
+      .eq("user_id", sesion.user.id)
+      .select()
+      .maybeSingle();
+    if (data) onPerfilActualizado(data);
+  }
+
+  const TIPOS = [
+    { campo: "notif_gol", icono: "balon", etiqueta: "Gol" },
+    { campo: "notif_empieza", icono: "calendario", etiqueta: "Empieza el partido" },
+    { campo: "notif_termina", icono: "check", etiqueta: "Termina el partido" },
+    { campo: "notif_tarjetas", icono: "tarjeta", etiqueta: "Tarjetas" },
+  ];
+
+  return (
+    <div style={{ maxWidth: 480, margin: "0 auto" }}>
+      <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+        <Icono tipo="menu" size={16} /> Ajustes
+      </h3>
+
+      <div style={{ background: tema.panel, border: `1px solid ${tema.borde}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <h4 style={{ margin: "0 0 6px", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="campana" size={15} /> Preferencias de notificaciones
+        </h4>
+        <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
+          Avisos de los partidos de tus equipos favoritos que tengan la campana activada. Funciona mientras el navegador esté instalado o abierto — en iPhone, solo si agregaste la app a tu pantalla de inicio (Safari 16.4 o más nuevo).
+        </p>
+
+        <button
+          onClick={activadas ? desactivarNotificaciones : activarNotificaciones}
+          disabled={procesando}
+          style={{
+            width: "100%", padding: "10px 14px", borderRadius: 6, cursor: procesando ? "default" : "pointer",
+            background: activadas ? "transparent" : acentoMarca, color: activadas ? "#e05555" : "#fff",
+            border: activadas ? "1px solid #e05555" : "none", fontWeight: "bold", fontSize: 13, marginBottom: activadas ? 14 : 0,
+          }}
+        >
+          {procesando ? "Un momento..." : activadas ? "Desactivar notificaciones" : "Activar notificaciones"}
+        </button>
+
+        {activadas && (
+          <div>
+            {TIPOS.map((tipo) => (
+              <label
+                key={tipo.campo}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: `1px solid ${tema.borde}`, fontSize: 13, cursor: "pointer" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!perfil?.[tipo.campo]}
+                  onChange={() => alternarTipo(tipo.campo, !!perfil?.[tipo.campo])}
+                />
+                <Icono tipo={tipo.icono} size={14} />
+                {tipo.etiqueta}
+              </label>
+            ))}
+            <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 10 }}>
+              El aviso de "semáforo en verde" por equipo favorito todavía no está disponible — sigue pendiente para una próxima actualización.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca }) {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
@@ -4242,6 +4425,9 @@ export default function Home() {
     } else if (itemMenu === "historial") {
       setMenuAbierto(false);
       setVistaActual("historial");
+    } else if (itemMenu === "ajustes") {
+      setMenuAbierto(false);
+      setVistaActual("ajustes");
     } else {
       mostrarProximamente();
     }
@@ -5351,7 +5537,7 @@ export default function Home() {
             onOcultarPermanente={ocultarTutorialPermanente}
           />
           {sesion ? (
-            <PanelFavoritosPagina sesion={sesion} tema={tema} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} />
+            <PanelFavoritosPagina sesion={sesion} tema={tema} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
           ) : (
             <div style={{ textAlign: "center", padding: 40 }}>
               <p style={{ color: tema.textoSuave, marginBottom: 16 }}>Inicia sesión para ver tus equipos favoritos.</p>
@@ -5388,6 +5574,12 @@ export default function Home() {
       {vistaActual === "perfil" && sesion && (
         <div style={{ margin: "20px auto" }}>
           <VistaPerfil sesion={sesion} perfil={perfil} onPerfilActualizado={setPerfil} tema={tema} acentoMarca={acentoMarca} />
+        </div>
+      )}
+
+      {vistaActual === "ajustes" && sesion && (
+        <div style={{ margin: "20px auto" }}>
+          <PantallaAjustes sesion={sesion} perfil={perfil} onPerfilActualizado={setPerfil} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
         </div>
       )}
 
