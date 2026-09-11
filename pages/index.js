@@ -193,7 +193,7 @@ const TEXTOS = {
     estudioClimatico: "Estudio Climático Personalizado", conEstudioClimatico: "Con mi Estudio Climático:",
     avisarSemaforoVerde: "Avisarme cuando haya semáforo verde",
     seleccionNacionalLabel: "Selección nacional:", equiposFamosos: "Equipos más famosos:",
-    alineacionesConfirmadas: "Alineaciones confirmadas", statsEnVivo: "Estadísticas en vivo (se actualizan solas)",
+    alineacionesConfirmadas: "Alineaciones confirmadas", statsEnVivo: "Estadísticas en vivo",
     statsReales: "Estadísticas reales de este encuentro",
     cornersCorto: "Córners", amarillasCorto: "Amarillas", rojasCorto: "Rojas",
     faltasCorto: "Faltas", posesionCorto: "Posesión", tirosTotalesCorto: "Tiros totales", tirosPuertaCorto: "Tiros a puerta",
@@ -231,7 +231,7 @@ const TEXTOS = {
     estudioClimatico: "Personalized Weather Study", conEstudioClimatico: "With my Weather Study:",
     avisarSemaforoVerde: "Notify me when it hits green light",
     seleccionNacionalLabel: "National team:", equiposFamosos: "Most famous teams:",
-    alineacionesConfirmadas: "Confirmed lineups", statsEnVivo: "Live stats (auto-updating)",
+    alineacionesConfirmadas: "Confirmed lineups", statsEnVivo: "Live stats",
     statsReales: "Real stats for this match",
     cornersCorto: "Corners", amarillasCorto: "Yellow cards", rojasCorto: "Red cards",
     faltasCorto: "Fouls", posesionCorto: "Possession", tirosTotalesCorto: "Total shots", tirosPuertaCorto: "Shots on target",
@@ -431,12 +431,18 @@ function calcularPuntualesNumerico(fixtures, teamId, statsMap) {
 }
 
 // Arma las 6 "fuentes" (local, visitante, liga, no liga, temporada, forma reciente)
-// para UN equipo, con valor y N de cada estadística (goles, córners, amarillas, faltas)
-function construirFuentesEquipo(fixturesCompletos, teamId, statsMap) {
+// para UN equipo, con valor y N de cada estadística (goles, córners, amarillas, faltas).
+// Si se pasa "competicionExacta" ({id, season} del partido que se está estudiando), la fuente
+// "liga" deja de ser "cualquier partido de liga" y pasa a ser SOLO esa competición+temporada
+// exacta — más preciso, aunque con menos partidos de muestra. El motor de pesos (más abajo)
+// ya baja el peso solo con pocos partidos, así que no hace falta un mínimo fijo.
+function construirFuentesEquipo(fixturesCompletos, teamId, statsMap, competicionExacta) {
   const subsets = {
     local: fixturesCompletos.filter((f) => f.teams.home.id === teamId),
     visitante: fixturesCompletos.filter((f) => f.teams.away.id === teamId),
-    liga: fixturesCompletos.filter((f) => esLiga(f)),
+    liga: competicionExacta
+      ? fixturesCompletos.filter((f) => f.league?.id === competicionExacta.id && f.league?.season === competicionExacta.season)
+      : fixturesCompletos.filter((f) => esLiga(f)),
     noLiga: fixturesCompletos.filter((f) => !esLiga(f)),
     temporada: fixturesCompletos,
     forma: fixturesCompletos.slice(0, 5),
@@ -563,6 +569,78 @@ const LINEAS_MERCADOS = {
   amarillas: [1.5, 2.5, 3.5, 4.5, 5.5],
   faltas: [18.5, 21.5, 24.5, 27.5],
 };
+
+// Doble oportunidad: no es un cálculo nuevo, es una suma directa de las probabilidades de 1X2
+// que ya tenemos (1X = Local o Empate, 12 = Local o Visitante, X2 = Empate o Visitante).
+function probabilidadDobleOportunidad(p1X2) {
+  if (!p1X2) return null;
+  return {
+    p1X: p1X2.pLocal + p1X2.pEmpate,
+    p12: p1X2.pLocal + p1X2.pVisitante,
+    pX2: p1X2.pEmpate + p1X2.pVisitante,
+  };
+}
+
+// Marcador exacto: usa la misma matriz de Poisson independiente que ya usamos para 1X2,
+// pero en vez de agrupar en Local/Empate/Visitante, guarda cada combinación de goles.
+// Devuelve los marcadores más probables ordenados de mayor a menor.
+function probabilidadMarcadorExacto(lambdaLocal, lambdaVisitante, maxGoles = 6, top = 5) {
+  if (lambdaLocal === null || lambdaVisitante === null) return null;
+  const resultados = [];
+  for (let i = 0; i <= maxGoles; i++) {
+    for (let j = 0; j <= maxGoles; j++) {
+      resultados.push({ local: i, visitante: j, prob: poissonProb(lambdaLocal, i) * poissonProb(lambdaVisitante, j) });
+    }
+  }
+  resultados.sort((a, b) => b.prob - a.prob);
+  return resultados.slice(0, top);
+}
+
+// Líneas de hándicap asiático disponibles para elegir (desde el punto de vista del Local:
+// negativo = el Local tiene que ganar por esa diferencia; positivo = arranca con esa ventaja).
+const LINEAS_HANDICAP = [-2, -1.5, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.5, 2];
+
+// Hándicap asiático — metodología estándar de casas de apuestas: en líneas "enteras" (0, ±1, ±2...)
+// puede haber "push" (se devuelve la apuesta si el resultado ajustado queda exacto en 0). En líneas
+// de cuarto (.25/.75) la apuesta se reparte 50/50 entre las dos líneas vecinas de .5 — acá mostramos
+// el promedio de cubrir esas dos líneas, que es la forma simplificada en la que lo mostramos (no es
+// una simulación exacta de devolución de apuesta, es nuestra forma de resumirlo en un solo %).
+function probabilidadHandicapAsiatico(lambdaLocal, lambdaVisitante, lineaLocal, maxGoles = 10) {
+  if (lambdaLocal === null || lambdaVisitante === null) return null;
+
+  function calcularLineaSimple(linea) {
+    let cubre = 0, push = 0, noCubre = 0;
+    for (let i = 0; i <= maxGoles; i++) {
+      for (let j = 0; j <= maxGoles; j++) {
+        const p = poissonProb(lambdaLocal, i) * poissonProb(lambdaVisitante, j);
+        const diff = i - j + linea;
+        if (diff > 0) cubre += p;
+        else if (diff === 0) push += p;
+        else noCubre += p;
+      }
+    }
+    return { cubre, push, noCubre };
+  }
+
+  const fraccion = Math.abs(lineaLocal % 1);
+  const esLineaCuarto = Math.abs(fraccion - 0.25) < 0.001 || Math.abs(fraccion - 0.75) < 0.001;
+
+  if (!esLineaCuarto) {
+    const r = calcularLineaSimple(lineaLocal);
+    return { probCubre: r.cubre, probPush: r.push, probNoCubre: r.noCubre, esLineaCuarto: false };
+  }
+
+  const lineaBaja = Math.floor(lineaLocal * 2) / 2;
+  const lineaAlta = lineaBaja + 0.5;
+  const r1 = calcularLineaSimple(lineaBaja);
+  const r2 = calcularLineaSimple(lineaAlta);
+  return {
+    probCubre: (r1.cubre + r2.cubre) / 2,
+    probPush: 0,
+    probNoCubre: (r1.noCubre + r2.noCubre) / 2,
+    esLineaCuarto: true,
+  };
+}
 
 function calcularHeadToHead(fixturesLocal, fixturesVisitante, idLocal, idVisitante) {
   const todos = [...(fixturesLocal || []), ...(fixturesVisitante || [])];
@@ -932,7 +1010,7 @@ function PanelFavoritos({ sesion, tema, acentoMarca, onCerrar }) {
   );
 }
 
-function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca, sesion, onPedirLogin, onAbrirPerfil, mostrarToast }) {
+function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca, sesion, onPedirLogin, onAbrirPerfil, mostrarToast, competicionActual }) {
   const [query, setQuery] = useState("");
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -1004,7 +1082,9 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
 
   const fixturesLocalVenue = fixtures.filter((f) => selectedTeam && f.teams.home.id === selectedTeam.team.id);
   const fixturesVisitanteVenue = fixtures.filter((f) => selectedTeam && f.teams.away.id === selectedTeam.team.id);
-  const fixturesLigaActual = fixtures.filter((f) => esLiga(f));
+  const fixturesLigaActual = competicionActual
+    ? fixtures.filter((f) => f.league?.id === competicionActual.id && f.league?.season === competicionActual.season)
+    : fixtures.filter((f) => esLiga(f));
   const fixturesNoLiga = fixtures.filter((f) => !esLiga(f));
   const fixturesFormaReciente = fixtures.slice(0, 5); // ya vienen ordenados del más reciente al más viejo
 
@@ -1074,7 +1154,7 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
           <div className="jmcs-subpaneles-individual" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <SubPanel titulo={traducir("comoLocal")} fixtures={fixturesLocalVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
             <SubPanel titulo={traducir("comoVisitante")} fixtures={fixturesVisitanteVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
-            <SubPanel titulo={traducir("ligaActual")} fixtures={fixturesLigaActual} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
+            <SubPanel titulo={competicionActual?.nombre || traducir("ligaActual")} fixtures={fixturesLigaActual} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
             <SubPanel titulo={traducir("noLiga")} fixtures={fixturesNoLiga} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
             <SubPanel titulo={traducir("formaReciente")} fixtures={fixturesFormaReciente} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
           </div>
@@ -1371,8 +1451,9 @@ function CalculadoraValor({ opciones, tema, acento }) {
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual }) {
   const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
+  const [lineaHandicap, setLineaHandicap] = useState(0);
   const [permisoNotificaciones, setPermisoNotificaciones] = useState(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"
   );
@@ -1408,8 +1489,8 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
-  const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
-  const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap);
+  const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap, competicionActual);
+  const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap, competicionActual);
 
   const partidosH2H = h2h?.partidos || [];
   const h2hGolesLocal = calcularGolesNumerico(partidosH2H, equipoLocal.team.id);
@@ -1440,17 +1521,32 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   const lambdaCornersLocal = calcularValorEsperado(motorLocal.corners, esPartidoLiga);
   const lambdaCornersVisitante = calcularValorEsperado(motorVisitante.corners, esPartidoLiga);
   const lambdaCornersTotal = lambdaCornersLocal !== null && lambdaCornersVisitante !== null ? lambdaCornersLocal + lambdaCornersVisitante : null;
+  const lambdaCornersTotalAjustado =
+    climaAjuste?.activo && lambdaCornersLocal !== null && lambdaCornersVisitante !== null
+      ? lambdaCornersLocal * (climaAjuste.factorLocalPorMercado?.corners ?? 1) + lambdaCornersVisitante * (climaAjuste.factorVisitantePorMercado?.corners ?? 1)
+      : null;
 
   const lambdaAmarillasLocal = calcularValorEsperado(motorLocal.amarillas, esPartidoLiga);
   const lambdaAmarillasVisitante = calcularValorEsperado(motorVisitante.amarillas, esPartidoLiga);
   const lambdaAmarillasTotal = lambdaAmarillasLocal !== null && lambdaAmarillasVisitante !== null ? lambdaAmarillasLocal + lambdaAmarillasVisitante : null;
+  const lambdaAmarillasTotalAjustado =
+    climaAjuste?.activo && lambdaAmarillasLocal !== null && lambdaAmarillasVisitante !== null
+      ? lambdaAmarillasLocal * (climaAjuste.factorLocalPorMercado?.amarillas ?? 1) + lambdaAmarillasVisitante * (climaAjuste.factorVisitantePorMercado?.amarillas ?? 1)
+      : null;
 
   const lambdaFaltasLocal = calcularValorEsperado(motorLocal.faltas, esPartidoLiga);
   const lambdaFaltasVisitante = calcularValorEsperado(motorVisitante.faltas, esPartidoLiga);
   const lambdaFaltasTotal = lambdaFaltasLocal !== null && lambdaFaltasVisitante !== null ? lambdaFaltasLocal + lambdaFaltasVisitante : null;
+  const lambdaFaltasTotalAjustado =
+    climaAjuste?.activo && lambdaFaltasLocal !== null && lambdaFaltasVisitante !== null
+      ? lambdaFaltasLocal * (climaAjuste.factorLocalPorMercado?.faltas ?? 1) + lambdaFaltasVisitante * (climaAjuste.factorVisitantePorMercado?.faltas ?? 1)
+      : null;
 
   const probBTTS = probabilidadBTTS(lambdaGolesLocal, lambdaGolesVisitante);
   const prob1X2 = probabilidad1X2(lambdaGolesLocal, lambdaGolesVisitante);
+  const probDobleOportunidad = probabilidadDobleOportunidad(prob1X2);
+  const marcadoresProbables = probabilidadMarcadorExacto(lambdaGolesLocal, lambdaGolesVisitante);
+  const probHandicap = probabilidadHandicapAsiatico(lambdaGolesLocal, lambdaGolesVisitante, lineaHandicap);
 
   const lambdaGolesLocalAjustado = climaAjuste?.activo && lambdaGolesLocal !== null ? lambdaGolesLocal * climaAjuste.factorLocal : null;
   const lambdaGolesVisitanteAjustado = climaAjuste?.activo && lambdaGolesVisitante !== null ? lambdaGolesVisitante * climaAjuste.factorVisitante : null;
@@ -1581,6 +1677,96 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </div>
       )}
 
+      {probDobleOportunidad && mostrarMercado("dobleOportunidad") && (
+        <div style={{ marginBottom: 18 }}>
+          <h4 style={{ marginBottom: 8, fontSize: 14 }}>Doble oportunidad</h4>
+          <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
+            Sale de sumar las mismas probabilidades de Ganador del partido de arriba — no es un cálculo aparte.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {[
+              { etiqueta: `${equipoLocal.team.name} o Empate`, prob: probDobleOportunidad.p1X },
+              { etiqueta: `${equipoLocal.team.name} o ${equipoVisitante.team.name}`, prob: probDobleOportunidad.p12 },
+              { etiqueta: `Empate o ${equipoVisitante.team.name}`, prob: probDobleOportunidad.pX2 },
+            ].map((item) => {
+              const { color } = colorSemaforo(item.prob);
+              return (
+                <div
+                  key={item.etiqueta}
+                  style={{
+                    padding: "8px 14px", borderRadius: 6, background: color, color: "#fff",
+                    fontSize: 13, fontWeight: "bold", minWidth: 130, textAlign: "center",
+                  }}
+                >
+                  {item.etiqueta}<br />{Math.round(item.prob * 100)}%
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {marcadoresProbables && mostrarMercado("marcadorExacto") && (
+        <div style={{ marginBottom: 18 }}>
+          <h4 style={{ marginBottom: 8, fontSize: 14 }}>Marcador exacto</h4>
+          <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
+            Los {marcadoresProbables.length} marcadores más probables según nuestro modelo — el marcador exacto siempre es un mercado de probabilidad baja, aunque salga en verde no es un resultado esperado con certeza.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {marcadoresProbables.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: "8px 14px", borderRadius: 6, background: tema.panel, border: `1px solid ${tema.borde}`,
+                  fontSize: 13, fontWeight: "bold", minWidth: 80, textAlign: "center", color: tema.texto,
+                }}
+              >
+                {m.local} - {m.visitante}
+                <br />
+                <span style={{ fontWeight: "normal", fontSize: 11, color: tema.textoSuave }}>{(m.prob * 100).toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {probHandicap && mostrarMercado("handicapAsiatico") && (
+        <div style={{ marginBottom: 18 }}>
+          <h4 style={{ marginBottom: 8, fontSize: 14 }}>Hándicap asiático (Local)</h4>
+          <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
+            Negativo = {equipoLocal.team.name} tiene que ganar por esa diferencia. Positivo = arranca con esa ventaja.
+            {probHandicap.esLineaCuarto && " Esta línea es de cuarto: se reparte entre las dos líneas vecinas, así que mostramos el promedio de cubrir ambas."}
+          </p>
+          <select
+            value={lineaHandicap}
+            onChange={(e) => setLineaHandicap(parseFloat(e.target.value))}
+            style={{
+              marginBottom: 10, padding: "6px 10px", fontSize: 13, borderRadius: 6,
+              border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto,
+            }}
+          >
+            {LINEAS_HANDICAP.map((l) => (
+              <option key={l} value={l}>{l > 0 ? `+${l}` : l}</option>
+            ))}
+          </select>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {(() => {
+              const { color } = colorSemaforo(probHandicap.probCubre);
+              return (
+                <div style={{ padding: "8px 14px", borderRadius: 6, background: color, color: "#fff", fontSize: 13, fontWeight: "bold", minWidth: 130, textAlign: "center" }}>
+                  Cubre {equipoLocal.team.name}<br />{Math.round(probHandicap.probCubre * 100)}%
+                </div>
+              );
+            })()}
+            {!probHandicap.esLineaCuarto && probHandicap.probPush > 0.005 && (
+              <div style={{ padding: "8px 14px", borderRadius: 6, background: tema.panel, border: `1px solid ${tema.borde}`, color: tema.texto, fontSize: 13, fontWeight: "bold", minWidth: 100, textAlign: "center" }}>
+                Push<br />{Math.round(probHandicap.probPush * 100)}%
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {mostrarMercado("goles") && (
         <FilaMercado nombre={traducir("golesTotales")} lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
       )}
@@ -1614,18 +1800,18 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       )}
 
       {mostrarMercado("corners") && (
-        <FilaMercado nombre={traducir("cornersTotales")} lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado nombre={traducir("cornersTotales")} lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} lambdaAjustado={lambdaCornersTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
       {mostrarMercado("amarillas") && (
-        <FilaMercado nombre={traducir("amarillasTotales")} lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado nombre={traducir("amarillasTotales")} lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} lambdaAjustado={lambdaAmarillasTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
       {mostrarMercado("faltas") && (
-        <FilaMercado nombre={traducir("faltasTotales")} lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado nombre={traducir("faltasTotales")} lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} lambdaAjustado={lambdaFaltasTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
 
       {!datosPuntualesListos && (
         <p style={{ color: tema.textoSuave, fontSize: 12, marginTop: -8, marginBottom: 18 }}>
-          ℹ️ Carga los "datos puntuales" arriba para completar córners, tarjetas y faltas con datos reales.
+          <Icono tipo="portapapeles" size={13} /> Carga los "datos puntuales" arriba para completar córners, tarjetas y faltas con datos reales.
         </p>
       )}
 
@@ -2125,11 +2311,13 @@ function useColorDeEscudo(logoUrl, colorRespaldo) {
   return color;
 }
 
-function dividirPorCategorias(fixtures, teamId) {
+function dividirPorCategorias(fixtures, teamId, competicionExacta) {
   return {
     local: fixtures.filter((f) => f.teams.home.id === teamId),
     visitante: fixtures.filter((f) => f.teams.away.id === teamId),
-    liga: fixtures.filter((f) => esLiga(f)),
+    liga: competicionExacta
+      ? fixtures.filter((f) => f.league?.id === competicionExacta.id && f.league?.season === competicionExacta.season)
+      : fixtures.filter((f) => esLiga(f)),
     noLiga: fixtures.filter((f) => !esLiga(f)),
     forma: fixtures.slice(0, 5),
   };
@@ -2172,11 +2360,11 @@ function CategoriaEspejo({ titulo, fixturesLocal, fixturesVisitante, idLocal, id
   );
 }
 
-function SeccionEspejo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, statsMap, tema }) {
+function SeccionEspejo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, statsMap, tema, competicionActual }) {
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
-  const catLocal = dividirPorCategorias(fixturesLocal, equipoLocal.team.id);
-  const catVisitante = dividirPorCategorias(fixturesVisitante, equipoVisitante.team.id);
+  const catLocal = dividirPorCategorias(fixturesLocal, equipoLocal.team.id, competicionActual);
+  const catVisitante = dividirPorCategorias(fixturesVisitante, equipoVisitante.team.id, competicionActual);
 
   return (
     <div>
@@ -2186,7 +2374,7 @@ function SeccionEspejo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       </div>
 
       <CategoriaEspejo titulo="Como Local / Como Visitante" fixturesLocal={catLocal.local} fixturesVisitante={catVisitante.visitante} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
-      <CategoriaEspejo titulo={traducir("ligaActual")} fixturesLocal={catLocal.liga} fixturesVisitante={catVisitante.liga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
+      <CategoriaEspejo titulo={competicionActual?.nombre || traducir("ligaActual")} fixturesLocal={catLocal.liga} fixturesVisitante={catVisitante.liga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
       <CategoriaEspejo titulo={traducir("noLiga")} fixturesLocal={catLocal.noLiga} fixturesVisitante={catVisitante.noLiga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
       <CategoriaEspejo titulo={traducir("formaReciente")} fixturesLocal={catLocal.forma} fixturesVisitante={catVisitante.forma} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
     </div>
@@ -2732,7 +2920,7 @@ function ModalEstudioClimatico({
         <TutorialFlotante
           id="clima"
           titulo="¿Cuánto pesa cada punto?"
-          texto="Cada punto de diferencia que muevas (0 a 10) equivale aproximadamente a un 1.5% de cambio en la probabilidad de ese equipo — es nuestra propia fórmula, no un dato científicamente validado. El punto de JMCS (fijo) siempre representa el clima real; el tuyo es tu propio criterio."
+          texto="Cada punto de diferencia que muevas (0 a 10) equivale aproximadamente a un 1.5% de cambio en la probabilidad de ese equipo — es nuestra propia fórmula, no un dato científicamente validado. Además, cada mercado reacciona distinto: por ejemplo, más viento baja nuestra estimación de goles pero sube la de córners, porque asumimos más centros mal ejecutados. El punto de JMCS (fijo) siempre representa el clima real; el tuyo es tu propio criterio."
           tema={tema}
           acentoMarca={acentoMarca}
           tutorialesOcultos={tutorialesOcultos}
@@ -3546,6 +3734,9 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
             { id: "corners", icono: "banderin", etiqueta: traducir("cornersCorto") },
             { id: "amarillas", icono: "tarjeta", etiqueta: traducir("tarjetasAm") },
             { id: "faltas", icono: "exclamacion", etiqueta: traducir("faltasCorto") },
+            { id: "dobleOportunidad", icono: "objetivo", etiqueta: "Doble oportunidad" },
+            { id: "marcadorExacto", icono: "porteria", etiqueta: "Marcador exacto" },
+            { id: "handicapAsiatico", icono: "balanza", etiqueta: "Hándicap asiático" },
           ].map((m) => (
             <button
               key={m.id}
@@ -3919,6 +4110,7 @@ export default function Home() {
   const [notaProximamente, setNotaProximamente] = useState(false);
   const [tarjetaActivaMovil, setTarjetaActivaMovil] = useState("local");
   const [toqueInicioX, setToqueInicioX] = useState(null);
+  const [toqueInicioY, setToqueInicioY] = useState(null);
   const [chatAbierto, setChatAbierto] = useState(false);
   const [sesion, setSesion] = useState(null);
   const [cargandoSesion, setCargandoSesion] = useState(true);
@@ -4042,6 +4234,7 @@ export default function Home() {
   const [contextoFavoritosIA, setContextoFavoritosIA] = useState("");
   const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
   const [toqueSwipeX, setToqueSwipeX] = useState(null);
+  const [toqueSwipeY, setToqueSwipeY] = useState(null);
   const [vistaAnterior, setVistaAnterior] = useState("inicio");
   const [equipoPerfil, setEquipoPerfil] = useState(null);
 
@@ -4174,6 +4367,14 @@ export default function Home() {
     });
     setPartidoCalendario(p);
   }
+
+  // Si el partido que se está estudiando vino del calendario, sabemos exactamente en qué
+  // competición y temporada se juega — el motor usa eso en vez de "cualquier partido de liga".
+  // Si el usuario buscó los dos equipos a mano (sin pasar por el calendario), no hay forma de saber
+  // la competición exacta del próximo cruce, así que el motor cae de vuelta al comportamiento genérico.
+  const competicionActual = partidoCalendario?.league?.id
+    ? { id: partidoCalendario.league.id, season: partidoCalendario.league.season, nombre: partidoCalendario.league.name }
+    : null;
 
   useEffect(() => {
     if (!partidoCalendario?.fixture?.venue?.city || !partidoCalendario?.fixture?.date) {
@@ -4406,12 +4607,24 @@ export default function Home() {
     setConfirmarGlobalAbierto(false);
   }
 
-  function calcularFactorEquipoClima(rol) {
+  // Sensibilidad de cada mercado a cada variable climática — es nuestra propia estimación,
+  // igual que el resto de esta fórmula del Estudio Climático, no un dato validado científicamente.
+  // 1.0 = misma sensibilidad que goles (el mercado que ya usábamos como base). Negativo = se mueve
+  // en sentido contrario a como se mueven los goles con esa variable.
+  const SENSIBILIDAD_CLIMA = {
+    goles: { viento: 1.0, lluvia: 1.0, temperatura: 1.0, humedad: 1.0 },
+    corners: { viento: -0.8, lluvia: -0.6, temperatura: 0.3, humedad: 0.2 },
+    amarillas: { viento: 0.2, lluvia: 0.9, temperatura: 0.4, humedad: 0.3 },
+    faltas: { viento: 0.2, lluvia: 0.9, temperatura: 0.4, humedad: 0.3 },
+  };
+
+  function calcularFactorEquipoClima(rol, mercado = "goles") {
     if (!ajustesClima || !climaOficialNorm) return 1;
     let sumaDeltas = 0;
+    const sensibilidad = SENSIBILIDAD_CLIMA[mercado] || SENSIBILIDAD_CLIMA.goles;
     ["viento", "lluvia", "temperatura", "humedad"].forEach((v) => {
       const a = ajustesClima[rol]?.[v];
-      if (a?.activo) sumaDeltas += a.valorUsuario - climaOficialNorm[v];
+      if (a?.activo) sumaDeltas += (a.valorUsuario - climaOficialNorm[v]) * sensibilidad[v];
     });
     return Math.max(0.7, Math.min(1.3, 1 + sumaDeltas * 0.015));
   }
@@ -4421,8 +4634,28 @@ export default function Home() {
     (["local", "visitante"].some((rol) => ["viento", "lluvia", "temperatura", "humedad"].some((v) => ajustesClima[rol]?.[v]?.activo)));
 
   const climaAjuste = hayAjusteClimaActivo
-    ? { activo: true, factorLocal: calcularFactorEquipoClima("local"), factorVisitante: calcularFactorEquipoClima("visitante") }
-    : { activo: false, factorLocal: 1, factorVisitante: 1 };
+    ? {
+        activo: true,
+        factorLocal: calcularFactorEquipoClima("local"),
+        factorVisitante: calcularFactorEquipoClima("visitante"),
+        factorLocalPorMercado: {
+          goles: calcularFactorEquipoClima("local", "goles"),
+          corners: calcularFactorEquipoClima("local", "corners"),
+          amarillas: calcularFactorEquipoClima("local", "amarillas"),
+          faltas: calcularFactorEquipoClima("local", "faltas"),
+        },
+        factorVisitantePorMercado: {
+          goles: calcularFactorEquipoClima("visitante", "goles"),
+          corners: calcularFactorEquipoClima("visitante", "corners"),
+          amarillas: calcularFactorEquipoClima("visitante", "amarillas"),
+          faltas: calcularFactorEquipoClima("visitante", "faltas"),
+        },
+      }
+    : {
+        activo: false, factorLocal: 1, factorVisitante: 1,
+        factorLocalPorMercado: { goles: 1, corners: 1, amarillas: 1, faltas: 1 },
+        factorVisitantePorMercado: { goles: 1, corners: 1, amarillas: 1, faltas: 1 },
+      };
 
   const acentoMarca = modoOscuro ? DORADO : "#1F7A46";
 
@@ -4431,8 +4664,8 @@ export default function Home() {
   let lambdaGolesLocalReal = null;
   let lambdaGolesVisitanteReal = null;
   if (equipoLocal?.team && equipoVisitante?.team) {
-    const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap);
-    const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap);
+    const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap, competicionActual);
+    const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap, competicionActual);
     const partidosH2H = h2h?.partidos || [];
     const h2hGolesLocal = calcularGolesNumerico(partidosH2H, equipoLocal.team.id);
     const h2hGolesVisitante = calcularGolesNumerico(partidosH2H, equipoVisitante.team.id);
@@ -4454,18 +4687,27 @@ export default function Home() {
   return (
     <div
       style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}
-      onTouchStart={(e) => setToqueSwipeX(e.touches[0].clientX)}
+      onTouchStart={(e) => {
+        setToqueSwipeX(e.touches[0].clientX);
+        setToqueSwipeY(e.touches[0].clientY);
+      }}
       onTouchEnd={(e) => {
         if (toqueSwipeX === null) return;
         const deltaX = e.changedTouches[0].clientX - toqueSwipeX;
+        const deltaY = toqueSwipeY === null ? 0 : e.changedTouches[0].clientY - toqueSwipeY;
         const ORDEN_PESTANAS = ["inicio", "estudio", "favoritos"];
         const indiceActual = ORDEN_PESTANAS.indexOf(vistaActual);
         const hayModalAbierto = estudioClimaticoAbierto || authModalAbierto || favoritosPanelAbierto || chatAbierto;
-        if (!hayModalAbierto && indiceActual !== -1 && Math.abs(deltaX) > 70) {
+        // Solo cuenta como cambio de pestaña si el movimiento horizontal es claramente mayor
+        // al vertical (un swipe de verdad), no un scroll hacia abajo con el dedo levemente
+        // de costado — eso antes cambiaba de pestaña por error.
+        const esSwipeHorizontal = Math.abs(deltaX) > 90 && Math.abs(deltaX) > Math.abs(deltaY) * 2;
+        if (!hayModalAbierto && indiceActual !== -1 && esSwipeHorizontal) {
           if (deltaX < 0 && indiceActual < ORDEN_PESTANAS.length - 1) setVistaActual(ORDEN_PESTANAS[indiceActual + 1]);
           else if (deltaX > 0 && indiceActual > 0) setVistaActual(ORDEN_PESTANAS[indiceActual - 1]);
         }
         setToqueSwipeX(null);
+        setToqueSwipeY(null);
       }}
     >
       <style jsx global>{`
@@ -5229,17 +5471,23 @@ export default function Home() {
           <div
             className="jmcs-carrusel-contenedor"
             style={{ display: "flex", gap: 30, flexWrap: "wrap" }}
-            onTouchStart={(e) => setToqueInicioX(e.touches[0].clientX)}
+            onTouchStart={(e) => {
+              setToqueInicioX(e.touches[0].clientX);
+              setToqueInicioY(e.touches[0].clientY);
+            }}
             onTouchEnd={(e) => {
               if (toqueInicioX === null) return;
               const deltaX = e.changedTouches[0].clientX - toqueInicioX;
-              const UMBRAL = 45;
-              if (deltaX < -UMBRAL && tarjetaActivaMovil === "local") {
+              const deltaY = toqueInicioY === null ? 0 : e.changedTouches[0].clientY - toqueInicioY;
+              const UMBRAL = 60;
+              const esSwipeHorizontal = Math.abs(deltaX) > UMBRAL && Math.abs(deltaX) > Math.abs(deltaY) * 2;
+              if (esSwipeHorizontal && deltaX < 0 && tarjetaActivaMovil === "local") {
                 setTarjetaActivaMovil("visitante");
-              } else if (deltaX > UMBRAL && tarjetaActivaMovil === "visitante") {
+              } else if (esSwipeHorizontal && deltaX > 0 && tarjetaActivaMovil === "visitante") {
                 setTarjetaActivaMovil("local");
               }
               setToqueInicioX(null);
+              setToqueInicioY(null);
             }}
           >
             <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "local" ? "true" : "false"} style={{ flex: 1, minWidth: 320 }}>
@@ -5253,6 +5501,7 @@ export default function Home() {
                 onPedirLogin={abrirLogin}
                 onAbrirPerfil={abrirPerfilEquipo}
                 mostrarToast={mostrarToast}
+                competicionActual={competicionActual}
                 onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoLocal(team);
                   setFixturesLocal(fixtures || []);
@@ -5273,6 +5522,7 @@ export default function Home() {
                 onPedirLogin={abrirLogin}
                 onAbrirPerfil={abrirPerfilEquipo}
                 mostrarToast={mostrarToast}
+                competicionActual={competicionActual}
                 onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoVisitante(team);
                   setFixturesVisitante(fixtures || []);
@@ -5312,6 +5562,7 @@ export default function Home() {
               fixturesVisitante={fixturesVisitante}
               statsMap={statsMap}
               tema={tema}
+              competicionActual={competicionActual}
             />
           </div>
 
@@ -5392,6 +5643,7 @@ export default function Home() {
             onPedirLogin={abrirLogin}
             mercadosPreferidos={perfil?.mercados_preferidos}
             mostrarToast={mostrarToast}
+            competicionActual={competicionActual}
           />
         </div>
 
