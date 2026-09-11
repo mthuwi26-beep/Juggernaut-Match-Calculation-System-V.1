@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 const TEMAS = {
@@ -4323,7 +4323,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
   );
 }
 
-export default function Home() {
+function Home() {
   const [equipoLocal, setEquipoLocal] = useState(null);
   const [fixturesLocal, setFixturesLocal] = useState([]);
   const [equipoVisitante, setEquipoVisitante] = useState(null);
@@ -6082,3 +6082,59 @@ export default function Home() {
     </div>
   );
 }
+
+// ============================================================
+// TRAMPA DE ERRORES TEMPORAL — para diagnosticar el bug de las
+// notificaciones sin depender de la consola del navegador. En vez
+// de la pantalla negra genérica de Next.js, muestra el mensaje real
+// del error, para poder mandarlo por captura. Se puede sacar más
+// adelante una vez resuelto el problema.
+class TrampaDeErrores extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null, info: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    this.setState({ info });
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 20, fontFamily: "monospace", background: "#fff", color: "#b00", minHeight: "100vh" }}>
+          <h2 style={{ color: "#b00" }}>Se rompió algo — mandale captura de esto a tu socio:</h2>
+          <p style={{ fontWeight: "bold", fontSize: 15 }}>{String(this.state.error?.message || this.state.error)}</p>
+          <pre style={{ whiteSpace: "pre-wrap", fontSize: 11, color: "#333", background: "#f5f5f5", padding: 10, borderRadius: 6 }}>
+            {this.state.error?.stack}
+          </pre>
+          {this.state.info?.componentStack && (
+            <>
+              <p style={{ fontWeight: "bold", marginTop: 16 }}>Dónde pasó:</p>
+              <pre style={{ whiteSpace: "pre-wrap", fontSize: 11, color: "#333", background: "#f5f5f5", padding: 10, borderRadius: 6 }}>
+                {this.state.info.componentStack}
+              </pre>
+            </>
+          )}
+          <button
+            onClick={() => window.location.href = "/"}
+            style={{ marginTop: 16, padding: "10px 16px", background: "#2e6b3e", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+          >
+            Volver a Inicio
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function HomeConTrampaDeErrores() {
+  return (
+    <TrampaDeErrores>
+      <Home />
+    </TrampaDeErrores>
+  );
+}
+
