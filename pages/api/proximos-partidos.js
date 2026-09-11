@@ -1,9 +1,15 @@
+import { obtenerCache, guardarCache, CACHE_2_HORAS } from "../../lib/cacheApi";
+
 export default async function handler(req, res) {
   const { teamId } = req.query;
 
   if (!teamId) {
     return res.status(400).json({ error: "Falta el ID del equipo" });
   }
+
+  const clave = `proximos-partidos:${teamId}`;
+  const cacheado = await obtenerCache(clave);
+  if (cacheado) return res.status(200).json(cacheado);
 
   try {
     const response = await fetch(
@@ -17,7 +23,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ error: JSON.stringify(data.errors) });
     }
 
-    res.status(200).json(data.response || []);
+    const resultado = data.response || [];
+    await guardarCache(clave, resultado, CACHE_2_HORAS);
+    res.status(200).json(resultado);
   } catch (error) {
     res.status(500).json({ error: "No se pudo traer los próximos partidos" });
   }
