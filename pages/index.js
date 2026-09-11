@@ -4657,6 +4657,9 @@ function Home() {
     } else if (itemMenu === "favoritos") {
       setMenuAbierto(false);
       setVistaActual("favoritos");
+    } else if (itemMenu === "estudio") {
+      setMenuAbierto(false);
+      setVistaActual("estudio");
     } else if (itemMenu === "historial") {
       setMenuAbierto(false);
       setVistaActual("historial");
@@ -5631,7 +5634,10 @@ function Home() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setVistaActual(tab.id)}
+              onClick={() => {
+                if ((tab.id === "estudio" || tab.id === "favoritos") && !sesion) abrirLogin();
+                else setVistaActual(tab.id);
+              }}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 padding: "8px 18px", fontSize: 13, borderRadius: 20, cursor: "pointer",
