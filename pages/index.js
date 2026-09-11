@@ -2620,9 +2620,14 @@ function EstadisticasPartidoReal({ fixtureId, nombreLocal, nombreVisitante, tema
   );
 }
 
-function MarcadorEnVivo({ fixtureId, nombreLocal, nombreVisitante, tema, acentoMarca }) {
+function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoMarca, sesion, onPedirLogin, mostrarToast }) {
   const [marcador, setMarcador] = useState(null);
   const [error, setError] = useState("");
+  const [vigilando, setVigilando] = useState(false);
+  const [cargandoVigilancia, setCargandoVigilancia] = useState(false);
+
+  const nombreLocal = equipoLocal?.team?.name;
+  const nombreVisitante = equipoVisitante?.team?.name;
 
   useEffect(() => {
     if (!fixtureId) return;
@@ -2648,6 +2653,54 @@ function MarcadorEnVivo({ fixtureId, nombreLocal, nombreVisitante, tema, acentoM
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fixtureId, marcador?.estadoCorto]);
 
+  // Revisa si ya se está avisando de alguno de los dos equipos de este partido
+  useEffect(() => {
+    if (!sesion || !equipoLocal?.team?.id || !equipoVisitante?.team?.id) { setVigilando(false); return; }
+    let cancelado = false;
+    supabase
+      .from("favoritos")
+      .select("team_id, notificar")
+      .eq("user_id", sesion.user.id)
+      .in("team_id", [equipoLocal.team.id, equipoVisitante.team.id])
+      .then(({ data }) => {
+        if (!cancelado) setVigilando(!!(data || []).some((f) => f.notificar));
+      });
+    return () => { cancelado = true; };
+  }, [sesion, equipoLocal?.team?.id, equipoVisitante?.team?.id]);
+
+  // Activa o desactiva el aviso de gol/fin de partido para AMBOS equipos de este encuentro
+  // (si todavía no eran favoritos, los agrega — es un atajo rápido para no tener que ir a Favoritos)
+  async function alternarVigilancia() {
+    if (!sesion) { onPedirLogin && onPedirLogin(); return; }
+    if (!equipoLocal?.team?.id || !equipoVisitante?.team?.id) return;
+    setCargandoVigilancia(true);
+    try {
+      if (!vigilando) {
+        const { data: perfilData } = await supabase.from("perfiles").select("notif_activadas").eq("user_id", sesion.user.id).maybeSingle();
+        if (!perfilData?.notif_activadas) {
+          mostrarToast && mostrarToast("Primero activá las notificaciones en Ajustes > Preferencias de notificaciones.");
+          setCargandoVigilancia(false);
+          return;
+        }
+      }
+      for (const eq of [equipoLocal, equipoVisitante]) {
+        const { data: existente } = await supabase.from("favoritos").select("id").eq("user_id", sesion.user.id).eq("team_id", eq.team.id).maybeSingle();
+        if (existente) {
+          await supabase.from("favoritos").update({ notificar: !vigilando }).eq("user_id", sesion.user.id).eq("team_id", eq.team.id);
+        } else if (!vigilando) {
+          await supabase.from("favoritos").insert({
+            user_id: sesion.user.id, team_id: eq.team.id, team_name: eq.team.name, team_logo: eq.team.logo, team_country: eq.team.country, notificar: true,
+          });
+        }
+      }
+      setVigilando(!vigilando);
+      mostrarToast && mostrarToast(!vigilando ? "Te vamos a avisar de los goles y el final de este partido." : "Dejamos de avisarte de este partido.");
+    } catch {
+      mostrarToast && mostrarToast("No se pudo actualizar el aviso. Intenta de nuevo.");
+    }
+    setCargandoVigilancia(false);
+  }
+
   if (!fixtureId || error || !marcador) return null;
 
   const enVivo = ESTADOS_EN_VIVO.includes(marcador.estadoCorto);
@@ -2657,7 +2710,7 @@ function MarcadorEnVivo({ fixtureId, nombreLocal, nombreVisitante, tema, acentoM
 
   return (
     <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 16,
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap",
       background: tema.panel, borderRadius: 8, padding: "10px 16px", marginBottom: 14,
       border: enVivo ? `2px solid ${acentoMarca}` : `1px solid ${tema.borde}`,
     }}>
@@ -2665,6 +2718,17 @@ function MarcadorEnVivo({ fixtureId, nombreLocal, nombreVisitante, tema, acentoM
         <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#e05555", fontWeight: "bold", fontSize: 12 }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#e05555", display: "inline-block", animation: "jmcsPulso 1.5s ease-in-out infinite" }} />
           EN VIVO
+          <button
+            onClick={alternarVigilancia}
+            disabled={cargandoVigilancia}
+            title={vigilando ? "Dejar de avisarme de este partido" : "Avisarme de goles y del final de este partido"}
+            style={{
+              background: "transparent", border: "none", cursor: cargandoVigilancia ? "default" : "pointer",
+              color: vigilando ? acentoMarca : tema.textoSuave, padding: 0, display: "flex", alignItems: "center",
+            }}
+          >
+            <Icono tipo={vigilando ? "campana" : "campanaTachada"} size={14} />
+          </button>
         </span>
       )}
       <span style={{ fontSize: 15 }}>{nombreLocal}</span>
@@ -5628,10 +5692,13 @@ export default function Home() {
                 />
                 <MarcadorEnVivo
                   fixtureId={partidoCalendario?.fixture?.id}
-                  nombreLocal={equipoLocal.team.name}
-                  nombreVisitante={equipoVisitante.team.name}
+                  equipoLocal={equipoLocal}
+                  equipoVisitante={equipoVisitante}
                   tema={tema}
                   acentoMarca={acentoMarca}
+                  sesion={sesion}
+                  onPedirLogin={abrirLogin}
+                  mostrarToast={mostrarToast}
                 />
               </>
             )}
