@@ -1,9 +1,22 @@
+import { obtenerCache, guardarCache, CACHE_3_MINUTOS, CACHE_PARA_SIEMPRE } from "../../lib/cacheApi";
+
 export default async function handler(req, res) {
   const { date } = req.query;
 
   if (!date) {
     return res.status(400).json({ error: "Falta la fecha" });
   }
+
+  // Un día que ya pasó no cambia más (los resultados quedan fijos) — lo cacheamos para
+  // siempre. Hoy o un día futuro sí puede cambiar de un minuto a otro (partidos que
+  // arrancan, resultados que se actualizan), así que ahí el caché dura solo 3 minutos.
+  const hoy = new Date().toISOString().slice(0, 10);
+  const esFechaPasada = date < hoy;
+  const ttl = esFechaPasada ? CACHE_PARA_SIEMPRE : CACHE_3_MINUTOS;
+
+  const clave = `partidos-fecha:${date}`;
+  const cacheado = await obtenerCache(clave);
+  if (cacheado) return res.status(200).json(cacheado);
 
   try {
     const response = await fetch(
@@ -20,7 +33,9 @@ export default async function handler(req, res) {
     }
 
     // Limitamos a 50 para no saturar la pantalla (partidos de todo el mundo en un solo día pueden ser cientos)
-    res.status(200).json((data.response || []).slice(0, 50));
+    const resultado = (data.response || []).slice(0, 50);
+    await guardarCache(clave, resultado, ttl);
+    res.status(200).json(resultado);
   } catch (error) {
     res.status(500).json({ error: "No se pudo conectar con API-Football" });
   }
