@@ -7,20 +7,95 @@
 // 2) Pide a API-Football TODOS los partidos en vivo del mundo en una sola llamada
 // 3) Se queda solo con los que involucran a un equipo vigilado
 // 4) Compara contra el último estado que guardamos, para detectar qué CAMBIÓ
-//    (arrancó, hubo un gol, hubo una tarjeta, terminó)
+//    (arrancó, hubo un gol, hubo una tarjeta, terminó, o algún mercado llegó a verde)
 // 5) A cada usuario que corresponda (según sus preferencias) le manda un push
 //
-// NOTA IMPORTANTE (para ser honestos): el "semáforo verde" no está acá todavía.
-// Ese cálculo hoy vive adentro de la pantalla de React (PanelSemaforo) y no se
-// puede correr desde el servidor sin antes sacar esa lógica de ahí — queda
-// pendiente para una tanda futura, tal como lo hablamos.
+// El semáforo verde SOLO se calcula para partidos donde alguien realmente lo quiere
+// (notif_semaforo=true), porque revisar córners/tarjetas/faltas requiere traer el
+// historial completo de estadísticas de ambos equipos — es la parte más cara en
+// cuota de API-Football de todo este archivo.
 
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { enviarPush } from "../../lib/push";
+const motor = require("../../lib/motor");
 
 const ESTADOS_FINALIZADOS = ["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"];
 // Si tu dominio cambia, agregá NEXT_PUBLIC_SITE_URL en Vercel con la URL nueva.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://juggernaut-match-calculation-system-nine.vercel.app";
+
+// Calcula el semáforo de los 4 mercados (goles, córners, amarillas, faltas) para un
+// partido en vivo, usando el mismo motor que la pantalla de Estudio. Devuelve la
+// lista de combinaciones mercado+línea que están en verde (>=70%) ahora mismo.
+async function calcularMercadosEnVerde(partido) {
+  const idLocal = partido.teams.home.id;
+  const idVisitante = partido.teams.away.id;
+
+  const [resLocal, resVisitante] = await Promise.all([
+    fetch(`${SITE_URL}/api/fixtures?teamId=${idLocal}`).then((r) => r.json()),
+    fetch(`${SITE_URL}/api/fixtures?teamId=${idVisitante}`).then((r) => r.json()),
+  ]);
+  const fixturesLocal = Array.isArray(resLocal) ? resLocal : [];
+  const fixturesVisitante = Array.isArray(resVisitante) ? resVisitante : [];
+  if (fixturesLocal.length === 0 || fixturesVisitante.length === 0) return [];
+
+  const h2h = motor.calcularHeadToHead(fixturesLocal, fixturesVisitante, idLocal, idVisitante);
+
+  // Datos puntuales (córners/tarjetas/faltas) de todos los partidos históricos que
+  // vamos a necesitar — esto es lo que gasta más cuota. Ya está cacheado 30 min
+  // en /api/estadisticas-partido, así que revisiones seguidas del mismo partido
+  // no vuelven a pagar este costo dentro de esa media hora.
+  const fixturesParaStats = [...fixturesLocal, ...fixturesVisitante, ...h2h.partidos];
+  const idsUnicos = [...new Set(fixturesParaStats.map((f) => f.fixture.id))];
+  const statsMap = {};
+  for (const fixtureId of idsUnicos) {
+    try {
+      const r = await fetch(`${SITE_URL}/api/estadisticas-partido?fixtureId=${fixtureId}`).then((x) => x.json());
+      if (!r.error) {
+        const homeIdDeEsePartido = fixturesParaStats.find((f) => f.fixture.id === fixtureId)?.teams.home.id;
+        const procesado = motor.procesarEstadisticasPartido(r, homeIdDeEsePartido);
+        if (procesado) statsMap[fixtureId] = procesado;
+      }
+    } catch {
+      // si falla uno puntual, seguimos con el resto
+    }
+  }
+
+  const esPartidoLiga = motor.esLiga(partido);
+  const fuentesLocal = motor.construirFuentesEquipo(fixturesLocal, idLocal, statsMap, null);
+  const fuentesVisitante = motor.construirFuentesEquipo(fixturesVisitante, idVisitante, statsMap, null);
+  const h2hGolesLocal = motor.calcularGolesNumerico(h2h.partidos, idLocal);
+  const h2hGolesVisitante = motor.calcularGolesNumerico(h2h.partidos, idVisitante);
+  const h2hPuntualesLocal = motor.calcularPuntualesNumerico(h2h.partidos, idLocal, statsMap);
+  const h2hPuntualesVisitante = motor.calcularPuntualesNumerico(h2h.partidos, idVisitante, statsMap);
+
+  function armarMotor(fuentesEq, actualClave, contrariaClave, h2hGoles, h2hPuntuales) {
+    return {
+      goles: { actual: fuentesEq[actualClave].goles, contraria: fuentesEq[contrariaClave].goles, liga: fuentesEq.liga.goles, noLiga: fuentesEq.noLiga.goles, temporada: fuentesEq.temporada.goles, forma: fuentesEq.forma.goles, h2h: h2hGoles },
+      corners: { actual: fuentesEq[actualClave].corners, contraria: fuentesEq[contrariaClave].corners, liga: fuentesEq.liga.corners, noLiga: fuentesEq.noLiga.corners, temporada: fuentesEq.temporada.corners, forma: fuentesEq.forma.corners, h2h: h2hPuntuales.corners },
+      amarillas: { actual: fuentesEq[actualClave].amarillas, contraria: fuentesEq[contrariaClave].amarillas, liga: fuentesEq.liga.amarillas, noLiga: fuentesEq.noLiga.amarillas, temporada: fuentesEq.temporada.amarillas, forma: fuentesEq.forma.amarillas, h2h: h2hPuntuales.amarillas },
+      faltas: { actual: fuentesEq[actualClave].faltas, contraria: fuentesEq[contrariaClave].faltas, liga: fuentesEq.liga.faltas, noLiga: fuentesEq.noLiga.faltas, temporada: fuentesEq.temporada.faltas, forma: fuentesEq.forma.faltas, h2h: h2hPuntuales.faltas },
+    };
+  }
+
+  const motorLocal = armarMotor(fuentesLocal, "local", "visitante", h2hGolesLocal, h2hPuntualesLocal);
+  const motorVisitante = armarMotor(fuentesVisitante, "visitante", "local", h2hGolesVisitante, h2hPuntualesVisitante);
+
+  const enVerde = [];
+  ["goles", "corners", "amarillas", "faltas"].forEach((mercado) => {
+    const lambdaLocal = motor.calcularValorEsperado(motorLocal[mercado], esPartidoLiga);
+    const lambdaVisitante = motor.calcularValorEsperado(motorVisitante[mercado], esPartidoLiga);
+    if (lambdaLocal === null || lambdaVisitante === null) return;
+    const lambdaTotal = lambdaLocal + lambdaVisitante;
+    motor.LINEAS_MERCADOS[mercado].forEach((linea) => {
+      const prob = motor.probabilidadOver(lambdaTotal, linea);
+      if (prob !== null && prob >= 0.7) {
+        enVerde.push({ mercado, linea, prob });
+      }
+    });
+  });
+
+  return enVerde;
+}
 
 export default async function handler(req, res) {
   if (req.query.secret !== process.env.VIGILANTE_SECRET) {
@@ -65,7 +140,7 @@ export default async function handler(req, res) {
     const userIdsVigilantes = [...new Set(favoritosVigilados.map((f) => f.user_id))];
     const { data: perfiles } = await supabaseAdmin
       .from("perfiles")
-      .select("user_id, notif_activadas, notif_gol, notif_empieza, notif_termina, notif_tarjetas")
+      .select("user_id, notif_activadas, notif_gol, notif_empieza, notif_termina, notif_tarjetas, notif_semaforo")
       .in("user_id", userIdsVigilantes);
     const mapaPerfiles = {};
     (perfiles || []).forEach((p) => { mapaPerfiles[p.user_id] = p; });
@@ -119,6 +194,38 @@ export default async function handler(req, res) {
           if (destinatarios.length > 0) {
             eventosAEnviar.push({ userIds: destinatarios, titulo: `¡Gol de ${nombreVisitante}!`, cuerpo: marcador });
           }
+        }
+      }
+
+      // --- Semáforo verde: solo si alguien realmente lo pidió, porque es lo que
+      // más cuota gasta de todo el vigilante (trae historial completo de ambos equipos) ---
+      const interesadosEnSemaforo = usuariosConPreferencia(usuariosAmbos, "notif_semaforo");
+      if (interesadosEnSemaforo.length > 0) {
+        try {
+          const enVerde = await calcularMercadosEnVerde(partido);
+          for (const item of enVerde) {
+            const { data: yaExiste } = await supabaseAdmin
+              .from("alertas_semaforo_enviadas")
+              .select("id")
+              .eq("fixture_id", fixtureId)
+              .eq("mercado", item.mercado)
+              .eq("linea", item.linea)
+              .maybeSingle();
+            if (yaExiste) continue;
+
+            const { error: errorInsert } = await supabaseAdmin
+              .from("alertas_semaforo_enviadas")
+              .insert({ fixture_id: fixtureId, mercado: item.mercado, linea: item.linea });
+            if (errorInsert) continue; // ya lo insertó otra ejecución en paralelo, no duplicar
+
+            eventosAEnviar.push({
+              userIds: interesadosEnSemaforo,
+              titulo: "Semáforo en verde",
+              cuerpo: `${marcador}\n${item.mercado} Over ${item.linea}: ${Math.round(item.prob * 100)}%`,
+            });
+          }
+        } catch {
+          // si falla el cálculo del semáforo para este partido, seguimos con el resto
         }
       }
 
