@@ -2304,7 +2304,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   );
 }
 
-function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, sesion, onPedirLogin, onAbrirPerfil, mostrarToast }) {
+function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, sesion, onPedirLogin, onAbrirPerfil, mostrarToast, onSeleccionarPartido }) {
   if (!equipo?.team) return null;
 
   const ultimos5 = (fixtures || []).slice(0, 5);
@@ -2356,10 +2356,12 @@ function PanelEquipoLateral({ equipo, stats, posesion, fixtures, tema, acento, s
                   return (
                     <div
                       key={f.fixture.id}
-                      title={`${f.teams.home.name} ${f.goals.home}-${f.goals.away} ${f.teams.away.name}`}
+                      onClick={() => onSeleccionarPartido && onSeleccionarPartido(f)}
+                      title={`${f.teams.home.name} ${f.goals.home}-${f.goals.away} ${f.teams.away.name} — toca para ver el estudio de este partido`}
                       style={{
                         width: 22, height: 22, borderRadius: "50%", background: color, color: "#fff",
                         fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: onSeleccionarPartido ? "pointer" : "default",
                       }}
                     >
                       {letra}
@@ -2831,8 +2833,8 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "center", gap: compacto ? 8 : 16, flexWrap: "wrap",
           background: tema.panel, borderRadius: compacto ? 5 : 8, padding: compacto ? "2px 10px" : "10px 16px",
-          border: enVivo ? `2px solid ${acentoMarca}` : `1px solid ${tema.borde}`,
-          boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
+          border: `2px solid ${enVivo ? acentoMarca : tema.borde}`,
+          boxShadow: enVivo ? `0 4px 16px rgba(0,0,0,0.25)` : `0 3px 12px rgba(0,0,0,0.18)`,
           transition: "padding 0.15s ease, gap 0.15s ease, border-radius 0.15s ease",
         }}>
           {enVivo && (
@@ -5592,6 +5594,13 @@ function Home() {
           z-index: 40;
         }
 
+        @media (min-width: 1024px) {
+          .jmcs-marcador-sticky {
+            top: 150px;
+            width: min(90vw, 720px);
+          }
+        }
+
         .jmcs-solo-pc { display: none; }
         @media (min-width: 1024px) {
           .jmcs-solo-pc { display: block; }
@@ -6118,7 +6127,7 @@ function Home() {
         </div>
 
         <div className="jmcs-ala-local">
-          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
+          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} onSeleccionarPartido={seleccionarPartidoDelCalendario} />
         </div>
 
         <div className="jmcs-centro">
@@ -6384,7 +6393,7 @@ function Home() {
         </div>
 
         <div className="jmcs-ala-visitante">
-          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
+          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} onSeleccionarPartido={seleccionarPartidoDelCalendario} />
         </div>
       </div>
       )}
@@ -6621,3 +6630,4 @@ export default function HomeConTrampaDeErrores() {
     </TrampaDeErrores>
   );
 }
+
