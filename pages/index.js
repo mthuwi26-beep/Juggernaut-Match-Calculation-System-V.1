@@ -2800,38 +2800,46 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
   if (!enVivo && !finalizado) return null; // "NS" (aún no comienza) no muestra nada
 
   return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center", gap: compacto ? 10 : 16, flexWrap: "wrap",
-      background: tema.panel, borderRadius: 8, padding: compacto ? "5px 12px" : "10px 16px", marginBottom: 14,
-      border: enVivo ? `2px solid ${acentoMarca}` : `1px solid ${tema.borde}`,
-      transition: "padding 0.15s ease, gap 0.15s ease",
-    }}>
-      {enVivo && (
-        <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#e05555", fontWeight: "bold", fontSize: compacto ? 10 : 12 }}>
-          <span style={{ width: compacto ? 6 : 8, height: compacto ? 6 : 8, borderRadius: "50%", background: "#e05555", display: "inline-block", animation: "jmcsPulso 1.5s ease-in-out infinite" }} />
-          {!compacto && "EN VIVO"}
-          <button
-            onClick={alternarVigilancia}
-            disabled={cargandoVigilancia}
-            title={vigilando ? "Dejar de avisarme de este partido" : "Avisarme de goles y del final de este partido"}
-            style={{
-              background: "transparent", border: "none", cursor: cargandoVigilancia ? "default" : "pointer",
-              color: vigilando ? acentoMarca : tema.textoSuave, padding: 0, display: "flex", alignItems: "center",
-            }}
-          >
-            <Icono tipo={vigilando ? "campana" : "campanaTachada"} size={compacto ? 11 : 14} />
-          </button>
-        </span>
-      )}
-      <span style={{ fontSize: compacto ? 12 : 15 }}>{nombreLocal}</span>
-      <span style={{ fontSize: compacto ? 15 : 20, fontWeight: "bold" }}>{marcador.golesLocal} - {marcador.golesVisitante}</span>
-      <span style={{ fontSize: compacto ? 12 : 15 }}>{nombreVisitante}</span>
-      {!compacto && (
-        <span style={{ fontSize: 12, color: tema.textoSuave }}>
-          {marcador.minuto ? `${marcador.minuto}'` : ""} {ETIQUETAS_ESTADO[marcador.estadoCorto] || marcador.estadoCorto}
-        </span>
-      )}
-    </div>
+    <>
+      {/* Espacio reservado en el flujo normal, para que el contenido de abajo no
+          salte hacia arriba al sacar la caja del marcador del flujo (position: fixed) */}
+      <div style={{ height: compacto ? 40 : 66, marginBottom: 14 }} />
+      <div className="jmcs-marcador-sticky">
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: compacto ? 10 : 16, flexWrap: "wrap",
+          background: tema.panel, borderRadius: 8, padding: compacto ? "5px 12px" : "10px 16px",
+          border: enVivo ? `2px solid ${acentoMarca}` : `1px solid ${tema.borde}`,
+          boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
+          transition: "padding 0.15s ease, gap 0.15s ease",
+        }}>
+          {enVivo && (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#e05555", fontWeight: "bold", fontSize: compacto ? 10 : 12 }}>
+              <span style={{ width: compacto ? 6 : 8, height: compacto ? 6 : 8, borderRadius: "50%", background: "#e05555", display: "inline-block", animation: "jmcsPulso 1.5s ease-in-out infinite" }} />
+              {!compacto && "EN VIVO"}
+              <button
+                onClick={alternarVigilancia}
+                disabled={cargandoVigilancia}
+                title={vigilando ? "Dejar de avisarme de este partido" : "Avisarme de goles y del final de este partido"}
+                style={{
+                  background: "transparent", border: "none", cursor: cargandoVigilancia ? "default" : "pointer",
+                  color: vigilando ? acentoMarca : tema.textoSuave, padding: 0, display: "flex", alignItems: "center",
+                }}
+              >
+                <Icono tipo={vigilando ? "campana" : "campanaTachada"} size={compacto ? 11 : 14} />
+              </button>
+            </span>
+          )}
+          <span style={{ fontSize: compacto ? 12 : 15 }}>{nombreLocal}</span>
+          <span style={{ fontSize: compacto ? 15 : 20, fontWeight: "bold" }}>{marcador.golesLocal} - {marcador.golesVisitante}</span>
+          <span style={{ fontSize: compacto ? 12 : 15 }}>{nombreVisitante}</span>
+          {!compacto && (
+            <span style={{ fontSize: 12, color: tema.textoSuave }}>
+              {marcador.minuto ? `${marcador.minuto}'` : ""} {ETIQUETAS_ESTADO[marcador.estadoCorto] || marcador.estadoCorto}
+            </span>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -5428,9 +5436,12 @@ function Home() {
         }
 
         .jmcs-marcador-sticky {
-          position: sticky;
-          top: 8px;
-          z-index: 10;
+          position: fixed;
+          top: 62px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: min(94vw, 640px);
+          z-index: 40;
         }
 
         .jmcs-solo-pc { display: none; }
@@ -5989,18 +6000,16 @@ function Home() {
                   tema={tema}
                   acentoMarca={acentoMarca}
                 />
-                <div className="jmcs-marcador-sticky">
-                  <MarcadorEnVivo
-                    fixtureId={partidoCalendario?.fixture?.id}
-                    equipoLocal={equipoLocal}
-                    equipoVisitante={equipoVisitante}
-                    tema={tema}
-                    acentoMarca={acentoMarca}
-                    sesion={sesion}
-                    onPedirLogin={abrirLogin}
-                    mostrarToast={mostrarToast}
-                  />
-                </div>
+                <MarcadorEnVivo
+                  fixtureId={partidoCalendario?.fixture?.id}
+                  equipoLocal={equipoLocal}
+                  equipoVisitante={equipoVisitante}
+                  tema={tema}
+                  acentoMarca={acentoMarca}
+                  sesion={sesion}
+                  onPedirLogin={abrirLogin}
+                  mostrarToast={mostrarToast}
+                />
               </>
             )}
 
