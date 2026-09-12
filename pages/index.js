@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Head from "next/head";
 import { supabase } from "../lib/supabaseClient";
 
@@ -2728,6 +2729,12 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
   const [vigilando, setVigilando] = useState(false);
   const [cargandoVigilancia, setCargandoVigilancia] = useState(false);
   const [compacto, setCompacto] = useState(false);
+  const [montado, setMontado] = useState(false);
+
+  // "document" no existe en el render del servidor — recién marcamos "montado"
+  // una vez que el componente ya está corriendo en el navegador, para poder
+  // usar createPortal de forma segura.
+  useEffect(() => { setMontado(true); }, []);
 
   const nombreLocal = equipoLocal?.team?.name;
   const nombreVisitante = equipoVisitante?.team?.name;
@@ -2824,46 +2831,50 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
 
   if (!enVivo && !finalizado) return null; // "NS" (aún no comienza) no muestra nada
 
+  const caja = (
+    <div className="jmcs-marcador-sticky">
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center", gap: compacto ? 8 : 16, flexWrap: "wrap",
+        background: tema.panel, borderRadius: compacto ? 5 : 8, padding: compacto ? "2px 10px" : "10px 16px",
+        border: `2px solid ${enVivo ? acentoMarca : tema.borde}`,
+        boxShadow: enVivo ? `0 4px 16px rgba(0,0,0,0.25)` : `0 3px 12px rgba(0,0,0,0.18)`,
+        transition: "padding 0.15s ease, gap 0.15s ease, border-radius 0.15s ease",
+      }}>
+        {enVivo && (
+          <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#e05555", fontWeight: "bold", fontSize: compacto ? 9 : 12 }}>
+            <span style={{ width: compacto ? 5 : 8, height: compacto ? 5 : 8, borderRadius: "50%", background: "#e05555", display: "inline-block", animation: "jmcsPulso 1.5s ease-in-out infinite" }} />
+            {!compacto && "EN VIVO"}
+            <button
+              onClick={alternarVigilancia}
+              disabled={cargandoVigilancia}
+              title={vigilando ? "Dejar de avisarme de este partido" : "Avisarme de goles y del final de este partido"}
+              style={{
+                background: "transparent", border: "none", cursor: cargandoVigilancia ? "default" : "pointer",
+                color: vigilando ? acentoMarca : tema.textoSuave, padding: 0, display: "flex", alignItems: "center",
+              }}
+            >
+              <Icono tipo={vigilando ? "campana" : "campanaTachada"} size={compacto ? 10 : 14} />
+            </button>
+          </span>
+        )}
+        <span style={{ fontSize: compacto ? 10 : 15 }}>{nombreLocal}</span>
+        <span style={{ fontSize: compacto ? 12 : 20, fontWeight: "bold" }}>{marcador.golesLocal} - {marcador.golesVisitante}</span>
+        <span style={{ fontSize: compacto ? 10 : 15 }}>{nombreVisitante}</span>
+        {!compacto && (
+          <span style={{ fontSize: 12, color: tema.textoSuave }}>
+            {marcador.minuto ? `${marcador.minuto}'` : ""} {ETIQUETAS_ESTADO[marcador.estadoCorto] || marcador.estadoCorto}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <>
       {/* Espacio reservado en el flujo normal, para que el contenido de abajo no
           salte hacia arriba al sacar la caja del marcador del flujo (position: fixed) */}
       <div style={{ height: compacto ? 26 : 66, marginBottom: 14 }} />
-      <div className="jmcs-marcador-sticky">
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "center", gap: compacto ? 8 : 16, flexWrap: "wrap",
-          background: tema.panel, borderRadius: compacto ? 5 : 8, padding: compacto ? "2px 10px" : "10px 16px",
-          border: `2px solid ${enVivo ? acentoMarca : tema.borde}`,
-          boxShadow: enVivo ? `0 4px 16px rgba(0,0,0,0.25)` : `0 3px 12px rgba(0,0,0,0.18)`,
-          transition: "padding 0.15s ease, gap 0.15s ease, border-radius 0.15s ease",
-        }}>
-          {enVivo && (
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#e05555", fontWeight: "bold", fontSize: compacto ? 9 : 12 }}>
-              <span style={{ width: compacto ? 5 : 8, height: compacto ? 5 : 8, borderRadius: "50%", background: "#e05555", display: "inline-block", animation: "jmcsPulso 1.5s ease-in-out infinite" }} />
-              {!compacto && "EN VIVO"}
-              <button
-                onClick={alternarVigilancia}
-                disabled={cargandoVigilancia}
-                title={vigilando ? "Dejar de avisarme de este partido" : "Avisarme de goles y del final de este partido"}
-                style={{
-                  background: "transparent", border: "none", cursor: cargandoVigilancia ? "default" : "pointer",
-                  color: vigilando ? acentoMarca : tema.textoSuave, padding: 0, display: "flex", alignItems: "center",
-                }}
-              >
-                <Icono tipo={vigilando ? "campana" : "campanaTachada"} size={compacto ? 10 : 14} />
-              </button>
-            </span>
-          )}
-          <span style={{ fontSize: compacto ? 10 : 15 }}>{nombreLocal}</span>
-          <span style={{ fontSize: compacto ? 12 : 20, fontWeight: "bold" }}>{marcador.golesLocal} - {marcador.golesVisitante}</span>
-          <span style={{ fontSize: compacto ? 10 : 15 }}>{nombreVisitante}</span>
-          {!compacto && (
-            <span style={{ fontSize: 12, color: tema.textoSuave }}>
-              {marcador.minuto ? `${marcador.minuto}'` : ""} {ETIQUETAS_ESTADO[marcador.estadoCorto] || marcador.estadoCorto}
-            </span>
-          )}
-        </div>
-      </div>
+      {montado ? createPortal(caja, document.body) : null}
     </>
   );
 }
@@ -4468,6 +4479,141 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin, mostrarToast 
   );
 }
 
+// Muestra todo lo relacionado a UN partido puntual ya jugado (estadísticas de
+// ambos equipos, enfrentamientos directos, datos generales) SIN semáforo ni
+// pronósticos — no tiene sentido "predecir" un resultado que ya pasó.
+// Se usa como ventana superpuesta en celular, y como contenido de la pestaña
+// nueva que se abre en PC.
+function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
+  const [fixturesLocal, setFixturesLocal] = useState(null);
+  const [fixturesVisitante, setFixturesVisitante] = useState(null);
+  const [climaData, setClimaData] = useState(null);
+
+  const idLocal = fixture.teams.home.id;
+  const idVisitante = fixture.teams.away.id;
+
+  useEffect(() => {
+    let cancelado = false;
+    Promise.all([
+      fetch(`/api/fixtures?teamId=${idLocal}`).then((r) => r.json()),
+      fetch(`/api/fixtures?teamId=${idVisitante}`).then((r) => r.json()),
+    ]).then(([a, b]) => {
+      if (!cancelado) {
+        setFixturesLocal(Array.isArray(a) ? a : []);
+        setFixturesVisitante(Array.isArray(b) ? b : []);
+      }
+    });
+    return () => { cancelado = true; };
+  }, [idLocal, idVisitante]);
+
+  useEffect(() => {
+    if (!fixture.fixture?.venue?.city || !fixture.fixture?.date) return;
+    let cancelado = false;
+    const fecha = fixture.fixture.date.slice(0, 10);
+    fetch(`/api/clima?ciudad=${encodeURIComponent(fixture.fixture.venue.city)}&fecha=${fecha}`)
+      .then((r) => r.json())
+      .then((data) => { if (!cancelado && !data.error) setClimaData(data); })
+      .catch(() => {});
+    return () => { cancelado = true; };
+  }, [fixture.fixture?.venue?.city, fixture.fixture?.date]);
+
+  const statsLocal = fixturesLocal ? calcularEstadisticasGoles(fixturesLocal, idLocal) : null;
+  const statsVisitante = fixturesVisitante ? calcularEstadisticasGoles(fixturesVisitante, idVisitante) : null;
+  const h2h = fixturesLocal ? calcularHeadToHead(fixturesLocal, fixturesVisitante || [], idLocal, idVisitante) : null;
+
+  const golesLocal = fixture.goals?.home;
+  const golesVisitante = fixture.goals?.away;
+  const fechaLegible = fixture.fixture?.date ? new Date(fixture.fixture.date).toLocaleDateString() : "";
+
+  const [montado, setMontado] = useState(false);
+  useEffect(() => { setMontado(true); }, []);
+  if (!montado) return null;
+
+  return createPortal(
+    <div
+      onClick={onCerrar}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200,
+        display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "20px 12px",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: tema.fondo, color: tema.texto, borderRadius: 10, padding: 20, maxWidth: 560, width: "100%", position: "relative" }}
+      >
+        <button
+          onClick={onCerrar}
+          title="Cerrar — seguís en tu Estudio, solo estabas viendo este partido"
+          style={{ position: "absolute", top: 10, right: 10, background: "transparent", border: "none", cursor: "pointer", color: tema.textoSuave }}
+        >
+          <Icono tipo="cerrar" size={18} />
+        </button>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginBottom: 4, flexWrap: "wrap" }}>
+          <img src={corregirEscudo(fixture.teams.home.logo)} alt="" width={40} height={40} onError={manejarErrorEscudo} />
+          <strong style={{ fontSize: 16 }}>{fixture.teams.home.name} {golesLocal}-{golesVisitante} {fixture.teams.away.name}</strong>
+          <img src={corregirEscudo(fixture.teams.away.logo)} alt="" width={40} height={40} onError={manejarErrorEscudo} />
+        </div>
+        <p style={{ textAlign: "center", fontSize: 11, color: tema.textoSuave, marginBottom: 18 }}>
+          {fixture.league?.name} — {fechaLegible}
+        </p>
+
+        <div style={{ background: tema.panel, borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <Icono tipo="estadio" size={13} /> {fixture.fixture?.venue?.name || "Sin datos"}{fixture.fixture?.venue?.city ? `, ${fixture.fixture.venue.city}` : ""}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: climaData ? 4 : 0 }}>
+            <Icono tipo="balanza" size={13} /> Árbitro: {fixture.fixture?.referee || "Sin datos"}
+          </div>
+          {climaData && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Icono tipo="termometro" size={13} /> {climaData.temperaturaMin}° – {climaData.temperaturaMax}°C, {climaData.precipitacionMm} mm lluvia
+            </div>
+          )}
+        </div>
+
+        <h4 style={{ fontSize: 13, marginBottom: 10 }}>Tabla comparativa — temporada completa</h4>
+        {!statsLocal || !statsVisitante ? (
+          <p style={{ fontSize: 12, color: tema.textoSuave }}>Cargando estadísticas...</p>
+        ) : (
+          <div style={{ display: "flex", gap: 16, fontSize: 12, marginBottom: 20 }}>
+            <div style={{ flex: 1 }}>
+              <strong style={{ display: "block", marginBottom: 6 }}>{fixture.teams.home.name}</strong>
+              <FilaStat etiqueta="Récord (V-E-D)" valor={`${statsLocal.victorias}-${statsLocal.empates}-${statsLocal.derrotas}`} />
+              <FilaStat etiqueta="Goles a favor (prom.)" valor={statsLocal.promedioGolesFavor} />
+              <FilaStat etiqueta="Goles en contra (prom.)" valor={statsLocal.promedioGolesContra} />
+              <FilaStat etiqueta="% Over 2.5" valor={`${statsLocal.over25Pct}%`} />
+              <FilaStat etiqueta="% BTTS" valor={`${statsLocal.bttsPct}%`} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <strong style={{ display: "block", marginBottom: 6 }}>{fixture.teams.away.name}</strong>
+              <FilaStat etiqueta="Récord (V-E-D)" valor={`${statsVisitante.victorias}-${statsVisitante.empates}-${statsVisitante.derrotas}`} />
+              <FilaStat etiqueta="Goles a favor (prom.)" valor={statsVisitante.promedioGolesFavor} />
+              <FilaStat etiqueta="Goles en contra (prom.)" valor={statsVisitante.promedioGolesContra} />
+              <FilaStat etiqueta="% Over 2.5" valor={`${statsVisitante.over25Pct}%`} />
+              <FilaStat etiqueta="% BTTS" valor={`${statsVisitante.bttsPct}%`} />
+            </div>
+          </div>
+        )}
+
+        {h2h && h2h.total > 0 && (
+          <>
+            <h4 style={{ fontSize: 13, marginBottom: 10 }}>Enfrentamientos directos</h4>
+            <p style={{ fontSize: 12, marginBottom: 20 }}>
+              {h2h.total} partido{h2h.total !== 1 ? "s" : ""} — Victorias {fixture.teams.home.name}: {h2h.victoriasLocal}, Empates: {h2h.empates}, Victorias {fixture.teams.away.name}: {h2h.victoriasVisitante}
+            </p>
+          </>
+        )}
+
+        <p style={{ fontSize: 10, color: tema.textoSuave, textAlign: "center" }}>
+          Este partido ya se jugó — no se muestra semáforo ni pronósticos, esa parte solo tiene sentido para partidos futuros.
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mostrarToast }) {
   const [fixtures, setFixtures] = useState([]);
   const [proximos, setProximos] = useState([]);
@@ -5037,6 +5183,38 @@ function Home() {
     });
     setPartidoCalendario(p);
   }
+
+  // Cuando tocás un V/E/D de "Últimos 5": en PC se abre una pestaña nueva
+  // (no interrumpe el Estudio que ya tenías armado), en celular se abre una
+  // ventana superpuesta encima de lo que ya estabas viendo.
+  const [resultadoModalFixture, setResultadoModalFixture] = useState(null);
+  function verResultadoPartido(f) {
+    const esEscritorio = typeof window !== "undefined" && window.innerWidth >= 1024;
+    if (esEscritorio) {
+      window.open(`${window.location.origin}${window.location.pathname}?fixtureId=${f.fixture.id}`, "_blank");
+    } else {
+      setResultadoModalFixture(f);
+    }
+  }
+
+  // Si la página se abrió con ?fixtureId=X en la URL (la pestaña nueva de PC),
+  // cargamos directo el Estudio de ese partido puntual, sin semáforo ni pronósticos.
+  const [modoSoloResultado, setModoSoloResultado] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const fixtureId = new URLSearchParams(window.location.search).get("fixtureId");
+    if (!fixtureId) return;
+    fetch(`/api/partido-por-id?fixtureId=${fixtureId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) return;
+        seleccionarPartidoDelCalendario(data);
+        setModoSoloResultado(true);
+        setVistaActual("estudio");
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Si el partido que se está estudiando vino del calendario, O si detectamos un
   // próximo cruce futuro (todavía no jugado) entre los dos equipos elegidos a mano,
@@ -6127,7 +6305,7 @@ function Home() {
         </div>
 
         <div className="jmcs-ala-local">
-          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} onSeleccionarPartido={seleccionarPartidoDelCalendario} />
+          <PanelEquipoLateral equipo={equipoLocal} stats={statsGoLocal} posesion={posesionLocal} fixtures={fixturesLocal} acento={colorMarcaLocal} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} onSeleccionarPartido={verResultadoPartido} />
         </div>
 
         <div className="jmcs-centro">
@@ -6368,32 +6546,39 @@ function Home() {
             />
           )}
 
-          <PanelSemaforo
-            equipoLocal={equipoLocal}
-            equipoVisitante={equipoVisitante}
-            fixturesLocal={fixturesLocal}
-            fixturesVisitante={fixturesVisitante}
-            h2h={h2h}
-            statsMap={statsMap}
-            datosPuntualesListos={datosPuntualesListos}
-            esPartidoLiga={esPartidoLiga}
-            setEsPartidoLiga={setEsPartidoLiga}
-            tema={tema}
-            acento={acento}
-            climaAjuste={climaAjuste}
-            coberturaPuntuales={coberturaPuntuales}
-            sesion={sesion}
-            onPedirLogin={abrirLogin}
-            mercadosPreferidos={perfil?.mercados_preferidos}
-            mostrarToast={mostrarToast}
-            competicionActual={competicionActual}
-            ignorarCompeticionExacta={ignorarCompeticionExacta}
-            setIgnorarCompeticionExacta={setIgnorarCompeticionExacta}
-          />
+          {!modoSoloResultado && (
+            <PanelSemaforo
+              equipoLocal={equipoLocal}
+              equipoVisitante={equipoVisitante}
+              fixturesLocal={fixturesLocal}
+              fixturesVisitante={fixturesVisitante}
+              h2h={h2h}
+              statsMap={statsMap}
+              datosPuntualesListos={datosPuntualesListos}
+              esPartidoLiga={esPartidoLiga}
+              setEsPartidoLiga={setEsPartidoLiga}
+              tema={tema}
+              acento={acento}
+              climaAjuste={climaAjuste}
+              coberturaPuntuales={coberturaPuntuales}
+              sesion={sesion}
+              onPedirLogin={abrirLogin}
+              mercadosPreferidos={perfil?.mercados_preferidos}
+              mostrarToast={mostrarToast}
+              competicionActual={competicionActual}
+              ignorarCompeticionExacta={ignorarCompeticionExacta}
+              setIgnorarCompeticionExacta={setIgnorarCompeticionExacta}
+            />
+          )}
+          {modoSoloResultado && (
+            <p style={{ textAlign: "center", fontSize: 12, color: tema.textoSuave, padding: "16px 0" }}>
+              Este partido ya se jugó — no se muestra semáforo ni pronósticos, esa parte solo tiene sentido para partidos futuros.
+            </p>
+          )}
         </div>
 
         <div className="jmcs-ala-visitante">
-          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} onSeleccionarPartido={seleccionarPartidoDelCalendario} />
+          <PanelEquipoLateral equipo={equipoVisitante} stats={statsGoVisitante} posesion={posesionVisitante} fixtures={fixturesVisitante} acento={colorMarcaVisitante} tema={tema} sesion={sesion} onPedirLogin={abrirLogin} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} onSeleccionarPartido={verResultadoPartido} />
         </div>
       </div>
       )}
@@ -6551,6 +6736,15 @@ function Home() {
       )}
 
       <Footer contenido={contenidoFooter} tema={tema} acentoMarca={acentoMarca} />
+
+      {resultadoModalFixture && (
+        <ModalResultadoPartido
+          fixture={resultadoModalFixture}
+          tema={tema}
+          acentoMarca={acentoMarca}
+          onCerrar={() => setResultadoModalFixture(null)}
+        />
+      )}
     </div>
     </>
   );
