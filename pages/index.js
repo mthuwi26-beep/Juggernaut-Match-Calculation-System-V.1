@@ -2824,6 +2824,21 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
     setCargandoVigilancia(false);
   }
 
+  const mostrando = !!marcador && (ESTADOS_EN_VIVO.includes(marcador.estadoCorto) || ["FT", "AET", "PEN"].includes(marcador.estadoCorto));
+
+  // Mientras la barra esté visible, le agregamos una clase al <body> para que
+  // TODA la página (no solo esta columna) se corra hacia abajo y la barra
+  // nunca quede tapando nada, sin importar qué haya en esa parte de la pantalla.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.toggle("jmcs-tiene-marcador", mostrando);
+    document.body.classList.toggle("jmcs-marcador-compacto", mostrando && compacto);
+    return () => {
+      document.body.classList.remove("jmcs-tiene-marcador");
+      document.body.classList.remove("jmcs-marcador-compacto");
+    };
+  }, [mostrando, compacto]);
+
   if (!fixtureId || error || !marcador) return null;
 
   const enVivo = ESTADOS_EN_VIVO.includes(marcador.estadoCorto);
@@ -2835,10 +2850,10 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
     <div className="jmcs-marcador-sticky">
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: compacto ? 8 : 16, flexWrap: "wrap",
-        background: tema.panel, borderRadius: compacto ? 5 : 8, padding: compacto ? "2px 10px" : "10px 16px",
-        border: `2px solid ${enVivo ? acentoMarca : tema.borde}`,
-        boxShadow: enVivo ? `0 4px 16px rgba(0,0,0,0.25)` : `0 3px 12px rgba(0,0,0,0.18)`,
-        transition: "padding 0.15s ease, gap 0.15s ease, border-radius 0.15s ease",
+        background: tema.panel, padding: compacto ? "4px 10px" : "8px 16px",
+        borderBottom: `2px solid ${enVivo ? acentoMarca : tema.borde}`,
+        boxShadow: enVivo ? `0 2px 10px rgba(0,0,0,0.2)` : `0 2px 8px rgba(0,0,0,0.15)`,
+        transition: "padding 0.15s ease",
       }}>
         {enVivo && (
           <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#e05555", fontWeight: "bold", fontSize: compacto ? 9 : 12 }}>
@@ -2869,14 +2884,7 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
     </div>
   );
 
-  return (
-    <>
-      {/* Espacio reservado en el flujo normal, para que el contenido de abajo no
-          salte hacia arriba al sacar la caja del marcador del flujo (position: fixed) */}
-      <div style={{ height: compacto ? 26 : 66, marginBottom: 14 }} />
-      {montado ? createPortal(caja, document.body) : null}
-    </>
-  );
+  return montado ? createPortal(caja, document.body) : null;
 }
 
 // ===== Estudio Climático Personalizado =====
@@ -5049,6 +5057,28 @@ function Home() {
   const [favoritosPanelAbierto, setFavoritosPanelAbierto] = useState(false);
   const [contextoFavoritosIA, setContextoFavoritosIA] = useState("");
   const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
+
+  // Conecta la navegación con el historial real del navegador, para que el
+  // botón "Atrás" vuelva a la pestaña anterior (o cierre el modal de resultado)
+  // en vez de sacarte de la página entera. Cubre el cambio de pestaña principal
+  // y el modal de "ver resultado de un partido" — no cubre todavía cada
+  // selección puntual de equipo dentro de Estudio, eso sería un sistema de
+  // historial más grande aparte.
+  const evitarPushVistaRef = useRef(false);
+  const primeraCargaRef = useRef(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (evitarPushVistaRef.current) { evitarPushVistaRef.current = false; return; }
+    if (primeraCargaRef.current) {
+      primeraCargaRef.current = false;
+      window.history.replaceState({ vistaActual, modal: false }, "", window.location.href);
+      return;
+    }
+    window.history.pushState({ vistaActual, modal: false }, "", window.location.href);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vistaActual]);
+
   const [toqueSwipeX, setToqueSwipeX] = useState(null);
   const [toqueSwipeY, setToqueSwipeY] = useState(null);
   const [vistaAnterior, setVistaAnterior] = useState("inicio");
@@ -5188,6 +5218,28 @@ function Home() {
   // (no interrumpe el Estudio que ya tenías armado), en celular se abre una
   // ventana superpuesta encima de lo que ya estabas viendo.
   const [resultadoModalFixture, setResultadoModalFixture] = useState(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !resultadoModalFixture) return;
+    window.history.pushState({ vistaActual, modal: true }, "", window.location.href);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultadoModalFixture]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function alVolverAtras(e) {
+      const estado = e.state || {};
+      if (!estado.modal && resultadoModalFixture) {
+        setResultadoModalFixture(null);
+        return;
+      }
+      evitarPushVistaRef.current = true;
+      setVistaActual(estado.vistaActual || "inicio");
+    }
+    window.addEventListener("popstate", alVolverAtras);
+    return () => window.removeEventListener("popstate", alVolverAtras);
+  }, [resultadoModalFixture]);
+
   function verResultadoPartido(f) {
     const esEscritorio = typeof window !== "undefined" && window.innerWidth >= 1024;
     if (esEscritorio) {
@@ -5765,18 +5817,21 @@ function Home() {
 
         .jmcs-marcador-sticky {
           position: fixed;
-          top: 62px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: min(94vw, 640px);
-          z-index: 40;
+          top: 0;
+          left: 0;
+          right: 0;
+          width: 100%;
+          z-index: 100;
         }
 
-        @media (min-width: 1024px) {
-          .jmcs-marcador-sticky {
-            top: 150px;
-            width: min(90vw, 720px);
-          }
+        /* Cuando la barra del marcador está visible, empujamos TODA la página
+           hacia abajo (con padding en el body) para que nunca se superponga
+           con nada, sin importar qué haya en esa parte de la pantalla. */
+        body.jmcs-tiene-marcador {
+          padding-top: 46px;
+        }
+        body.jmcs-tiene-marcador.jmcs-marcador-compacto {
+          padding-top: 30px;
         }
 
         .jmcs-solo-pc { display: none; }
