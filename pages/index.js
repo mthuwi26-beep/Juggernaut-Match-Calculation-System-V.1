@@ -224,7 +224,7 @@ const TEXTOS = {
     notifErrorGuardar: "No se pudo guardar el cambio. Intenta de nuevo.",
     unMomento: "Un momento...", desactivarNotif: "Desactivar notificaciones", activarNotif: "Activar notificaciones",
     notifGol: "Gol", notifEmpieza: "Empieza el partido", notifTermina: "Termina el partido", notifTarjetas: "Tarjetas",
-    notifSemaforoPendiente: 'El aviso de "semáforo en verde" por equipo favorito todavía no está disponible — sigue pendiente para una próxima actualización.',
+    notifSemaforoEtiqueta: "Semáforo en verde", notifSemaforoAviso: "Puede tardar un poco más en avisar (revisamos el historial completo de ambos equipos antes de calcular el semáforo).",
   },
   en: {
     inicio: "Home", estudio: "Study", favoritos: "Favorites",
@@ -287,7 +287,7 @@ const TEXTOS = {
     notifErrorGuardar: "Couldn't save the change. Try again.",
     unMomento: "One moment...", desactivarNotif: "Disable notifications", activarNotif: "Enable notifications",
     notifGol: "Goal", notifEmpieza: "Match starts", notifTermina: "Match ends", notifTarjetas: "Cards",
-    notifSemaforoPendiente: 'The "green light" alert per favorite team isn\'t available yet — still pending for a future update.',
+    notifSemaforoEtiqueta: "Green light", notifSemaforoAviso: "May take a bit longer to alert (we check both teams' full history before calculating the traffic light).",
   },
 };
 
@@ -3774,6 +3774,7 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
     { campo: "notif_empieza", icono: "calendario", etiqueta: traducir("notifEmpieza") },
     { campo: "notif_termina", icono: "check", etiqueta: traducir("notifTermina") },
     { campo: "notif_tarjetas", icono: "tarjeta", etiqueta: traducir("notifTarjetas") },
+    { campo: "notif_semaforo", icono: "semaforo", etiqueta: traducir("notifSemaforoEtiqueta") },
   ];
 
   return (
@@ -3819,7 +3820,7 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
               </label>
             ))}
             <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 10 }}>
-              {traducir("notifSemaforoPendiente")}
+              {traducir("notifSemaforoAviso")}
             </p>
           </div>
         )}
