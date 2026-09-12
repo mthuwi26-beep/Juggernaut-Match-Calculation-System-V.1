@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import Head from "next/head";
 import { supabase } from "../lib/supabaseClient";
 
 const TEMAS = {
@@ -199,6 +200,31 @@ const TEXTOS = {
     faltasCorto: "Faltas", posesionCorto: "Posesión", tirosTotalesCorto: "Tiros totales", tirosPuertaCorto: "Tiros a puerta",
     goles: "Goles", ambosAnotanChip: "Ambos anotan", ganadorChip: "Ganador",
     subirFoto: "Subir mi propia foto", perfilActualizado: "Perfil actualizado.",
+    chatTitulo: "IA sobre este partido", chatSugerencia: 'Ej: "¿Qué opinas de este partido?", "¿Ves valor en el over de goles?", "¿Qué equipo ves más sólido?"',
+    chatPensando: "Pensando...", chatPlaceholder: "Escribe tu pregunta sobre el partido...",
+    chatEnviar: "Enviar", chatErrorConexion: "No se pudo conectar con la IA",
+    panelAdminCargando: "Cargando panel...", panelAdminUsuarios: "Usuarios registrados",
+    panelAdminEstudios: "Estudios guardados", panelAdminAciertos: "% de aciertos (verificados)",
+    panelAdminFavoritos: "Equipos en favoritos", panelAdminSinDatos: "Sin datos aún",
+    comoLocalVisitante: "Como Local / Como Visitante",
+    tutClimaTitulo: "¿Cuánto pesa cada punto?",
+    tutClimaTexto: "Cada punto de diferencia que muevas (0 a 10) equivale aproximadamente a un 1.5% de cambio en la probabilidad de ese equipo — es nuestra propia fórmula, no un dato científicamente validado. Además, cada mercado reacciona distinto: por ejemplo, más viento baja nuestra estimación de goles pero sube la de córners, porque asumimos más centros mal ejecutados. El punto de JMCS (fijo) siempre representa el clima real; el tuyo es tu propio criterio.",
+    tutInicioTitulo: "Bienvenido a Inicio",
+    tutInicioTexto: "Aquí ves los partidos del día agrupados por país. Busca un equipo o un país arriba (aparecen resultados mientras escribes), o toca cualquier tarjeta de partido para abrir su Estudio completo.",
+    tutFavoritosTitulo: "Tus equipos favoritos",
+    tutFavoritosTexto: "Guarda cualquier equipo tocando la estrella junto a su nombre, en cualquier parte de la app. Aquí los verás todos juntos — toca uno para ver su perfil completo.",
+    tutEstudioTitulo: "Cómo funciona Estudio",
+    tutEstudioTexto: "Elige un partido del calendario a la izquierda, o busca Local y Visitante a mano abajo. Comparamos sus estadísticas reales y calculamos un semáforo de probabilidades — verde es más probable, rojo menos.",
+    ajustesTitulo: "Ajustes", prefsNotifTitulo: "Preferencias de notificaciones",
+    prefsNotifDesc: "Avisos de los partidos de tus equipos favoritos que tengan la campana activada. Funciona mientras el navegador esté instalado o abierto — en iPhone, solo si agregaste la app a tu pantalla de inicio (Safari 16.4 o más nuevo).",
+    notifNoSoportado: "Tu navegador no soporta notificaciones push. Probá desde Chrome o Firefox en Android, o instalando la app en la pantalla de inicio en iPhone (Safari 16.4+).",
+    notifSinPermiso: "No diste permiso de notificaciones — no vamos a poder avisarte.",
+    notifActivadasMsg: "Notificaciones activadas.", notifErrorActivar: "No se pudieron activar las notificaciones. Intenta de nuevo.",
+    notifDesactivadasMsg: "Notificaciones desactivadas.", notifErrorDesactivar: "No se pudo desactivar. Intenta de nuevo.",
+    notifErrorGuardar: "No se pudo guardar el cambio. Intenta de nuevo.",
+    unMomento: "Un momento...", desactivarNotif: "Desactivar notificaciones", activarNotif: "Activar notificaciones",
+    notifGol: "Gol", notifEmpieza: "Empieza el partido", notifTermina: "Termina el partido", notifTarjetas: "Tarjetas",
+    notifSemaforoPendiente: 'El aviso de "semáforo en verde" por equipo favorito todavía no está disponible — sigue pendiente para una próxima actualización.',
   },
   en: {
     inicio: "Home", estudio: "Study", favoritos: "Favorites",
@@ -237,6 +263,31 @@ const TEXTOS = {
     faltasCorto: "Fouls", posesionCorto: "Possession", tirosTotalesCorto: "Total shots", tirosPuertaCorto: "Shots on target",
     goles: "Goals", ambosAnotanChip: "Both teams score", ganadorChip: "Winner",
     subirFoto: "Upload my own photo", perfilActualizado: "Profile updated.",
+    chatTitulo: "AI about this match", chatSugerencia: 'E.g.: "What do you think of this match?", "Do you see value in over goals?", "Which team looks stronger?"',
+    chatPensando: "Thinking...", chatPlaceholder: "Type your question about the match...",
+    chatEnviar: "Send", chatErrorConexion: "Could not connect to the AI",
+    panelAdminCargando: "Loading panel...", panelAdminUsuarios: "Registered users",
+    panelAdminEstudios: "Saved studies", panelAdminAciertos: "% correct (verified)",
+    panelAdminFavoritos: "Teams in favorites", panelAdminSinDatos: "No data yet",
+    comoLocalVisitante: "As Home / As Away",
+    tutClimaTitulo: "How much does each point weigh?",
+    tutClimaTexto: "Each point of difference you move (0 to 10) is roughly a 1.5% change in that team's probability — it's our own formula, not a scientifically validated figure. Also, each market reacts differently: for example, more wind lowers our goals estimate but raises corners, since we assume more mis-hit crosses. The JMCS point (fixed) always represents the real weather; yours is your own judgment.",
+    tutInicioTitulo: "Welcome to Home",
+    tutInicioTexto: "Here you see today's matches grouped by country. Search for a team or country above (results appear as you type), or tap any match card to open its full Study.",
+    tutFavoritosTitulo: "Your favorite teams",
+    tutFavoritosTexto: "Save any team by tapping the star next to its name, anywhere in the app. Here you'll see them all together — tap one to see its full profile.",
+    tutEstudioTitulo: "How Study works",
+    tutEstudioTexto: "Pick a match from the calendar on the left, or search Home and Away manually below. We compare their real stats and calculate a probability traffic light — green is more likely, red less.",
+    ajustesTitulo: "Settings", prefsNotifTitulo: "Notification preferences",
+    prefsNotifDesc: "Alerts for matches of your favorite teams that have the bell turned on. Works while the browser is installed or open — on iPhone, only if you added the app to your home screen (Safari 16.4 or newer).",
+    notifNoSoportado: "Your browser doesn't support push notifications. Try Chrome or Firefox on Android, or install the app to your home screen on iPhone (Safari 16.4+).",
+    notifSinPermiso: "You didn't grant notification permission — we won't be able to notify you.",
+    notifActivadasMsg: "Notifications enabled.", notifErrorActivar: "Couldn't enable notifications. Try again.",
+    notifDesactivadasMsg: "Notifications disabled.", notifErrorDesactivar: "Couldn't disable. Try again.",
+    notifErrorGuardar: "Couldn't save the change. Try again.",
+    unMomento: "One moment...", desactivarNotif: "Disable notifications", activarNotif: "Enable notifications",
+    notifGol: "Goal", notifEmpieza: "Match starts", notifTermina: "Match ends", notifTarjetas: "Cards",
+    notifSemaforoPendiente: 'The "green light" alert per favorite team isn\'t available yet — still pending for a future update.',
   },
 };
 
@@ -922,7 +973,11 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil, mostra
   }, [sesion]);
 
   async function quitar(teamId) {
-    await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", teamId);
+    const { error } = await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", teamId);
+    if (error) {
+      mostrarToast && mostrarToast("No se pudo quitar el favorito. Intenta de nuevo.");
+      return;
+    }
     setFavoritos((prev) => prev.filter((f) => f.team_id !== teamId));
   }
 
@@ -935,6 +990,7 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil, mostra
     const { error } = await supabase.from("favoritos").update({ notificar: !valorActual }).eq("user_id", sesion.user.id).eq("team_id", teamId);
     if (error) {
       setFavoritos((prev) => prev.map((f) => (f.team_id === teamId ? { ...f, notificar: valorActual } : f)));
+      mostrarToast && mostrarToast("No se pudo guardar el cambio. Intenta de nuevo.");
     }
   }
 
@@ -989,7 +1045,7 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil, mostra
   );
 }
 
-function PanelFavoritos({ sesion, tema, acentoMarca, onCerrar }) {
+function PanelFavoritos({ sesion, tema, acentoMarca, onCerrar, mostrarToast }) {
   const [favoritos, setFavoritos] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -1006,7 +1062,11 @@ function PanelFavoritos({ sesion, tema, acentoMarca, onCerrar }) {
   }, [sesion]);
 
   async function quitar(teamId) {
-    await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", teamId);
+    const { error } = await supabase.from("favoritos").delete().eq("user_id", sesion.user.id).eq("team_id", teamId);
+    if (error) {
+      mostrarToast && mostrarToast("No se pudo quitar el favorito. Intenta de nuevo.");
+      return;
+    }
     setFavoritos((prev) => prev.filter((f) => f.team_id !== teamId));
   }
 
@@ -2107,6 +2167,10 @@ function armarContextoParaIA({ equipoLocal, equipoVisitante, statsGoLocal, stats
     contexto += `\nNo hay enfrentamientos directos recientes registrados.\n`;
   }
 
+  if (IDIOMA_ACTUAL === "en") {
+    contexto += "\n(Please answer the user in English.)\n";
+  }
+
   return contexto;
 }
 
@@ -2146,7 +2210,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
         setMensajes((prev) => [...prev, { rol: "ia", texto: data.respuesta }]);
       }
     } catch (err) {
-      setError("No se pudo conectar con la IA");
+      setError(traducir("chatErrorConexion"));
     }
     setCargando(false);
   }
@@ -2154,7 +2218,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h3 style={{ margin: 0, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="chat" size={14} /> {tituloOverride || "IA sobre este partido"}</h3>
+        <h3 style={{ margin: 0, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="chat" size={14} /> {tituloOverride || traducir("chatTitulo")}</h3>
         {onCerrar && (
           <button onClick={onCerrar} style={{ background: "transparent", border: "none", fontSize: 18, cursor: "pointer", color: tema.texto }}>
             <Icono tipo="cerrar" size={16} />
@@ -2165,7 +2229,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
       <div style={{ maxHeight: 350, overflowY: "auto", marginBottom: 14, marginTop: 10 }}>
         {mensajes.length === 0 && (
           <p style={{ color: tema.textoSuave, fontSize: 13 }}>
-            {sugerenciasOverride || 'Ej: "¿Qué opinas de este partido?", "¿Ves valor en el over de goles?", "¿Qué equipo ves más sólido?"'}
+            {sugerenciasOverride || traducir("chatSugerencia")}
           </p>
         )}
         {mensajes.map((m, i) => (
@@ -2182,7 +2246,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
             {m.texto}
           </div>
         ))}
-        {cargando && <p style={{ fontSize: 13, color: tema.textoSuave }}>Pensando...</p>}
+        {cargando && <p style={{ fontSize: 13, color: tema.textoSuave }}>{traducir("chatPensando")}</p>}
       </div>
 
       {error && <p style={{ color: "#e05555", fontSize: 13, marginBottom: 10 }}>{error}</p>}
@@ -2192,7 +2256,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
           type="text"
           value={pregunta}
           onChange={(e) => setPregunta(e.target.value)}
-          placeholder="Escribe tu pregunta sobre el partido..."
+          placeholder={traducir("chatPlaceholder")}
           style={{
             flex: 1, padding: 10, fontSize: 14,
             background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4,
@@ -2206,7 +2270,7 @@ function ChatIA({ equipoLocal, equipoVisitante, statsGoLocal, statsGoVisitante, 
             border: "none", borderRadius: 4, cursor: cargando ? "default" : "pointer",
           }}
         >
-          Enviar
+          {traducir("chatEnviar")}
         </button>
       </form>
 
@@ -2418,7 +2482,7 @@ function SeccionEspejo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         <span>{equipoVisitante.team.name}</span>
       </div>
 
-      <CategoriaEspejo titulo="Como Local / Como Visitante" fixturesLocal={catLocal.local} fixturesVisitante={catVisitante.visitante} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
+      <CategoriaEspejo titulo={traducir("comoLocalVisitante")} fixturesLocal={catLocal.local} fixturesVisitante={catVisitante.visitante} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
       <CategoriaEspejo titulo={competicionActual?.nombre || traducir("ligaActual")} fixturesLocal={catLocal.liga} fixturesVisitante={catVisitante.liga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
       <CategoriaEspejo titulo={traducir("noLiga")} fixturesLocal={catLocal.noLiga} fixturesVisitante={catVisitante.noLiga} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
       <CategoriaEspejo titulo={traducir("formaReciente")} fixturesLocal={catLocal.forma} fixturesVisitante={catVisitante.forma} idLocal={equipoLocal.team.id} idVisitante={equipoVisitante.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
@@ -2699,11 +2763,13 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
       for (const eq of [equipoLocal, equipoVisitante]) {
         const { data: existente } = await supabase.from("favoritos").select("id").eq("user_id", sesion.user.id).eq("team_id", eq.team.id).maybeSingle();
         if (existente) {
-          await supabase.from("favoritos").update({ notificar: !vigilando }).eq("user_id", sesion.user.id).eq("team_id", eq.team.id);
+          const { error } = await supabase.from("favoritos").update({ notificar: !vigilando }).eq("user_id", sesion.user.id).eq("team_id", eq.team.id);
+          if (error) throw error;
         } else if (!vigilando) {
-          await supabase.from("favoritos").insert({
+          const { error } = await supabase.from("favoritos").insert({
             user_id: sesion.user.id, team_id: eq.team.id, team_name: eq.team.name, team_logo: eq.team.logo, team_country: eq.team.country, notificar: true,
           });
+          if (error) throw error;
         }
       }
       setVigilando(!vigilando);
@@ -3028,8 +3094,8 @@ function ModalEstudioClimatico({
 
         <TutorialFlotante
           id="clima"
-          titulo="¿Cuánto pesa cada punto?"
-          texto="Cada punto de diferencia que muevas (0 a 10) equivale aproximadamente a un 1.5% de cambio en la probabilidad de ese equipo — es nuestra propia fórmula, no un dato científicamente validado. Además, cada mercado reacciona distinto: por ejemplo, más viento baja nuestra estimación de goles pero sube la de córners, porque asumimos más centros mal ejecutados. El punto de JMCS (fijo) siempre representa el clima real; el tuyo es tu propio criterio."
+          titulo={traducir("tutClimaTitulo")}
+          texto={traducir("tutClimaTexto")}
           tema={tema}
           acentoMarca={acentoMarca}
           tutorialesOcultos={tutorialesOcultos}
@@ -3627,14 +3693,14 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
 
   async function activarNotificaciones() {
     if (!soportado) {
-      mostrarToast("Tu navegador no soporta notificaciones push. Probá desde Chrome o Firefox en Android, o instalando la app en la pantalla de inicio en iPhone (Safari 16.4+).");
+      mostrarToast(traducir("notifNoSoportado"));
       return;
     }
     setProcesando(true);
     try {
       const permiso = await Notification.requestPermission();
       if (permiso !== "granted") {
-        mostrarToast("No diste permiso de notificaciones — no vamos a poder avisarte.");
+        mostrarToast(traducir("notifSinPermiso"));
         setProcesando(false);
         return;
       }
@@ -3660,9 +3726,9 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
         .select()
         .maybeSingle();
       if (data) onPerfilActualizado(data);
-      mostrarToast("Notificaciones activadas.");
+      mostrarToast(traducir("notifActivadasMsg"));
     } catch (err) {
-      mostrarToast("No se pudieron activar las notificaciones. Intenta de nuevo.");
+      mostrarToast(traducir("notifErrorActivar"));
     }
     setProcesando(false);
   }
@@ -3685,42 +3751,43 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
         .select()
         .maybeSingle();
       if (data) onPerfilActualizado(data);
-      mostrarToast("Notificaciones desactivadas.");
+      mostrarToast(traducir("notifDesactivadasMsg"));
     } catch (err) {
-      mostrarToast("No se pudo desactivar. Intenta de nuevo.");
+      mostrarToast(traducir("notifErrorDesactivar"));
     }
     setProcesando(false);
   }
 
   async function alternarTipo(campo, valorActual) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("perfiles")
       .update({ [campo]: !valorActual })
       .eq("user_id", sesion.user.id)
       .select()
       .maybeSingle();
     if (data) onPerfilActualizado(data);
+    else mostrarToast && mostrarToast(traducir("notifErrorGuardar"));
   }
 
   const TIPOS = [
-    { campo: "notif_gol", icono: "balon", etiqueta: "Gol" },
-    { campo: "notif_empieza", icono: "calendario", etiqueta: "Empieza el partido" },
-    { campo: "notif_termina", icono: "check", etiqueta: "Termina el partido" },
-    { campo: "notif_tarjetas", icono: "tarjeta", etiqueta: "Tarjetas" },
+    { campo: "notif_gol", icono: "balon", etiqueta: traducir("notifGol") },
+    { campo: "notif_empieza", icono: "calendario", etiqueta: traducir("notifEmpieza") },
+    { campo: "notif_termina", icono: "check", etiqueta: traducir("notifTermina") },
+    { campo: "notif_tarjetas", icono: "tarjeta", etiqueta: traducir("notifTarjetas") },
   ];
 
   return (
     <div style={{ maxWidth: 480, margin: "0 auto" }}>
       <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
-        <Icono tipo="menu" size={16} /> Ajustes
+        <Icono tipo="menu" size={16} /> {traducir("ajustesTitulo")}
       </h3>
 
       <div style={{ background: tema.panel, border: `1px solid ${tema.borde}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
         <h4 style={{ margin: "0 0 6px", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
-          <Icono tipo="campana" size={15} /> Preferencias de notificaciones
+          <Icono tipo="campana" size={15} /> {traducir("prefsNotifTitulo")}
         </h4>
         <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
-          Avisos de los partidos de tus equipos favoritos que tengan la campana activada. Funciona mientras el navegador esté instalado o abierto — en iPhone, solo si agregaste la app a tu pantalla de inicio (Safari 16.4 o más nuevo).
+          {traducir("prefsNotifDesc")}
         </p>
 
         <button
@@ -3732,7 +3799,7 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
             border: activadas ? "1px solid #e05555" : "none", fontWeight: "bold", fontSize: 13, marginBottom: activadas ? 14 : 0,
           }}
         >
-          {procesando ? "Un momento..." : activadas ? "Desactivar notificaciones" : "Activar notificaciones"}
+          {procesando ? traducir("unMomento") : activadas ? traducir("desactivarNotif") : traducir("activarNotif")}
         </button>
 
         {activadas && (
@@ -3752,7 +3819,7 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
               </label>
             ))}
             <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 10 }}>
-              El aviso de "semáforo en verde" por equipo favorito todavía no está disponible — sigue pendiente para una próxima actualización.
+              {traducir("notifSemaforoPendiente")}
             </p>
           </div>
         )}
@@ -3838,7 +3905,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
     else cargarTodo();
   }
 
-  if (cargando) return <p style={{ textAlign: "center", color: tema.textoSuave }}>Cargando panel...</p>;
+  if (cargando) return <p style={{ textAlign: "center", color: tema.textoSuave }}>{traducir("panelAdminCargando")}</p>;
   if (error) return <p style={{ textAlign: "center", color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} /> {error}</p>;
   if (!stats) return null;
 
@@ -3851,10 +3918,10 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 24 }}>
         {[
-          { etiqueta: "Usuarios registrados", valor: stats.totalUsuarios },
-          { etiqueta: "Estudios guardados", valor: stats.totalEstudiosGuardados },
-          { etiqueta: "% de aciertos (verificados)", valor: porcentajeAciertos !== null ? `${porcentajeAciertos}%` : "Sin datos aún" },
-          { etiqueta: "Equipos en favoritos", valor: stats.totalFavoritos },
+          { etiqueta: traducir("panelAdminUsuarios"), valor: stats.totalUsuarios },
+          { etiqueta: traducir("panelAdminEstudios"), valor: stats.totalEstudiosGuardados },
+          { etiqueta: traducir("panelAdminAciertos"), valor: porcentajeAciertos !== null ? `${porcentajeAciertos}%` : traducir("panelAdminSinDatos") },
+          { etiqueta: traducir("panelAdminFavoritos"), valor: stats.totalFavoritos },
         ].map((c) => (
           <div key={c.etiqueta} style={{ flex: "1 1 200px", background: tema.panel, borderRadius: 8, padding: 16, borderTop: `3px solid ${acentoMarca}` }}>
             <div style={{ fontSize: 22, fontWeight: "bold" }}>{c.valor}</div>
@@ -4201,7 +4268,7 @@ function TutorialFlotante({ id, titulo, texto, tema, acentoMarca, tutorialesOcul
   );
 }
 
-function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
+function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin, mostrarToast }) {
   const [predicciones, setPredicciones] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -4218,7 +4285,11 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
   }, [sesion]);
 
   async function marcarResultado(id, resultado) {
-    await supabase.from("predicciones").update({ resultado }).eq("id", id);
+    const { error } = await supabase.from("predicciones").update({ resultado }).eq("id", id);
+    if (error) {
+      mostrarToast && mostrarToast("No se pudo guardar. Intenta de nuevo.");
+      return;
+    }
     setPredicciones((prev) => prev.map((p) => (p.id === id ? { ...p, resultado } : p)));
   }
 
@@ -5144,7 +5215,18 @@ function Home() {
   }
 
   return (
-    <div
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#2e6b3e" />
+        {/* Para que funcione como app instalada en iPhone (Safari 16.4+) */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="JMCS" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+      </Head>
+      <div
       style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}
       onTouchStart={(e) => {
         setToqueSwipeX(e.touches[0].clientX);
@@ -5687,8 +5769,8 @@ function Home() {
         >
           <TutorialFlotante
             id="inicio"
-            titulo="Bienvenido a Inicio"
-            texto="Aquí ves los partidos del día agrupados por país. Busca un equipo o un país arriba (aparecen resultados mientras escribes), o toca cualquier tarjeta de partido para abrir su Estudio completo."
+            titulo={traducir("tutInicioTitulo")}
+            texto={traducir("tutInicioTexto")}
             tema={tema}
             acentoMarca={acentoMarca}
             tutorialesOcultos={tutorialesOcultos}
@@ -5788,8 +5870,8 @@ function Home() {
         <div style={{ maxWidth: 900, margin: "20px auto", padding: "0 12px" }}>
           <TutorialFlotante
             id="favoritos"
-            titulo="Tus equipos favoritos"
-            texto="Guarda cualquier equipo tocando la estrella junto a su nombre, en cualquier parte de la app. Aquí los verás todos juntos — toca uno para ver su perfil completo."
+            titulo={traducir("tutFavoritosTitulo")}
+            texto={traducir("tutFavoritosTexto")}
             tema={tema}
             acentoMarca={acentoMarca}
             tutorialesOcultos={tutorialesOcultos}
@@ -5826,7 +5908,7 @@ function Home() {
 
       {vistaActual === "historial" && (
         <div style={{ margin: "20px auto" }}>
-          <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} />
+          <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} />
         </div>
       )}
 
@@ -5861,8 +5943,8 @@ function Home() {
         <div className="jmcs-centro">
           <TutorialFlotante
             id="estudio"
-            titulo="Cómo funciona Estudio"
-            texto="Elige un partido del calendario a la izquierda, o busca Local y Visitante a mano abajo. Comparamos sus estadísticas reales y calculamos un semáforo de probabilidades — verde es más probable, rojo menos."
+            titulo={traducir("tutEstudioTitulo")}
+            texto={traducir("tutEstudioTexto")}
             tema={tema}
             acentoMarca={acentoMarca}
             tutorialesOcultos={tutorialesOcultos}
@@ -6201,6 +6283,7 @@ function Home() {
           tema={tema}
           acentoMarca={acentoMarca}
           onCerrar={() => setFavoritosPanelAbierto(false)}
+          mostrarToast={mostrarToast}
         />
       )}
 
@@ -6275,6 +6358,7 @@ function Home() {
         />
       )}
     </div>
+    </>
   );
 }
 
