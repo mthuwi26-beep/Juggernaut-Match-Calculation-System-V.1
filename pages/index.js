@@ -1543,7 +1543,7 @@ function CalculadoraValor({ opciones, tema, acento }) {
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual, ignorarCompeticionExacta, setIgnorarCompeticionExacta }) {
   const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
   const [lineaHandicap, setLineaHandicap] = useState(0);
   const [permisoNotificaciones, setPermisoNotificaciones] = useState(
@@ -1594,8 +1594,9 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
   if (!equipoLocal?.team || !equipoVisitante?.team) return null;
 
-  const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap, competicionActual);
-  const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap, competicionActual);
+  const competicionParaMotor = ignorarCompeticionExacta ? null : competicionActual;
+  const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap, competicionParaMotor);
+  const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap, competicionParaMotor);
 
   const partidosH2H = h2h?.partidos || [];
   const h2hGolesLocal = calcularGolesNumerico(partidosH2H, equipoLocal.team.id);
@@ -1718,14 +1719,36 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </div>
       )}
 
-      <div style={{ marginBottom: 20, fontSize: 13, display: "flex", gap: 16 }}>
-        <label style={{ cursor: "pointer" }}>
-          <input type="radio" checked={esPartidoLiga} onChange={() => setEsPartidoLiga(true)} style={{ accentColor: acento }} /> Partido de Liga
-        </label>
-        <label style={{ cursor: "pointer" }}>
-          <input type="radio" checked={!esPartidoLiga} onChange={() => setEsPartidoLiga(false)} style={{ accentColor: acento }} /> Partido de Copa/otro torneo
-        </label>
-      </div>
+      {competicionActual?.nombre ? (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: tema.textoSuave, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <Icono tipo="trofeo" size={13} />
+            Competición detectada: <strong style={{ color: tema.texto }}>{competicionActual.nombre}</strong>
+          </div>
+          <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: tema.textoSuave }}>
+            <input
+              type="checkbox"
+              checked={ignorarCompeticionExacta}
+              onChange={(e) => setIgnorarCompeticionExacta(e.target.checked)}
+            />
+            Usar mis últimos 10 partidos sin importar de qué torneo/copa
+          </label>
+          {ignorarCompeticionExacta && (
+            <p style={{ fontSize: 11, color: "#c9a227", margin: "6px 0 0", display: "flex", alignItems: "center", gap: 5 }}>
+              <Icono tipo="exclamacion" size={12} color="#c9a227" /> Mezclar partidos de distintas competiciones puede hacer el pronóstico menos preciso — cada torneo tiene su propio nivel y ritmo de juego.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div style={{ marginBottom: 20, fontSize: 13, display: "flex", gap: 16 }}>
+          <label style={{ cursor: "pointer" }}>
+            <input type="radio" checked={esPartidoLiga} onChange={() => setEsPartidoLiga(true)} style={{ accentColor: acento }} /> Partido de Liga
+          </label>
+          <label style={{ cursor: "pointer" }}>
+            <input type="radio" checked={!esPartidoLiga} onChange={() => setEsPartidoLiga(false)} style={{ accentColor: acento }} /> Partido de Copa/otro torneo
+          </label>
+        </div>
+      )}
 
       {prob1X2 && mostrarMercado("ganador") && (
         <div style={{ marginBottom: 18 }}>
@@ -2803,18 +2826,18 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
     <>
       {/* Espacio reservado en el flujo normal, para que el contenido de abajo no
           salte hacia arriba al sacar la caja del marcador del flujo (position: fixed) */}
-      <div style={{ height: compacto ? 40 : 66, marginBottom: 14 }} />
+      <div style={{ height: compacto ? 26 : 66, marginBottom: 14 }} />
       <div className="jmcs-marcador-sticky">
         <div style={{
-          display: "flex", alignItems: "center", justifyContent: "center", gap: compacto ? 10 : 16, flexWrap: "wrap",
-          background: tema.panel, borderRadius: 8, padding: compacto ? "5px 12px" : "10px 16px",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: compacto ? 8 : 16, flexWrap: "wrap",
+          background: tema.panel, borderRadius: compacto ? 5 : 8, padding: compacto ? "2px 10px" : "10px 16px",
           border: enVivo ? `2px solid ${acentoMarca}` : `1px solid ${tema.borde}`,
           boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
-          transition: "padding 0.15s ease, gap 0.15s ease",
+          transition: "padding 0.15s ease, gap 0.15s ease, border-radius 0.15s ease",
         }}>
           {enVivo && (
-            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#e05555", fontWeight: "bold", fontSize: compacto ? 10 : 12 }}>
-              <span style={{ width: compacto ? 6 : 8, height: compacto ? 6 : 8, borderRadius: "50%", background: "#e05555", display: "inline-block", animation: "jmcsPulso 1.5s ease-in-out infinite" }} />
+            <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#e05555", fontWeight: "bold", fontSize: compacto ? 9 : 12 }}>
+              <span style={{ width: compacto ? 5 : 8, height: compacto ? 5 : 8, borderRadius: "50%", background: "#e05555", display: "inline-block", animation: "jmcsPulso 1.5s ease-in-out infinite" }} />
               {!compacto && "EN VIVO"}
               <button
                 onClick={alternarVigilancia}
@@ -2825,13 +2848,13 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
                   color: vigilando ? acentoMarca : tema.textoSuave, padding: 0, display: "flex", alignItems: "center",
                 }}
               >
-                <Icono tipo={vigilando ? "campana" : "campanaTachada"} size={compacto ? 11 : 14} />
+                <Icono tipo={vigilando ? "campana" : "campanaTachada"} size={compacto ? 10 : 14} />
               </button>
             </span>
           )}
-          <span style={{ fontSize: compacto ? 12 : 15 }}>{nombreLocal}</span>
-          <span style={{ fontSize: compacto ? 15 : 20, fontWeight: "bold" }}>{marcador.golesLocal} - {marcador.golesVisitante}</span>
-          <span style={{ fontSize: compacto ? 12 : 15 }}>{nombreVisitante}</span>
+          <span style={{ fontSize: compacto ? 10 : 15 }}>{nombreLocal}</span>
+          <span style={{ fontSize: compacto ? 12 : 20, fontWeight: "bold" }}>{marcador.golesLocal} - {marcador.golesVisitante}</span>
+          <span style={{ fontSize: compacto ? 10 : 15 }}>{nombreVisitante}</span>
           {!compacto && (
             <span style={{ fontSize: 12, color: tema.textoSuave }}>
               {marcador.minuto ? `${marcador.minuto}'` : ""} {ETIQUETAS_ESTADO[marcador.estadoCorto] || marcador.estadoCorto}
@@ -3864,6 +3887,8 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
   const [erroresAbiertos, setErroresAbiertos] = useState({});
   const [mantenimientoActivo, setMantenimientoActivo] = useState(false);
   const [mensajeMantenimiento, setMensajeMantenimiento] = useState("");
+  const [footerForm, setFooterForm] = useState({ quienes_somos: "", instagram_url: "", correo_contacto: "" });
+  const [guardandoFooter, setGuardandoFooter] = useState(false);
 
   function cargarTodo() {
     setCargando(true);
@@ -3887,9 +3912,29 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
         setMantenimientoActivo(!!data?.mantenimiento);
         setMensajeMantenimiento(data?.mensaje_mantenimiento || "");
       });
+    supabase
+      .from("contenido_footer")
+      .select("quienes_somos, instagram_url, correo_contacto")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setFooterForm(data);
+      });
   }
 
   useEffect(() => { cargarTodo(); }, []); // eslint-disable-line
+
+  async function guardarFooter() {
+    setGuardandoFooter(true);
+    const { error } = await supabase.rpc("actualizar_contenido_footer", {
+      nuevo_quienes_somos: footerForm.quienes_somos,
+      nuevo_instagram_url: footerForm.instagram_url,
+      nuevo_correo_contacto: footerForm.correo_contacto,
+    });
+    setGuardandoFooter(false);
+    if (error) mostrarToast && mostrarToast("No se pudo guardar. Intenta de nuevo.");
+    else mostrarToast && mostrarToast("Footer actualizado.");
+  }
 
   async function corregirError() {
     const { error } = await supabase.rpc("activar_mantenimiento", { mensaje: null });
@@ -4058,6 +4103,45 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
             ))}
           </div>
         )}
+      </div>
+
+      <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+        <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={14} /> Contenido del pie de página (footer)</h4>
+        <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
+          Esto es lo que ven todos los usuarios al final de la página — no hace falta subir código para cambiarlo.
+        </p>
+
+        <label style={{ fontSize: 12, display: "block", marginBottom: 4 }}>Quiénes somos</label>
+        <textarea
+          value={footerForm.quienes_somos}
+          onChange={(e) => setFooterForm((prev) => ({ ...prev, quienes_somos: e.target.value }))}
+          rows={5}
+          style={{ width: "100%", padding: 8, fontSize: 12, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto, marginBottom: 12, fontFamily: "inherit" }}
+        />
+
+        <label style={{ fontSize: 12, display: "block", marginBottom: 4 }}>Link de Instagram</label>
+        <input
+          type="text"
+          value={footerForm.instagram_url}
+          onChange={(e) => setFooterForm((prev) => ({ ...prev, instagram_url: e.target.value }))}
+          style={{ width: "100%", padding: 8, fontSize: 12, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto, marginBottom: 12 }}
+        />
+
+        <label style={{ fontSize: 12, display: "block", marginBottom: 4 }}>Correo de contacto</label>
+        <input
+          type="text"
+          value={footerForm.correo_contacto}
+          onChange={(e) => setFooterForm((prev) => ({ ...prev, correo_contacto: e.target.value }))}
+          style={{ width: "100%", padding: 8, fontSize: 12, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto, marginBottom: 12 }}
+        />
+
+        <button
+          onClick={guardarFooter}
+          disabled={guardandoFooter}
+          style={{ padding: "8px 16px", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: guardandoFooter ? "default" : "pointer", fontSize: 12, fontWeight: "bold" }}
+        >
+          {guardandoFooter ? "Guardando..." : "Guardar cambios"}
+        </button>
       </div>
 
       {esAdminPrincipal && (
@@ -4554,6 +4638,43 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
   );
 }
 
+function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
+  if (!contenido) return null;
+  return (
+    <footer style={{ marginTop: 40, borderTop: `1px solid ${tema.borde}`, padding: "28px 16px", textAlign: "center", color: tema.textoSuave }}>
+      <div style={{ maxWidth: 640, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 12 }}>
+          <img src="/logo.png" alt="JMCS" width={28} height={28} />
+          <strong style={{ color: tema.texto, fontSize: 14 }}>JMCS</strong>
+        </div>
+
+        {contenido.quienes_somos && (
+          <p style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 18, textAlign: "left" }}>{contenido.quienes_somos}</p>
+        )}
+
+        <p style={{ fontSize: 11, marginBottom: 14 }}>
+          Datos de partidos y estadísticas: <strong>API-Football</strong>. Clima: <strong>Open-Meteo</strong>.
+        </p>
+
+        <div style={{ display: "flex", justifyContent: "center", gap: 18, marginBottom: 10, flexWrap: "wrap" }}>
+          {contenido.instagram_url && (
+            <a href={contenido.instagram_url} target="_blank" rel="noopener noreferrer" style={{ color: acentoMarca, fontSize: 12, textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
+              <Icono tipo="camara" size={13} /> Instagram
+            </a>
+          )}
+          {contenido.correo_contacto && (
+            <a href={`mailto:${contenido.correo_contacto}`} style={{ color: acentoMarca, fontSize: 12, textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
+              <Icono tipo="chat" size={13} /> {contenido.correo_contacto}
+            </a>
+          )}
+        </div>
+
+        <p style={{ fontSize: 10, opacity: 0.7, marginTop: 16 }}>© {new Date().getFullYear()} JMCS — Juggernaut Match Calculation System</p>
+      </div>
+    </footer>
+  );
+}
+
 function PantallaMantenimiento({ mensaje, onIniciarSesion }) {
   return (
     <div style={{
@@ -4719,6 +4840,17 @@ function Home() {
       .eq("id", 1)
       .maybeSingle()
       .then(({ data }) => setConfigApp(data));
+  }, []);
+
+  // Contenido del footer (Quiénes somos, redes, contacto) — editable desde el panel de admin
+  const [contenidoFooter, setContenidoFooter] = useState(null);
+  useEffect(() => {
+    supabase
+      .from("contenido_footer")
+      .select("quienes_somos, instagram_url, correo_contacto")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => setContenidoFooter(data));
   }, []);
 
   function abrirLogin() {
@@ -4904,13 +5036,29 @@ function Home() {
     setPartidoCalendario(p);
   }
 
-  // Si el partido que se está estudiando vino del calendario, sabemos exactamente en qué
-  // competición y temporada se juega — el motor usa eso en vez de "cualquier partido de liga".
-  // Si el usuario buscó los dos equipos a mano (sin pasar por el calendario), no hay forma de saber
-  // la competición exacta del próximo cruce, así que el motor cae de vuelta al comportamiento genérico.
+  // Si el partido que se está estudiando vino del calendario, O si detectamos un
+  // próximo cruce futuro (todavía no jugado) entre los dos equipos elegidos a mano,
+  // sabemos exactamente en qué competición y temporada se juega — el motor usa eso
+  // en vez de "cualquier partido de liga". Solo si no se encuentra nada de nada
+  // (ningún partido futuro ni pasado entre esos equipos), cae al selector manual
+  // de Liga/Copa de abajo.
   const competicionActual = partidoCalendario?.league?.id
     ? { id: partidoCalendario.league.id, season: partidoCalendario.league.season, nombre: partidoCalendario.league.name }
     : null;
+
+  // El usuario puede preferir ignorar la competición detectada y usar el balde
+  // genérico de "últimos 10 partidos sin importar torneo" en su lugar.
+  const [ignorarCompeticionExacta, setIgnorarCompeticionExacta] = useState(false);
+  const competicionParaMotor = ignorarCompeticionExacta ? null : competicionActual;
+
+  // Cuando se conoce la competición exacta, ya no le preguntamos al usuario si es
+  // de Liga o de Copa — lo determinamos solos, con el mismo criterio que ya usa
+  // el resto del motor para separar esos dos grupos.
+  useEffect(() => {
+    if (competicionActual?.nombre) {
+      setEsPartidoLiga(esLiga({ league: { name: competicionActual.nombre } }));
+    }
+  }, [competicionActual?.nombre]);
 
   useEffect(() => {
     if (!partidoCalendario?.fixture?.venue?.city || !partidoCalendario?.fixture?.date) {
@@ -5200,8 +5348,8 @@ function Home() {
   let lambdaGolesLocalReal = null;
   let lambdaGolesVisitanteReal = null;
   if (equipoLocal?.team && equipoVisitante?.team) {
-    const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap, competicionActual);
-    const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap, competicionActual);
+    const fuentesEqLocal = construirFuentesEquipo(fixturesLocal, equipoLocal.team.id, statsMap, competicionParaMotor);
+    const fuentesEqVisitante = construirFuentesEquipo(fixturesVisitante, equipoVisitante.team.id, statsMap, competicionParaMotor);
     const partidosH2H = h2h?.partidos || [];
     const h2hGolesLocal = calcularGolesNumerico(partidosH2H, equipoLocal.team.id);
     const h2hGolesVisitante = calcularGolesNumerico(partidosH2H, equipoVisitante.team.id);
@@ -6230,6 +6378,8 @@ function Home() {
             mercadosPreferidos={perfil?.mercados_preferidos}
             mostrarToast={mostrarToast}
             competicionActual={competicionActual}
+            ignorarCompeticionExacta={ignorarCompeticionExacta}
+            setIgnorarCompeticionExacta={setIgnorarCompeticionExacta}
           />
         </div>
 
@@ -6390,6 +6540,8 @@ function Home() {
           onOcultarPermanente={ocultarTutorialPermanente}
         />
       )}
+
+      <Footer contenido={contenidoFooter} tema={tema} acentoMarca={acentoMarca} />
     </div>
     </>
   );
