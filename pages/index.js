@@ -4642,7 +4642,11 @@ function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: tema.fondo, color: tema.texto, borderRadius: 10, padding: 20, maxWidth: 560, width: "100%", position: "relative" }}
+        style={{
+          background: tema.fondo, color: tema.texto, borderRadius: 10, padding: "22px 24px",
+          width: "min(92vw, 680px)", maxHeight: "88vh", overflowY: "auto", position: "relative",
+          boxShadow: "0 10px 40px rgba(0,0,0,0.4)",
+        }}
       >
         <button
           onClick={onCerrar}
@@ -5443,12 +5447,7 @@ function Home() {
   }, [resultadoModalFixture]);
 
   function verResultadoPartido(f) {
-    const esEscritorio = typeof window !== "undefined" && window.innerWidth >= 1024;
-    if (esEscritorio) {
-      window.open(`${window.location.origin}${window.location.pathname}?fixtureId=${f.fixture.id}`, "_blank");
-    } else {
-      setResultadoModalFixture(f);
-    }
+    setResultadoModalFixture(f);
   }
 
   // Si la página se abrió con ?fixtureId=X en la URL (la pestaña nueva de PC),
