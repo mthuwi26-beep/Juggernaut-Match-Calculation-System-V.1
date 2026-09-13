@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Head from "next/head";
+import Script from "next/script";
 import { supabase } from "../lib/supabaseClient";
 
 const TEMAS = {
@@ -1575,7 +1576,7 @@ function CalculadoraValor({ opciones, tema, acento }) {
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual, ignorarCompeticionExacta, setIgnorarCompeticionExacta }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual, ignorarCompeticionExacta, setIgnorarCompeticionExacta, fixtureIdActual }) {
   const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
   const [lineaHandicap, setLineaHandicap] = useState(0);
   const [permisoNotificaciones, setPermisoNotificaciones] = useState(
@@ -1748,6 +1749,30 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
               <Icono tipo="campana" size={13} /> {traducir("avisarSemaforoVerde")}
             </button>
           )}
+        </div>
+      )}
+
+      {fixtureIdActual && (
+        <div style={{ marginBottom: 16, textAlign: "right" }}>
+          <button
+            onClick={async () => {
+              const url = `${window.location.origin}${window.location.pathname}?fixtureId=${fixtureIdActual}`;
+              const texto = `Mirá el pronóstico de ${equipoLocal.team.name} vs ${equipoVisitante.team.name} en JMCS`;
+              if (navigator.share) {
+                try { await navigator.share({ title: "JMCS", text: texto, url }); } catch {}
+              } else {
+                try {
+                  await navigator.clipboard.writeText(url);
+                  mostrarToast && mostrarToast("Link copiado — ya lo podés pegar donde quieras.");
+                } catch {
+                  mostrarToast && mostrarToast("No se pudo copiar el link.");
+                }
+              }
+            }}
+            style={{ fontSize: 12, padding: "8px 14px", background: "transparent", border: `1px solid ${acento}`, color: acento, borderRadius: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            <Icono tipo="flecha" size={13} /> Compartir este pronóstico
+          </button>
         </div>
       )}
 
@@ -4934,6 +4959,113 @@ Podemos modificar la app o estos términos en cualquier momento. Si hacemos un c
 8. Contacto
 Dudas sobre estos términos: jmcsystem26@gmail.com`;
 
+const TEXTO_PRIVACIDAD = `1. Qué datos guardamos
+Si te registrás: tu correo, un nombre de usuario, y opcionalmente una foto de perfil. Si usás la app sin cuenta, no guardamos ningún dato que te identifique — solo un contador de tiempo de uso en tu propio navegador (no en nuestros servidores).
+
+2. Qué guardamos cuando usás la app
+Tus equipos favoritos, tus pronósticos guardados, tu historial de aciertos, tus preferencias de mercados y notificaciones, y el tema (claro/oscuro) que elegiste. Todo esto se guarda para que la app funcione como la dejaste la última vez — no lo vendemos ni lo compartimos con nadie.
+
+3. Notificaciones push
+Si activás las notificaciones, guardamos la información técnica necesaria para poder enviártelas (una "suscripción" del navegador). La podés desactivar cuando quieras desde Ajustes, y ahí se borra.
+
+4. Terceros que usamos
+API-Football (datos de partidos y estadísticas) y Open-Meteo (clima). Estos servicios no reciben tu información personal — solo les pedimos datos deportivos y climáticos, no datos tuyos.
+
+5. Errores técnicos
+Si algo se rompe mientras usás la app, guardamos el error técnico (para poder arreglarlo) junto con tu ID de usuario si tenías sesión iniciada, para poder investigar qué pasó. Nunca compartimos esto con nadie fuera del equipo de JMCS.
+
+6. Tus derechos
+Podés pedirnos en cualquier momento que borremos tu cuenta y todos tus datos, escribiéndonos a jmcsystem26@gmail.com.
+
+7. Cambios
+Si cambiamos esta política de forma importante, te lo vamos a avisar dentro de la propia app.
+
+Contacto: jmcsystem26@gmail.com`;
+
+const PREGUNTAS_FRECUENTES = [
+  { p: "¿Qué es el semáforo (verde, amarillo, rojo)?", r: "Es nuestra forma de mostrar qué tan probable es cada resultado, según el modelo estadístico. Verde: 70% o más de probabilidad. Amarillo: entre 50% y 69%. Rojo: menos de 50%. No es una garantía de resultado, es una estimación." },
+  { p: "¿JMCS es una casa de apuestas?", r: "No. No operamos apuestas, no recibimos comisión de ninguna casa de apuestas, y no te recomendamos apostar. Somos una herramienta de métricas — lo que hagas con esa información es tu decisión." },
+  { p: "¿De dónde salen los datos?", r: "De API-Football (estadísticas de partidos) y Open-Meteo (clima). Nosotros los procesamos y los organizamos en indicadores." },
+  { p: "¿Por qué a veces dice 'S/D'?", r: "Significa 'sin datos'. Preferimos mostrarte que no tenemos esa información en vez de ocultarla o inventarla." },
+  { p: "¿Necesito cuenta para usar Estudio?", r: "Podés usar Estudio libremente sin cuenta por un tiempo limitado. Después de eso, te pedimos iniciar sesión (es gratis) para seguir usándolo sin límite." },
+  { p: "¿Qué pasa si cierro el navegador durante la prueba gratis?", r: "El tiempo de prueba se reinicia — es por sesión del navegador, no acumulado entre días." },
+  { p: "¿Cómo activo las notificaciones?", r: "Desde el menú → Ajustes → Preferencias de notificaciones. Podés elegir avisos de gol, inicio/fin de partido, tarjetas, y semáforo en verde, por cada equipo que marques con la campana en Favoritos." },
+  { p: "¿Puedo usar JMCS en mi celular como una app?", r: "Sí — desde el navegador, buscá la opción \"Agregar a pantalla de inicio\" (Android) o \"Añadir a inicio\" en Safari (iPhone, versión 16.4 o más nueva)." },
+  { p: "¿Tienen plan pago?", r: "Todavía no — por ahora todo es gratis con cuenta. Si en el futuro hay un plan pago, te lo vamos a avisar dentro de la propia app con tiempo." },
+];
+
+function ModalFAQ({ tema, acentoMarca, onCerrar }) {
+  const [abierta, setAbierta] = useState(null);
+  const [montado, setMontado] = useState(false);
+  useEffect(() => { setMontado(true); }, []);
+  if (!montado) return null;
+
+  return createPortal(
+    <div
+      onClick={onCerrar}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "20px 12px" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: tema.fondo, color: tema.texto, borderRadius: 10, padding: 24, width: "min(92vw, 560px)", maxHeight: "82vh", display: "flex", flexDirection: "column", position: "relative" }}
+      >
+        <button
+          onClick={onCerrar}
+          style={{ position: "absolute", top: 10, right: 10, background: "transparent", border: "none", cursor: "pointer", color: tema.textoSuave }}
+        >
+          <Icono tipo="cerrar" size={18} />
+        </button>
+        <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 17 }}>Preguntas Frecuentes</h3>
+        <div style={{ overflowY: "auto" }}>
+          {PREGUNTAS_FRECUENTES.map((item, i) => (
+            <div key={i} style={{ borderBottom: `1px solid ${tema.borde}`, padding: "10px 0" }}>
+              <div
+                onClick={() => setAbierta(abierta === i ? null : i)}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontSize: 13, fontWeight: "bold" }}
+              >
+                <span>{item.p}</span>
+                <span style={{ color: acentoMarca, fontSize: 16 }}>{abierta === i ? "−" : "+"}</span>
+              </div>
+              {abierta === i && (
+                <p style={{ fontSize: 12, color: tema.textoSuave, marginTop: 8, lineHeight: 1.5 }}>{item.r}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function ModalInfoLegal({ titulo, texto, tema, onCerrar }) {
+  const [montado, setMontado] = useState(false);
+  useEffect(() => { setMontado(true); }, []);
+  if (!montado) return null;
+
+  return createPortal(
+    <div
+      onClick={onCerrar}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "20px 12px" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: tema.fondo, color: tema.texto, borderRadius: 10, padding: 24, width: "min(92vw, 560px)", maxHeight: "82vh", display: "flex", flexDirection: "column", position: "relative" }}
+      >
+        <button
+          onClick={onCerrar}
+          style={{ position: "absolute", top: 10, right: 10, background: "transparent", border: "none", cursor: "pointer", color: tema.textoSuave }}
+        >
+          <Icono tipo="cerrar" size={18} />
+        </button>
+        <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 17 }}>{titulo}</h3>
+        <div style={{ fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", overflowY: "auto" }}>{texto}</div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function ModalTerminos({ tema, acentoMarca, sesion, mostrarToast, onAceptar }) {
   const [aceptando, setAceptando] = useState(false);
   const [montado, setMontado] = useState(false);
@@ -4980,6 +5112,7 @@ function ModalTerminos({ tema, acentoMarca, sesion, mostrarToast, onAceptar }) {
 }
 
 function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
+  const [modalLegal, setModalLegal] = useState(null); // "terminos" | "privacidad" | null
   if (!contenido) return null;
   return (
     <footer style={{ marginTop: 40, borderTop: `1px solid ${tema.borde}`, padding: "28px 16px", textAlign: "center", color: tema.textoSuave }}>
@@ -5010,8 +5143,30 @@ function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
           )}
         </div>
 
+        <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 4, flexWrap: "wrap" }}>
+          <button onClick={() => setModalLegal("faq")} style={{ background: "transparent", border: "none", color: tema.textoSuave, fontSize: 10, textDecoration: "underline", cursor: "pointer" }}>
+            Preguntas Frecuentes
+          </button>
+          <button onClick={() => setModalLegal("terminos")} style={{ background: "transparent", border: "none", color: tema.textoSuave, fontSize: 10, textDecoration: "underline", cursor: "pointer" }}>
+            Términos y Condiciones
+          </button>
+          <button onClick={() => setModalLegal("privacidad")} style={{ background: "transparent", border: "none", color: tema.textoSuave, fontSize: 10, textDecoration: "underline", cursor: "pointer" }}>
+            Política de Privacidad
+          </button>
+        </div>
+
         <p style={{ fontSize: 10, opacity: 0.7, marginTop: 16 }}>© {new Date().getFullYear()} JMCS — Juggernaut Match Calculation System</p>
       </div>
+
+      {modalLegal === "faq" && (
+        <ModalFAQ tema={tema} acentoMarca={acentoMarca} onCerrar={() => setModalLegal(null)} />
+      )}
+      {modalLegal === "terminos" && (
+        <ModalInfoLegal titulo="Términos y Condiciones" texto={TEXTO_TERMINOS} tema={tema} onCerrar={() => setModalLegal(null)} />
+      )}
+      {modalLegal === "privacidad" && (
+        <ModalInfoLegal titulo="Política de Privacidad" texto={TEXTO_PRIVACIDAD} tema={tema} onCerrar={() => setModalLegal(null)} />
+      )}
     </footer>
   );
 }
@@ -5467,9 +5622,13 @@ function Home() {
     setResultadoModalFixture(f);
   }
 
-  // Si la página se abrió con ?fixtureId=X en la URL (la pestaña nueva de PC),
-  // cargamos directo el Estudio de ese partido puntual, sin semáforo ni pronósticos.
+  // Si la página se abrió con ?fixtureId=X en la URL (compartir un pronóstico,
+  // o volver a un resultado ya jugado), cargamos directo el Estudio de ese
+  // partido puntual. Si ya se jugó, sin semáforo ni pronósticos (no tiene
+  // sentido). Si todavía no se jugó, se muestra el Estudio completo — así
+  // funciona un link de "compartir este pronóstico".
   const [modoSoloResultado, setModoSoloResultado] = useState(false);
+  const ESTADOS_YA_JUGADOS = ["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"];
   useEffect(() => {
     if (typeof window === "undefined") return;
     const fixtureId = new URLSearchParams(window.location.search).get("fixtureId");
@@ -5479,7 +5638,7 @@ function Home() {
       .then((data) => {
         if (data.error) return;
         seleccionarPartidoDelCalendario(data);
-        setModoSoloResultado(true);
+        setModoSoloResultado(ESTADOS_YA_JUGADOS.includes(data.fixture?.status?.short));
         setVistaActual("estudio");
       })
       .catch(() => {});
@@ -5882,6 +6041,8 @@ function Home() {
   return (
     <>
       <Head>
+        <title>JMCS — Juggernaut Match Calculation System</title>
+        <meta name="description" content="Métricas y estadísticas reales de fútbol: rendimiento como local/visitante, enfrentamientos directos, y probabilidades por competición. La herramienta te da los datos, vos sacás tus propias conclusiones." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#2e6b3e" />
@@ -5890,7 +6051,34 @@ function Home() {
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="JMCS" />
         <link rel="apple-touch-icon" href="/logo.png" />
+
+        {/* Cómo se ve cuando alguien comparte el link en WhatsApp, Instagram, etc. */}
+        <meta property="og:title" content="JMCS — Juggernaut Match Calculation System" />
+        <meta property="og:description" content="Métricas y estadísticas reales de fútbol, con metodología transparente." />
+        <meta property="og:image" content="https://juggernaut-match-calculation-system-nine.vercel.app/logo.png" />
+        <meta property="og:url" content="https://juggernaut-match-calculation-system-nine.vercel.app" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="JMCS — Juggernaut Match Calculation System" />
+        <meta name="twitter:description" content="Métricas y estadísticas reales de fútbol, con metodología transparente." />
+        <meta name="twitter:image" content="https://juggernaut-match-calculation-system-nine.vercel.app/logo.png" />
       </Head>
+
+      {/* Google Analytics — solo se activa si configurás NEXT_PUBLIC_GA_ID en Vercel.
+          Si no lo configurás, esto simplemente no hace nada, no rompe nada. */}
+      {process.env.NEXT_PUBLIC_GA_ID && (
+        <>
+          <Script src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`} strategy="afterInteractive" />
+          <Script id="google-analytics" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
+            `}
+          </Script>
+        </>
+      )}
       <div
       style={{ background: tema.fondo, color: tema.texto, minHeight: "100vh" }}
       onTouchStart={(e) => {
@@ -6904,6 +7092,7 @@ function Home() {
               competicionActual={competicionActual}
               ignorarCompeticionExacta={ignorarCompeticionExacta}
               setIgnorarCompeticionExacta={setIgnorarCompeticionExacta}
+              fixtureIdActual={partidoCalendario?.fixture?.id}
             />
           )}
           {modoSoloResultado && (
