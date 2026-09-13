@@ -4993,28 +4993,6 @@ function Home() {
   const [modoOscuro, setModoOscuro] = useState(false);
   const yaAplicoTemaGuardado = useRef(false);
 
-  // Al cargar el perfil de un usuario con cuenta, aplicamos su tema guardado
-  // una sola vez (si después lo cambia a mano, no lo pisamos de nuevo solos)
-  useEffect(() => {
-    if (perfil?.tema_preferido && !yaAplicoTemaGuardado.current) {
-      yaAplicoTemaGuardado.current = true;
-      setModoOscuro(perfil.tema_preferido === "oscuro");
-    }
-    if (!sesion) yaAplicoTemaGuardado.current = false;
-  }, [perfil?.tema_preferido, sesion]);
-
-  // Cada vez que un usuario CON cuenta cambia de tema, se lo guardamos para
-  // la próxima vez que entre — sin cuenta, el tema solo dura esta sesión.
-  function alternarTema() {
-    const nuevoModo = !modoOscuro;
-    setModoOscuro(nuevoModo);
-    if (sesion) {
-      supabase.from("perfiles").update({ tema_preferido: nuevoModo ? "oscuro" : "claro" }).eq("user_id", sesion.user.id).then(({ error }) => {
-        if (error) mostrarToast("No se pudo guardar tu preferencia de tema.");
-      });
-    }
-  }
-
   const [statsMap, setStatsMap] = useState({});
   const [cargandoPuntuales, setCargandoPuntuales] = useState(false);
   const [progreso, setProgreso] = useState("");
@@ -5070,6 +5048,29 @@ function Home() {
   const [esAdminPrincipal, setEsAdminPrincipal] = useState(false);
   const [cargandoChequeoAdmin, setCargandoChequeoAdmin] = useState(true);
   const [perfil, setPerfil] = useState(null);
+
+  // Al cargar el perfil de un usuario con cuenta, aplicamos su tema guardado
+  // una sola vez (si después lo cambia a mano, no lo pisamos de nuevo solos)
+  useEffect(() => {
+    if (perfil?.tema_preferido && !yaAplicoTemaGuardado.current) {
+      yaAplicoTemaGuardado.current = true;
+      setModoOscuro(perfil.tema_preferido === "oscuro");
+    }
+    if (!sesion) yaAplicoTemaGuardado.current = false;
+  }, [perfil?.tema_preferido, sesion]);
+
+  // Cada vez que un usuario CON cuenta cambia de tema, se lo guardamos para
+  // la próxima vez que entre — sin cuenta, el tema solo dura esta sesión.
+  function alternarTema() {
+    const nuevoModo = !modoOscuro;
+    setModoOscuro(nuevoModo);
+    if (sesion) {
+      supabase.from("perfiles").update({ tema_preferido: nuevoModo ? "oscuro" : "claro" }).eq("user_id", sesion.user.id).then(({ error }) => {
+        if (error) mostrarToast("No se pudo guardar tu preferencia de tema.");
+      });
+    }
+  }
+
   const [tutorialesOcultosLocal, setTutorialesOcultosLocal] = useState([]);
 
   async function ocultarTutorialPermanente(id) {
@@ -6992,7 +6993,8 @@ function Home() {
 class TrampaDeErrores extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { error: null, info: null };
+    this.state = { error: null, info: null, reportando: false };
+    this.reportarYVolver = this.reportarYVolver.bind(this);
   }
   static getDerivedStateFromError(error) {
     return { error };
@@ -7020,11 +7022,31 @@ class TrampaDeErrores extends React.Component {
       // silencioso a propósito
     }
   }
+  reportarYVolver() {
+    this.setState({ reportando: true });
+    const enviar = () =>
+      fetch("/api/registrar-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mensaje: String(this.state.error?.message || this.state.error),
+          stack: this.state.error?.stack || "",
+          componentStack: this.state.info?.componentStack || "",
+          ruta: typeof window !== "undefined" ? window.location.pathname : "",
+          userId: null,
+        }),
+      }).catch(() => {});
+    // Le damos como máximo 1.5s a que salga el reporte, y volvemos a Inicio
+    // pase lo que pase — no queremos dejar a nadie esperando de más.
+    Promise.race([enviar(), new Promise((r) => setTimeout(r, 1500))]).finally(() => {
+      window.location.href = "/";
+    });
+  }
   render() {
     if (this.state.error) {
       return (
         <div style={{ padding: 20, fontFamily: "monospace", background: "#fff", color: "#b00", minHeight: "100vh" }}>
-          <h2 style={{ color: "#b00" }}>Se rompió algo — mandale captura de esto a tu socio:</h2>
+          <h2 style={{ color: "#b00" }}>Se rompió algo</h2>
           <p style={{ fontWeight: "bold", fontSize: 15 }}>{String(this.state.error?.message || this.state.error)}</p>
           <pre style={{ whiteSpace: "pre-wrap", fontSize: 11, color: "#333", background: "#f5f5f5", padding: 10, borderRadius: 6 }}>
             {this.state.error?.stack}
@@ -7037,12 +7059,21 @@ class TrampaDeErrores extends React.Component {
               </pre>
             </>
           )}
-          <button
-            onClick={() => window.location.href = "/"}
-            style={{ marginTop: 16, padding: "10px 16px", background: "#2e6b3e", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
-          >
-            Volver a Inicio
-          </button>
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <button
+              onClick={() => window.location.href = "/"}
+              style={{ padding: "10px 16px", background: "#2e6b3e", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+            >
+              Volver a Inicio
+            </button>
+            <button
+              onClick={this.reportarYVolver}
+              disabled={this.state.reportando}
+              style={{ padding: "10px 16px", background: "#b00", color: "#fff", border: "none", borderRadius: 6, cursor: this.state.reportando ? "default" : "pointer" }}
+            >
+              {this.state.reportando ? "Reportando..." : "Reportar"}
+            </button>
+          </div>
         </div>
       );
     }
