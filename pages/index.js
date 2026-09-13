@@ -4588,13 +4588,33 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin, mostrarToast 
 // Se usa como ventana superpuesta en celular, y como contenido de la pestaña
 // nueva que se abre en PC.
 function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
+  const [climaData, setClimaData] = useState(null);
+  const [statsPartido, setStatsPartido] = useState(null);
+  const [cargandoStats, setCargandoStats] = useState(true);
   const [fixturesLocal, setFixturesLocal] = useState(null);
   const [fixturesVisitante, setFixturesVisitante] = useState(null);
-  const [climaData, setClimaData] = useState(null);
 
   const idLocal = fixture.teams.home.id;
   const idVisitante = fixture.teams.away.id;
 
+  // Estadísticas REALES de este partido puntual (córners, tarjetas, faltas,
+  // posesión, tiros) — como ya se jugó, esto tiene más sentido mostrar que
+  // promedios de temporada o porcentajes de probabilidad.
+  useEffect(() => {
+    let cancelado = false;
+    setCargandoStats(true);
+    fetch(`/api/estadisticas-partido?fixtureId=${fixture.fixture.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelado) return;
+        if (!data.error) setStatsPartido(procesarEstadisticasPartido(data, idLocal));
+        setCargandoStats(false);
+      })
+      .catch(() => { if (!cancelado) setCargandoStats(false); });
+    return () => { cancelado = true; };
+  }, [fixture.fixture.id, idLocal]);
+
+  // Solo para los enfrentamientos directos (contexto histórico, no un porcentaje de predicción)
   useEffect(() => {
     let cancelado = false;
     Promise.all([
@@ -4620,8 +4640,6 @@ function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
     return () => { cancelado = true; };
   }, [fixture.fixture?.venue?.city, fixture.fixture?.date]);
 
-  const statsLocal = fixturesLocal ? calcularEstadisticasGoles(fixturesLocal, idLocal) : null;
-  const statsVisitante = fixturesVisitante ? calcularEstadisticasGoles(fixturesVisitante, idVisitante) : null;
   const h2h = fixturesLocal ? calcularHeadToHead(fixturesLocal, fixturesVisitante || [], idLocal, idVisitante) : null;
 
   const golesLocal = fixture.goals?.home;
@@ -4679,27 +4697,26 @@ function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
           )}
         </div>
 
-        <h4 style={{ fontSize: 13, marginBottom: 10 }}>Tabla comparativa — temporada completa</h4>
-        {!statsLocal || !statsVisitante ? (
-          <p style={{ fontSize: 12, color: tema.textoSuave }}>Cargando estadísticas...</p>
+        <h4 style={{ fontSize: 13, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="barras" size={13} /> Estadísticas reales de este partido
+        </h4>
+        {cargandoStats ? (
+          <p style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 20 }}>Cargando estadísticas...</p>
+        ) : !statsPartido ? (
+          <p style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 20 }}>No hay estadísticas detalladas disponibles para este partido — depende de la cobertura de la liga.</p>
         ) : (
-          <div style={{ display: "flex", gap: 16, fontSize: 12, marginBottom: 20 }}>
-            <div style={{ flex: 1 }}>
-              <strong style={{ display: "block", marginBottom: 6 }}>{fixture.teams.home.name}</strong>
-              <FilaStat etiqueta="Récord (V-E-D)" valor={`${statsLocal.victorias}-${statsLocal.empates}-${statsLocal.derrotas}`} />
-              <FilaStat etiqueta="Goles a favor (prom.)" valor={statsLocal.promedioGolesFavor} />
-              <FilaStat etiqueta="Goles en contra (prom.)" valor={statsLocal.promedioGolesContra} />
-              <FilaStat etiqueta="% Over 2.5" valor={`${statsLocal.over25Pct}%`} />
-              <FilaStat etiqueta="% BTTS" valor={`${statsLocal.bttsPct}%`} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: "bold", marginBottom: 4 }}>
+              <span>{fixture.teams.home.name}</span>
+              <span>{fixture.teams.away.name}</span>
             </div>
-            <div style={{ flex: 1 }}>
-              <strong style={{ display: "block", marginBottom: 6 }}>{fixture.teams.away.name}</strong>
-              <FilaStat etiqueta="Récord (V-E-D)" valor={`${statsVisitante.victorias}-${statsVisitante.empates}-${statsVisitante.derrotas}`} />
-              <FilaStat etiqueta="Goles a favor (prom.)" valor={statsVisitante.promedioGolesFavor} />
-              <FilaStat etiqueta="Goles en contra (prom.)" valor={statsVisitante.promedioGolesContra} />
-              <FilaStat etiqueta="% Over 2.5" valor={`${statsVisitante.over25Pct}%`} />
-              <FilaStat etiqueta="% BTTS" valor={`${statsVisitante.bttsPct}%`} />
-            </div>
+            <FilaEnfrentada icono="banderin" etiqueta="Córners" valorLocal={statsPartido.corners.home} valorVisitante={statsPartido.corners.away} tema={tema} />
+            <FilaEnfrentada icono="tarjeta" etiqueta="Amarillas" valorLocal={statsPartido.amarillas.home} valorVisitante={statsPartido.amarillas.away} tema={tema} />
+            <FilaEnfrentada icono="tarjeta" etiqueta="Rojas" valorLocal={statsPartido.rojas.home} valorVisitante={statsPartido.rojas.away} tema={tema} destacar />
+            <FilaEnfrentada icono="exclamacion" etiqueta="Faltas" valorLocal={statsPartido.faltas.home} valorVisitante={statsPartido.faltas.away} tema={tema} />
+            <FilaEnfrentada icono="balon" etiqueta="Posesión" valorLocal={statsPartido.posesion.home} valorVisitante={statsPartido.posesion.away} tema={tema} />
+            <FilaEnfrentada icono="objetivo" etiqueta="Tiros totales" valorLocal={statsPartido.tirosTotales.home} valorVisitante={statsPartido.tirosTotales.away} tema={tema} />
+            <FilaEnfrentada icono="porteria" etiqueta="Tiros a puerta" valorLocal={statsPartido.tirosPuerta.home} valorVisitante={statsPartido.tirosPuerta.away} tema={tema} />
           </div>
         )}
 
