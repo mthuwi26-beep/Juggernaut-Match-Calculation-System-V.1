@@ -5203,15 +5203,17 @@ function Home() {
   // por ahora siguen siendo "próximamente" porque la función en sí (favoritos,
   // historial de aciertos, etc.) todavía no está construida.
   function accederOPedirCuenta(itemMenu) {
+    if (itemMenu === "estudio") {
+      setMenuAbierto(false);
+      setVistaActual("estudio");
+      return;
+    }
     if (!sesion) {
       setMenuAbierto(false);
       abrirLogin();
     } else if (itemMenu === "favoritos") {
       setMenuAbierto(false);
       setVistaActual("favoritos");
-    } else if (itemMenu === "estudio") {
-      setMenuAbierto(false);
-      setVistaActual("estudio");
     } else if (itemMenu === "historial") {
       setMenuAbierto(false);
       setVistaActual("historial");
@@ -5436,6 +5438,49 @@ function Home() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Prueba gratis de Estudio sin cuenta: 5 minutos por sesión del navegador
+  // (se resetea si cierra el navegador o la pestaña, no es acumulado entre días).
+  // El reloj corre SOLO mientras está parado en Estudio — si se va a Inicio,
+  // se pausa, y sigue sumando desde donde quedó cuando vuelve.
+  const TIEMPO_PRUEBA_ESTUDIO_MS = 5 * 60 * 1000;
+  const [tiempoEstudioAgotado, setTiempoEstudioAgotado] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || sesion || vistaActual !== "estudio" || tiempoEstudioAgotado) return;
+
+    const clave = "jmcs_tiempo_estudio_anonimo";
+    const acumuladoPrevio = parseInt(sessionStorage.getItem(clave) || "0", 10);
+
+    if (acumuladoPrevio >= TIEMPO_PRUEBA_ESTUDIO_MS) {
+      setTiempoEstudioAgotado(true);
+      abrirLogin();
+      return;
+    }
+
+    const inicio = Date.now();
+    const intervalo = setInterval(() => {
+      const transcurrido = Date.now() - inicio;
+      if (acumuladoPrevio + transcurrido >= TIEMPO_PRUEBA_ESTUDIO_MS) {
+        sessionStorage.setItem(clave, String(TIEMPO_PRUEBA_ESTUDIO_MS));
+        setTiempoEstudioAgotado(true);
+        abrirLogin();
+      }
+    }, 2000);
+
+    return () => {
+      const transcurrido = Date.now() - inicio;
+      sessionStorage.setItem(clave, String(acumuladoPrevio + transcurrido));
+      clearInterval(intervalo);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vistaActual, sesion, tiempoEstudioAgotado]);
+
+  // Si inicia sesión, el límite deja de importar (por si quedó marcado de antes)
+  useEffect(() => {
+    if (sesion) setTiempoEstudioAgotado(false);
+  }, [sesion]);
+
 
   // Si el partido que se está estudiando vino del calendario, O si detectamos un
   // próximo cruce futuro (todavía no jugado) entre los dos equipos elegidos a mano,
@@ -6309,7 +6354,7 @@ function Home() {
             <button
               key={tab.id}
               onClick={() => {
-                if ((tab.id === "estudio" || tab.id === "favoritos") && !sesion) abrirLogin();
+                if (tab.id === "favoritos" && !sesion) abrirLogin();
                 else setVistaActual(tab.id);
               }}
               style={{
@@ -6522,7 +6567,23 @@ function Home() {
         </div>
       )}
 
-      {vistaActual === "estudio" && (
+      {vistaActual === "estudio" && tiempoEstudioAgotado && !sesion && (
+        <div style={{ maxWidth: 480, margin: "60px auto", textAlign: "center", padding: "0 20px" }}>
+          <Icono tipo="candado" size={40} color={acentoMarca} />
+          <h3 style={{ marginTop: 16, marginBottom: 8 }}>Se acabó tu tiempo de prueba</h3>
+          <p style={{ fontSize: 13, color: tema.textoSuave, marginBottom: 20 }}>
+            Ya usaste tus 5 minutos gratis de Estudio sin cuenta. Iniciá sesión (es gratis) para seguir usándolo sin límite.
+          </p>
+          <button
+            onClick={abrirLogin}
+            style={{ padding: "12px 24px", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", fontSize: 13, cursor: "pointer" }}
+          >
+            Iniciar sesión o registrarme
+          </button>
+        </div>
+      )}
+
+      {vistaActual === "estudio" && !(tiempoEstudioAgotado && !sesion) && (
       <div className="jmcs-grid" style={{ maxWidth: 2400, margin: "0 auto" }}>
         <div className="jmcs-calendario">
           <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
