@@ -3910,6 +3910,9 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
   const [mensajeMantenimiento, setMensajeMantenimiento] = useState("");
   const [footerForm, setFooterForm] = useState({ quienes_somos: "", instagram_url: "", correo_contacto: "" });
   const [guardandoFooter, setGuardandoFooter] = useState(false);
+  const [planApi, setPlanApi] = useState("gratis");
+  const [cambiandoPlan, setCambiandoPlan] = useState(false);
+  const [aceptacionTerminos, setAceptacionTerminos] = useState([]);
 
   function cargarTodo() {
     setCargando(true);
@@ -3924,14 +3927,18 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
     supabase.rpc("listar_errores_cliente").then(({ data }) => {
       if (data) setErrores(data);
     });
+    supabase.rpc("listar_aceptacion_terminos").then(({ data }) => {
+      if (data) setAceptacionTerminos(data);
+    });
     supabase
       .from("configuracion_app")
-      .select("mantenimiento, mensaje_mantenimiento")
+      .select("mantenimiento, mensaje_mantenimiento, plan_api")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data }) => {
         setMantenimientoActivo(!!data?.mantenimiento);
         setMensajeMantenimiento(data?.mensaje_mantenimiento || "");
+        setPlanApi(data?.plan_api || "gratis");
       });
     supabase
       .from("contenido_footer")
@@ -3941,6 +3948,14 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
       .then(({ data }) => {
         if (data) setFooterForm(data);
       });
+  }
+
+  async function cambiarPlanApi(nuevo) {
+    setCambiandoPlan(true);
+    const { error } = await supabase.rpc("actualizar_plan_api", { nuevo_plan: nuevo });
+    setCambiandoPlan(false);
+    if (error) mostrarToast && mostrarToast("No se pudo cambiar el plan.");
+    else { setPlanApi(nuevo); mostrarToast && mostrarToast(`Plan cambiado a ${nuevo === "pro" ? "Pro" : "Gratis"}.`); }
   }
 
   useEffect(() => { cargarTodo(); }, []); // eslint-disable-line
@@ -4120,6 +4135,55 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
                     Borrar
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+        <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={14} /> Plan de API-Football</h4>
+        <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
+          Cuando actives tu plan pagado en API-Football, cambiá esto a "Pro" — el motor pasa solo a usar la temporada actual en vez de la fija de 2024, sin que necesites subir código nuevo.
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => cambiarPlanApi("gratis")}
+            disabled={cambiandoPlan}
+            style={{
+              padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: cambiandoPlan ? "default" : "pointer",
+              background: planApi === "gratis" ? acentoMarca : "transparent", color: planApi === "gratis" ? "#fff" : tema.texto,
+              border: `1px solid ${planApi === "gratis" ? acentoMarca : tema.borde}`,
+            }}
+          >
+            Plan Gratis API
+          </button>
+          <button
+            onClick={() => cambiarPlanApi("pro")}
+            disabled={cambiandoPlan}
+            style={{
+              padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: cambiandoPlan ? "default" : "pointer",
+              background: planApi === "pro" ? acentoMarca : "transparent", color: planApi === "pro" ? "#fff" : tema.texto,
+              border: `1px solid ${planApi === "pro" ? acentoMarca : tema.borde}`,
+            }}
+          >
+            Plan Pro API
+          </button>
+        </div>
+      </div>
+
+      <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+        <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={14} /> Aceptación de Términos y Condiciones</h4>
+        {aceptacionTerminos.length === 0 ? (
+          <p style={{ fontSize: 12, color: tema.textoSuave }}>Sin datos aún.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 220, overflowY: "auto" }}>
+            {aceptacionTerminos.map((u, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: `1px solid ${tema.borde}` }}>
+                <span>{u.username || "(sin nombre)"}</span>
+                <span style={{ color: u.terminos_aceptados ? "#2e9e4f" : "#e05555" }}>
+                  {u.terminos_aceptados ? new Date(u.terminos_aceptados_en).toLocaleDateString() : "No aceptó"}
+                </span>
               </div>
             ))}
           </div>
@@ -4794,6 +4858,75 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
   );
 }
 
+const TEXTO_TERMINOS = `1. Qué es JMCS
+JMCS (Juggernaut Match Calculation System) es una herramienta de métricas y estadísticas deportivas. Procesamos datos históricos reales de partidos de fútbol y los organizamos en indicadores, promedios y tendencias para que el usuario los consulte y saque sus propias conclusiones.
+
+2. No incitamos a apostar
+JMCS no es una casa de apuestas, no opera ni promueve apuestas, y no recibe comisión de ninguna casa de apuestas. Los porcentajes y "semáforos" que mostramos son estimaciones estadísticas de probabilidad, no recomendaciones de apuesta ni garantía de resultado. Si el usuario decide apostar basándose en esta información, lo hace bajo su propio criterio y responsabilidad.
+
+3. Cómo calculamos los datos
+Nuestras cifras salen de promedios y tendencias sobre partidos ya jugados (rendimiento como local/visitante, forma reciente, enfrentamientos directos, distribución de Poisson para convertir esos promedios en probabilidad). Cuando un valor es una estimación propia nuestra —no un dato validado externamente—, lo identificamos como tal dentro de la app. Estos cálculos dependen de datos de terceros (API-Football para estadísticas, Open-Meteo para clima) que pueden tener errores, demoras o estar incompletos.
+
+4. Sin responsabilidad por pérdidas o mal uso
+JMCS no se hace responsable por pérdidas económicas, decisiones de apuesta, o cualquier otro uso que el usuario le dé a la información acá presentada. La herramienta se ofrece "tal cual", sin garantía de exactitud, disponibilidad continua, o resultado.
+
+5. Edad mínima
+Este servicio está dirigido a mayores de 18 años.
+
+6. Cuenta de usuario
+Al registrarte, aceptás brindar información real y sos responsable de la actividad en tu cuenta. Podemos suspender cuentas que hagan mal uso de la plataforma.
+
+7. Cambios en el servicio y estos términos
+Podemos modificar la app o estos términos en cualquier momento. Si hacemos un cambio importante, lo vamos a anunciar dentro de la propia app.
+
+8. Contacto
+Dudas sobre estos términos: jmcsystem26@gmail.com`;
+
+function ModalTerminos({ tema, acentoMarca, sesion, mostrarToast, onAceptar }) {
+  const [aceptando, setAceptando] = useState(false);
+  const [montado, setMontado] = useState(false);
+  useEffect(() => { setMontado(true); }, []);
+
+  async function aceptar() {
+    setAceptando(true);
+    if (sesion) {
+      const { error } = await supabase
+        .from("perfiles")
+        .update({ terminos_aceptados: true, terminos_aceptados_en: new Date().toISOString() })
+        .eq("user_id", sesion.user.id);
+      if (error) {
+        mostrarToast && mostrarToast("No se pudo guardar. Intenta de nuevo.");
+        setAceptando(false);
+        return;
+      }
+    } else if (typeof window !== "undefined") {
+      localStorage.setItem("jmcs_terminos_aceptados", "true");
+    }
+    onAceptar();
+  }
+
+  if (!montado) return null;
+
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ background: tema.fondo, color: tema.texto, borderRadius: 10, padding: 24, maxWidth: 540, maxHeight: "82vh", display: "flex", flexDirection: "column" }}>
+        <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 17 }}>Términos y Condiciones</h3>
+        <div style={{ fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", overflowY: "auto", paddingRight: 6, marginBottom: 16 }}>
+          {TEXTO_TERMINOS}
+        </div>
+        <button
+          onClick={aceptar}
+          disabled={aceptando}
+          style={{ padding: "12px 16px", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", fontSize: 13, cursor: aceptando ? "default" : "pointer" }}
+        >
+          {aceptando ? "Guardando..." : "Acepto los Términos y Condiciones"}
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
   if (!contenido) return null;
   return (
@@ -4858,6 +4991,30 @@ function Home() {
   const [equipoVisitante, setEquipoVisitante] = useState(null);
   const [fixturesVisitante, setFixturesVisitante] = useState([]);
   const [modoOscuro, setModoOscuro] = useState(false);
+  const yaAplicoTemaGuardado = useRef(false);
+
+  // Al cargar el perfil de un usuario con cuenta, aplicamos su tema guardado
+  // una sola vez (si después lo cambia a mano, no lo pisamos de nuevo solos)
+  useEffect(() => {
+    if (perfil?.tema_preferido && !yaAplicoTemaGuardado.current) {
+      yaAplicoTemaGuardado.current = true;
+      setModoOscuro(perfil.tema_preferido === "oscuro");
+    }
+    if (!sesion) yaAplicoTemaGuardado.current = false;
+  }, [perfil?.tema_preferido, sesion]);
+
+  // Cada vez que un usuario CON cuenta cambia de tema, se lo guardamos para
+  // la próxima vez que entre — sin cuenta, el tema solo dura esta sesión.
+  function alternarTema() {
+    const nuevoModo = !modoOscuro;
+    setModoOscuro(nuevoModo);
+    if (sesion) {
+      supabase.from("perfiles").update({ tema_preferido: nuevoModo ? "oscuro" : "claro" }).eq("user_id", sesion.user.id).then(({ error }) => {
+        if (error) mostrarToast("No se pudo guardar tu preferencia de tema.");
+      });
+    }
+  }
+
   const [statsMap, setStatsMap] = useState({});
   const [cargandoPuntuales, setCargandoPuntuales] = useState(false);
   const [progreso, setProgreso] = useState("");
@@ -5008,6 +5165,17 @@ function Home() {
       .maybeSingle()
       .then(({ data }) => setContenidoFooter(data));
   }, []);
+
+  // Términos y condiciones: con cuenta, se guarda en el perfil (no se vuelve
+  // a mostrar más); sin cuenta, se guarda en el navegador de ese dispositivo.
+  const [mostrarTerminos, setMostrarTerminos] = useState(false);
+  useEffect(() => {
+    if (sesion) {
+      if (perfil) setMostrarTerminos(!perfil.terminos_aceptados);
+    } else if (typeof window !== "undefined") {
+      setMostrarTerminos(localStorage.getItem("jmcs_terminos_aceptados") !== "true");
+    }
+  }, [sesion, perfil]);
 
   function abrirLogin() {
     setAuthModalModo("login");
@@ -6107,7 +6275,7 @@ function Home() {
             )}
 
             <button
-              onClick={() => setModoOscuro(!modoOscuro)}
+              onClick={alternarTema}
               style={{
                 padding: "8px 14px", fontSize: 13,
                 background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`,
@@ -6798,6 +6966,16 @@ function Home() {
           tema={tema}
           acentoMarca={acentoMarca}
           onCerrar={() => setResultadoModalFixture(null)}
+        />
+      )}
+
+      {mostrarTerminos && (
+        <ModalTerminos
+          tema={tema}
+          acentoMarca={acentoMarca}
+          sesion={sesion}
+          mostrarToast={mostrarToast}
+          onAceptar={() => setMostrarTerminos(false)}
         />
       )}
     </div>
