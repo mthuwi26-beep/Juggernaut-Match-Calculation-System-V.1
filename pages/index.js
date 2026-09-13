@@ -1103,7 +1103,7 @@ function PanelFavoritos({ sesion, tema, acentoMarca, onCerrar, mostrarToast }) {
   );
 }
 
-function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca, sesion, onPedirLogin, onAbrirPerfil, mostrarToast, competicionActual }) {
+function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForzado, colorMarca, sesion, onPedirLogin, onAbrirPerfil, mostrarToast, competicionActual, onSeleccionarPartido }) {
   const [query, setQuery] = useState("");
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -1243,6 +1243,37 @@ function BuscadorEquipo({ etiqueta, onEquipoCargado, tema, statsMap, equipoForza
             </div>
             <BotonFavorito equipo={selectedTeam} sesion={sesion} tema={tema} onPedirLogin={onPedirLogin} mostrarToast={mostrarToast} />
           </div>
+
+          {fixtures.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: tema.textoSuave, marginBottom: 6 }}>
+                {traducir("ultimos5")}
+              </p>
+              <div style={{ display: "flex", gap: 4 }}>
+                {fixtures.slice(0, 5).map((f) => {
+                  const esLocal = f.teams.home.id === selectedTeam.team.id;
+                  const gf = esLocal ? f.goals.home : f.goals.away;
+                  const gc = esLocal ? f.goals.away : f.goals.home;
+                  const letra = gf > gc ? "V" : gf === gc ? "E" : "D";
+                  const color = gf > gc ? "#2e9e4f" : gf === gc ? "#c9a227" : "#c94c4c";
+                  return (
+                    <div
+                      key={f.fixture.id}
+                      onClick={() => onSeleccionarPartido && onSeleccionarPartido(f)}
+                      title={`${f.teams.home.name} ${f.goals.home}-${f.goals.away} ${f.teams.away.name} — toca para ver el estudio de este partido`}
+                      style={{
+                        width: 22, height: 22, borderRadius: "50%", background: color, color: "#fff",
+                        fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: onSeleccionarPartido ? "pointer" : "default",
+                      }}
+                    >
+                      {letra}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="jmcs-subpaneles-individual" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <SubPanel titulo={traducir("comoLocal")} fixtures={fixturesLocalVenue} teamId={selectedTeam.team.id} statsMap={statsMap} tema={tema} acento={ACENTOS_CATEGORIA.local} />
@@ -6710,6 +6741,7 @@ function Home() {
                 onAbrirPerfil={abrirPerfilEquipo}
                 mostrarToast={mostrarToast}
                 competicionActual={competicionActual}
+                onSeleccionarPartido={verResultadoPartido}
                 onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoLocal(team);
                   setFixturesLocal(fixtures || []);
@@ -6731,6 +6763,7 @@ function Home() {
                 onAbrirPerfil={abrirPerfilEquipo}
                 mostrarToast={mostrarToast}
                 competicionActual={competicionActual}
+                onSeleccionarPartido={verResultadoPartido}
                 onEquipoCargado={(team, fixtures, esDelCalendario) => {
                   setEquipoVisitante(team);
                   setFixturesVisitante(fixtures || []);
