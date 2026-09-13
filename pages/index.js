@@ -6678,10 +6678,12 @@ function Home() {
             className="jmcs-carrusel-contenedor"
             style={{ display: "flex", gap: 30, flexWrap: "wrap" }}
             onTouchStart={(e) => {
+              e.stopPropagation();
               setToqueInicioX(e.touches[0].clientX);
               setToqueInicioY(e.touches[0].clientY);
             }}
             onTouchEnd={(e) => {
+              e.stopPropagation();
               if (toqueInicioX === null) return;
               const deltaX = e.changedTouches[0].clientX - toqueInicioX;
               const deltaY = toqueInicioY === null ? 0 : e.changedTouches[0].clientY - toqueInicioY;
