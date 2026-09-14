@@ -27,29 +27,36 @@ export default async function handler(req, res) {
   try {
     const { monto, frecuencia } = PRECIOS[plan];
 
-    // Mientras estemos probando con cuentas de prueba de MercadoPago, el
-    // correo real del usuario logueado en JMCS no sirve como "comprador"
-    // (MercadoPago lo rechaza si no es una cuenta real o de prueba suya).
-    // Si configurás MERCADOPAGO_TEST_BUYER_EMAIL en Vercel, se usa ese en
-    // vez del correo real — SOLO para probar. Cuando pases a cobrar de
-    // verdad, borrá esa variable y vuelve a usar el correo real solo.
+    // Mientras probamos con cuentas de prueba creadas desde el panel visual
+    // de MercadoPago, no tenemos un correo válido para mandar como
+    // "comprador" (esas cuentas se manejan por usuario, no por correo).
+    // Con MERCADOPAGO_OMITIR_PAYER_EMAIL=true en Vercel, no mandamos ningún
+    // correo — MercadoPago le va a pedir iniciar sesión directo en su propia
+    // pantalla de pago, ahí sí con usuario y contraseña. Cuando pases a
+    // cobrar de verdad, borrá esa variable para volver a mandar el correo
+    // real del usuario (mejor experiencia, MercadoPago se lo autocompleta).
+    const omitirCorreo = process.env.MERCADOPAGO_OMITIR_PAYER_EMAIL === "true";
     const payerEmail = process.env.MERCADOPAGO_TEST_BUYER_EMAIL || email;
+
+    const cuerpoPedido = {
+      reason: `JMCS Plan Pro — ${plan === "anual" ? "Anual" : "Mensual"}`,
+      external_reference: userId,
+      auto_recurring: {
+        frequency: frecuencia,
+        frequency_type: "months",
+        transaction_amount: monto,
+        currency_id: "COP",
+      },
+      back_url: `${SITE_URL}/?pago=exito`,
+      status: "pending",
+    };
+    if (!omitirCorreo) {
+      cuerpoPedido.payer_email = payerEmail;
+    }
 
     const suscripcion = await mpFetch("/preapproval", {
       method: "POST",
-      body: JSON.stringify({
-        reason: `JMCS Plan Pro — ${plan === "anual" ? "Anual" : "Mensual"}`,
-        external_reference: userId,
-        payer_email: payerEmail,
-        auto_recurring: {
-          frequency: frecuencia,
-          frequency_type: "months",
-          transaction_amount: monto,
-          currency_id: "COP",
-        },
-        back_url: `${SITE_URL}/?pago=exito`,
-        status: "pending",
-      }),
+      body: JSON.stringify(cuerpoPedido),
     });
 
     // Guardamos el ID de la suscripción para poder identificarla cuando
