@@ -46,6 +46,7 @@ export default async function handler(req, res) {
             currency: "COP",
             customer_email: email,
             payment_source_id: perfil.wompi_payment_source_id,
+            payment_method: { installments: 1 },
             reference: referencia,
           }),
         });
