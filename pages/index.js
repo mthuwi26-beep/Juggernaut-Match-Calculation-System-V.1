@@ -5803,8 +5803,10 @@ function Home() {
   // suscripción del lado del servidor).
   useEffect(() => {
     if (typeof window === "undefined" || !sesion) return;
-    const pago = new URLSearchParams(window.location.search).get("pago");
-    if (pago !== "exito") return;
+    // MercadoPago a veces arma la URL de vuelta con un "?" de más en vez de
+    // "&" (ej: ?pago=exito?preapproval_id=...) — por eso no confiamos en
+    // URLSearchParams acá, buscamos directo en el texto completo de la URL.
+    if (!window.location.href.includes("pago=exito")) return;
     mostrarToast("¡Gracias! Estamos confirmando tu pago...");
     let intentos = 0;
     const intervalo = setInterval(() => {
