@@ -53,6 +53,13 @@ export default async function handler(req, res) {
 
     res.status(200).json({ url: suscripcion.init_point });
   } catch (error) {
-    res.status(500).json({ error: "No se pudo crear la suscripción" });
+    // Lo dejamos anotado en los logs de Vercel (Vercel → tu proyecto →
+    // pestaña "Logs" → filtrar por /api/crear-suscripcion) y también se lo
+    // mostramos al usuario por ahora, mientras estamos probando — una vez
+    // que esté funcionando bien, lo volvemos a un mensaje más genérico.
+    console.error("Error creando suscripción en MercadoPago:", JSON.stringify(error.datos || error.message || error));
+    res.status(500).json({
+      error: "No se pudo crear la suscripción: " + (error.datos?.message || error.message || "error desconocido"),
+    });
   }
 }
