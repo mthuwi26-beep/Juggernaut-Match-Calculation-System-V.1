@@ -5171,6 +5171,83 @@ function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
   );
 }
 
+function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast }) {
+  const [planElegido, setPlanElegido] = useState("mensual");
+  const [procesando, setProcesando] = useState(false);
+
+  async function suscribirse() {
+    setProcesando(true);
+    try {
+      const res = await fetch("/api/crear-suscripcion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: sesion.user.id, email: sesion.user.email, plan: planElegido }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        mostrarToast && mostrarToast(data.error || "No se pudo iniciar el pago. Intenta de nuevo.");
+        setProcesando(false);
+      }
+    } catch {
+      mostrarToast && mostrarToast("No se pudo conectar con el servidor de pagos.");
+      setProcesando(false);
+    }
+  }
+
+  return (
+    <div style={{ maxWidth: 460, margin: "60px auto", textAlign: "center", padding: "0 20px" }}>
+      <Icono tipo="trofeo" size={40} color={acentoMarca} />
+      <h3 style={{ marginTop: 16, marginBottom: 8 }}>Tu prueba gratis de 7 días terminó</h3>
+      <p style={{ fontSize: 13, color: tema.textoSuave, marginBottom: 24 }}>
+        Suscribite para seguir disfrutando de nuestros pronósticos, con acceso completo a Estudio.
+      </p>
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+        <div
+          onClick={() => setPlanElegido("mensual")}
+          style={{
+            flex: 1, padding: 16, borderRadius: 8, cursor: "pointer",
+            border: `2px solid ${planElegido === "mensual" ? acentoMarca : tema.borde}`,
+            background: planElegido === "mensual" ? tema.panel : "transparent",
+          }}
+        >
+          <div style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 4 }}>Mensual</div>
+          <strong style={{ fontSize: 18 }}>$70.000</strong>
+          <div style={{ fontSize: 11, color: tema.textoSuave }}>COP / mes</div>
+        </div>
+        <div
+          onClick={() => setPlanElegido("anual")}
+          style={{
+            flex: 1, padding: 16, borderRadius: 8, cursor: "pointer", position: "relative",
+            border: `2px solid ${planElegido === "anual" ? acentoMarca : tema.borde}`,
+            background: planElegido === "anual" ? tema.panel : "transparent",
+          }}
+        >
+          <div style={{ position: "absolute", top: -10, right: 8, background: acentoMarca, color: "#fff", fontSize: 9, padding: "2px 8px", borderRadius: 10, fontWeight: "bold" }}>
+            -15%
+          </div>
+          <div style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 4 }}>Anual</div>
+          <strong style={{ fontSize: 18 }}>$714.000</strong>
+          <div style={{ fontSize: 11, color: tema.textoSuave }}>COP / año</div>
+        </div>
+      </div>
+
+      <button
+        onClick={suscribirse}
+        disabled={procesando}
+        style={{ width: "100%", padding: "14px 24px", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", fontSize: 14, cursor: procesando ? "default" : "pointer" }}
+      >
+        {procesando ? "Conectando con MercadoPago..." : `Suscribirme — ${planElegido === "mensual" ? "$70.000/mes" : "$714.000/año"}`}
+      </button>
+      <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 14 }}>
+        El pago se procesa de forma segura a través de MercadoPago. Podés cancelar cuando quieras.
+      </p>
+    </div>
+  );
+}
+
 function PantallaMantenimiento({ mensaje, onIniciarSesion }) {
   return (
     <div style={{
@@ -5685,6 +5762,36 @@ function Home() {
   // Si inicia sesión, el límite deja de importar (por si quedó marcado de antes)
   useEffect(() => {
     if (sesion) setTiempoEstudioAgotado(false);
+  }, [sesion]);
+
+  // 7 días de prueba gratis desde que se registró (lo sabemos por la fecha de
+  // creación de su cuenta, ya la trae la sesión de Supabase) — pasado ese
+  // tiempo, necesita una suscripción activa para seguir usando Estudio.
+  const DIAS_PRUEBA_SUSCRIPCION = 7;
+  const diasDesdeRegistro = sesion?.user?.created_at
+    ? (Date.now() - new Date(sesion.user.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    : 0;
+  const enPeriodoPrueba = diasDesdeRegistro <= DIAS_PRUEBA_SUSCRIPCION;
+  const puedeUsarEstudio = !sesion || enPeriodoPrueba || !!perfil?.suscripcion_activa;
+
+  // Al volver de pagar en MercadoPago, refrescamos el perfil un par de veces
+  // (el aviso de MercadoPago puede tardar unos segundos en llegar y activar la
+  // suscripción del lado del servidor).
+  useEffect(() => {
+    if (typeof window === "undefined" || !sesion) return;
+    const pago = new URLSearchParams(window.location.search).get("pago");
+    if (pago !== "exito") return;
+    mostrarToast("¡Gracias! Estamos confirmando tu pago...");
+    let intentos = 0;
+    const intervalo = setInterval(() => {
+      intentos++;
+      supabase.from("perfiles").select("*").eq("user_id", sesion.user.id).maybeSingle().then(({ data }) => {
+        if (data) setPerfil(data);
+        if (data?.suscripcion_activa || intentos >= 6) clearInterval(intervalo);
+      });
+    }, 2000);
+    return () => clearInterval(intervalo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sesion]);
 
 
@@ -6818,7 +6925,11 @@ function Home() {
         </div>
       )}
 
-      {vistaActual === "estudio" && !(tiempoEstudioAgotado && !sesion) && (
+      {vistaActual === "estudio" && sesion && !puedeUsarEstudio && (
+        <PantallaSuscripcion sesion={sesion} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
+      )}
+
+      {vistaActual === "estudio" && !(tiempoEstudioAgotado && !sesion) && (sesion ? puedeUsarEstudio : true) && (
       <div className="jmcs-grid" style={{ maxWidth: 2400, margin: "0 auto" }}>
         <div className="jmcs-calendario">
           <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
