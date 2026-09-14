@@ -5171,7 +5171,21 @@ function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
   );
 }
 
-function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast }) {
+function BurbujaPrueba({ diasRestantes, onSuscribirse }) {
+  const color = diasRestantes >= 4 ? "#2e9e4f" : diasRestantes >= 2 ? "#c9a227" : "#e05555";
+  return (
+    <div className="jmcs-burbuja-prueba">
+      <span className="jmcs-burbuja-prueba-arriba">Te quedan</span>
+      <div className="jmcs-burbuja-prueba-circulo" style={{ background: color }}>
+        {diasRestantes}
+      </div>
+      <span className="jmcs-burbuja-prueba-abajo">días de tu prueba gratis</span>
+      <button onClick={onSuscribirse} className="jmcs-burbuja-prueba-boton">Suscribirse</button>
+    </div>
+  );
+}
+
+function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancelar }) {
   const [planElegido, setPlanElegido] = useState("mensual");
   const [procesando, setProcesando] = useState(false);
 
@@ -5244,6 +5258,14 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast }) {
       <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 14 }}>
         El pago se procesa de forma segura a través de MercadoPago. Podés cancelar cuando quieras.
       </p>
+      {onCancelar && (
+        <button
+          onClick={onCancelar}
+          style={{ marginTop: 12, background: "transparent", border: "none", color: tema.textoSuave, fontSize: 12, textDecoration: "underline", cursor: "pointer" }}
+        >
+          Volver, todavía tengo días de prueba
+        </button>
+      )}
     </div>
   );
 }
@@ -5772,7 +5794,9 @@ function Home() {
     ? (Date.now() - new Date(sesion.user.created_at).getTime()) / (1000 * 60 * 60 * 24)
     : 0;
   const enPeriodoPrueba = diasDesdeRegistro <= DIAS_PRUEBA_SUSCRIPCION;
-  const puedeUsarEstudio = !sesion || enPeriodoPrueba || !!perfil?.suscripcion_activa;
+  const puedeUsarEstudio = !sesion || esAdmin || enPeriodoPrueba || !!perfil?.suscripcion_activa;
+  const diasRestantesPrueba = Math.max(0, Math.ceil(DIAS_PRUEBA_SUSCRIPCION - diasDesdeRegistro));
+  const [suscripcionManualAbierta, setSuscripcionManualAbierta] = useState(false);
 
   // Al volver de pagar en MercadoPago, refrescamos el perfil un par de veces
   // (el aviso de MercadoPago puede tardar unos segundos en llegar y activar la
@@ -6365,6 +6389,66 @@ function Home() {
           display: block;
         }
 
+        .jmcs-burbuja-prueba {
+          position: fixed;
+          bottom: 20px;
+          left: 20px;
+          z-index: 50;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          background: transparent;
+        }
+
+        @media (max-width: 767px) {
+          .jmcs-burbuja-prueba {
+            bottom: 76px;
+            left: 14px;
+          }
+        }
+
+        .jmcs-burbuja-prueba-arriba {
+          font-size: 9px;
+          color: inherit;
+          opacity: 0.75;
+          margin-bottom: 2px;
+        }
+
+        .jmcs-burbuja-prueba-circulo {
+          width: 46px;
+          height: 46px;
+          border-radius: 50%;
+          color: #fff;
+          font-weight: bold;
+          font-size: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+          animation: jmcsPulso 8s ease-in-out infinite;
+        }
+
+        .jmcs-burbuja-prueba-abajo {
+          font-size: 8px;
+          opacity: 0.75;
+          margin-top: 3px;
+          text-align: center;
+          max-width: 66px;
+          line-height: 1.2;
+        }
+
+        .jmcs-burbuja-prueba-boton {
+          margin-top: 4px;
+          font-size: 9px;
+          font-weight: bold;
+          background: transparent;
+          border: none;
+          color: #2e6b3e;
+          text-decoration: underline;
+          cursor: pointer;
+          padding: 0;
+        }
+
         .jmcs-datos-sticky {
           position: sticky;
           top: 8px;
@@ -6925,11 +7009,17 @@ function Home() {
         </div>
       )}
 
-      {vistaActual === "estudio" && sesion && !puedeUsarEstudio && (
-        <PantallaSuscripcion sesion={sesion} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
+      {vistaActual === "estudio" && sesion && (!puedeUsarEstudio || suscripcionManualAbierta) && (
+        <PantallaSuscripcion
+          sesion={sesion}
+          tema={tema}
+          acentoMarca={acentoMarca}
+          mostrarToast={mostrarToast}
+          onCancelar={puedeUsarEstudio ? () => setSuscripcionManualAbierta(false) : null}
+        />
       )}
 
-      {vistaActual === "estudio" && !(tiempoEstudioAgotado && !sesion) && (sesion ? puedeUsarEstudio : true) && (
+      {vistaActual === "estudio" && !(tiempoEstudioAgotado && !sesion) && (sesion ? (puedeUsarEstudio && !suscripcionManualAbierta) : true) && (
       <div className="jmcs-grid" style={{ maxWidth: 2400, margin: "0 auto" }}>
         <div className="jmcs-calendario">
           <PanelCalendario tema={tema} onSeleccionarPartido={seleccionarPartidoDelCalendario} acentoMarca={acentoMarca} onAbrirPerfil={abrirPerfilEquipo} mostrarToast={mostrarToast} />
@@ -7372,6 +7462,13 @@ function Home() {
       )}
 
       <Footer contenido={contenidoFooter} tema={tema} acentoMarca={acentoMarca} />
+
+      {sesion && !esAdmin && enPeriodoPrueba && !perfil?.suscripcion_activa && (
+        <BurbujaPrueba
+          diasRestantes={diasRestantesPrueba}
+          onSuscribirse={() => { setVistaActual("estudio"); setSuscripcionManualAbierta(true); }}
+        />
+      )}
 
       {resultadoModalFixture && (
         <ModalResultadoPartido
