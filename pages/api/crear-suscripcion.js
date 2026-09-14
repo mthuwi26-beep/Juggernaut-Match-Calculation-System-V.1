@@ -1,16 +1,16 @@
-// Crea una "suscripción" (preapproval) en MercadoPago y devuelve el link
-// (init_point) para mandar al usuario a autorizar el cobro recurrente.
-// El pago en sí lo maneja MercadoPago en su propia página — nunca vemos ni
-// guardamos el número de tarjeta acá.
-import { mpFetch } from "../../lib/mercadopago";
+// Recibe el token de tarjeta (ya generado en el navegador del usuario) y:
+// 1. Crea una "fuente de pago" guardada en Wompi (para poder cobrar los
+//    meses/años siguientes sin pedir la tarjeta de nuevo)
+// 2. Cobra la primera transacción con esa fuente
+// 3. Si sale bien, activa la suscripción del usuario en nuestra base
+import { wompiFetch, firmarTransaccion } from "../../lib/wompi";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://juggernaut-match-calculation-system-nine.vercel.app";
-
 // $70.000 COP/mes, $714.000 COP/año (15% de descuento sobre pagar mes a mes)
+// Wompi trabaja en "centavos" incluso para pesos colombianos — por eso x100
 const PRECIOS = {
-  mensual: { monto: 70000, frecuencia: 1 },
-  anual: { monto: 714000, frecuencia: 12 },
+  mensual: { monto: 70000 * 100, meses: 1 },
+  anual: { monto: 714000 * 100, meses: 12 },
 };
 
 export default async function handler(req, res) {
@@ -18,64 +18,67 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const { userId, email, plan } = req.body || {};
+  const { userId, email, plan, cardToken, acceptanceToken, personalDataToken } = req.body || {};
 
-  if (!userId || !email || !plan || !PRECIOS[plan]) {
+  if (!userId || !email || !plan || !cardToken || !acceptanceToken || !PRECIOS[plan]) {
     return res.status(400).json({ error: "Faltan datos o el plan no es válido" });
   }
 
   try {
-    const { monto, frecuencia } = PRECIOS[plan];
+    const { monto, meses } = PRECIOS[plan];
 
-    // Mientras probamos con cuentas de prueba creadas desde el panel visual
-    // de MercadoPago, no tenemos un correo válido para mandar como
-    // "comprador" (esas cuentas se manejan por usuario, no por correo).
-    // Con MERCADOPAGO_OMITIR_PAYER_EMAIL=true en Vercel, no mandamos ningún
-    // correo — MercadoPago le va a pedir iniciar sesión directo en su propia
-    // pantalla de pago, ahí sí con usuario y contraseña. Cuando pases a
-    // cobrar de verdad, borrá esa variable para volver a mandar el correo
-    // real del usuario (mejor experiencia, MercadoPago se lo autocompleta).
-    const omitirCorreo = process.env.MERCADOPAGO_OMITIR_PAYER_EMAIL === "true";
-    const payerEmail = process.env.MERCADOPAGO_TEST_BUYER_EMAIL || email;
-
-    const cuerpoPedido = {
-      reason: `JMCS Plan Pro — ${plan === "anual" ? "Anual" : "Mensual"}`,
-      external_reference: userId,
-      auto_recurring: {
-        frequency: frecuencia,
-        frequency_type: "months",
-        transaction_amount: monto,
-        currency_id: "COP",
-      },
-      back_url: `${SITE_URL}/?pago=exito`,
-      notification_url: `${SITE_URL}/api/mercadopago-webhook`,
-      status: "pending",
-    };
-    if (!omitirCorreo) {
-      cuerpoPedido.payer_email = payerEmail;
-    }
-
-    const suscripcion = await mpFetch("/preapproval", {
+    // 1. Fuente de pago guardada
+    const fuentePago = await wompiFetch("/payment_sources", {
       method: "POST",
-      body: JSON.stringify(cuerpoPedido),
+      body: JSON.stringify({
+        type: "CARD",
+        token: cardToken,
+        customer_email: email,
+        acceptance_token: acceptanceToken,
+        accept_personal_auth: personalDataToken,
+      }),
     });
 
-    // Guardamos el ID de la suscripción para poder identificarla cuando
-    // llegue el aviso (webhook) de MercadoPago más adelante
+    const paymentSourceId = fuentePago.data.id;
+
+    // 2. Cobro de la primera transacción, con esa fuente
+    const referencia = `jmcs-${userId}-${Date.now()}`;
+    const firma = firmarTransaccion(referencia, monto, "COP");
+    const transaccion = await wompiFetch("/transactions", {
+      method: "POST",
+      body: JSON.stringify({
+        amount_in_cents: monto,
+        currency: "COP",
+        customer_email: email,
+        payment_source_id: paymentSourceId,
+        payment_method: { installments: 1 },
+        reference: referencia,
+        acceptance_token: acceptanceToken,
+        signature: firma,
+      }),
+    });
+
+    const estado = transaccion.data.status; // "APPROVED" | "PENDING" | "DECLINED" | "ERROR"
+    const activa = estado === "APPROVED";
+
+    const ahora = new Date();
+    const proximoPago = new Date(ahora);
+    proximoPago.setMonth(proximoPago.getMonth() + meses);
+
     await supabaseAdmin
       .from("perfiles")
-      .update({ mercadopago_preapproval_id: suscripcion.id, plan_suscripcion: plan })
+      .update({
+        wompi_payment_source_id: paymentSourceId,
+        wompi_ultima_transaccion_id: transaccion.data.id,
+        plan_suscripcion: plan,
+        suscripcion_activa: activa,
+        suscripcion_fecha_pago: activa ? ahora.toISOString() : null,
+        suscripcion_proximo_pago: activa ? proximoPago.toISOString() : null,
+      })
       .eq("user_id", userId);
 
-    res.status(200).json({ url: suscripcion.init_point });
+    res.status(200).json({ estado, activa, transaccion_id: transaccion.data.id });
   } catch (error) {
-    // Lo dejamos anotado en los logs de Vercel (Vercel → tu proyecto →
-    // pestaña "Logs" → filtrar por /api/crear-suscripcion) y también se lo
-    // mostramos al usuario por ahora, mientras estamos probando — una vez
-    // que esté funcionando bien, lo volvemos a un mensaje más genérico.
-    console.error("Error creando suscripción en MercadoPago:", JSON.stringify(error.datos || error.message || error));
-    res.status(500).json({
-      error: "No se pudo crear la suscripción: " + (error.datos?.message || error.message || "error desconocido"),
-    });
+    res.status(500).json({ error: error.datos?.error?.messages || error.datos || error.message });
   }
 }
