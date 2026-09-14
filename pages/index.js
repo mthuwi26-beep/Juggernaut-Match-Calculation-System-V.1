@@ -5243,20 +5243,83 @@ function ModalMiPlan({ perfil, tema, acentoMarca, onCerrar }) {
 function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancelar }) {
   const [planElegido, setPlanElegido] = useState("mensual");
   const [procesando, setProcesando] = useState(false);
+  const [numero, setNumero] = useState("");
+  const [titular, setTitular] = useState("");
+  const [mes, setMes] = useState("");
+  const [anio, setAnio] = useState("");
+  const [cvc, setCvc] = useState("");
+  const [acepto, setAcepto] = useState(false);
+  const [permalink, setPermalink] = useState(null);
+
+  const WOMPI_BASE = process.env.NEXT_PUBLIC_WOMPI_BASE_URL || "https://sandbox.wompi.co/v1";
+  const LLAVE_PUBLICA = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
+
+  useEffect(() => {
+    if (!LLAVE_PUBLICA) return;
+    fetch(`${WOMPI_BASE}/merchants/${LLAVE_PUBLICA}`)
+      .then((r) => r.json())
+      .then((data) => setPermalink(data.data?.presigned_acceptance?.permalink))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function suscribirse() {
+    if (!numero || !titular || !mes || !anio || !cvc) {
+      mostrarToast && mostrarToast("Completá todos los datos de la tarjeta.");
+      return;
+    }
+    if (!acepto) {
+      mostrarToast && mostrarToast("Tenés que aceptar los términos de tratamiento de datos.");
+      return;
+    }
     setProcesando(true);
     try {
-      const res = await fetch("/api/crear-suscripcion", {
+      // 1. Pedimos los tokens de aceptación (términos + datos personales)
+      const resMerchant = await fetch(`${WOMPI_BASE}/merchants/${LLAVE_PUBLICA}`);
+      const merchant = await resMerchant.json();
+      const acceptanceToken = merchant.data?.presigned_acceptance?.acceptance_token;
+      const personalDataToken = merchant.data?.presigned_personal_data_auth?.acceptance_token;
+
+      // 2. Tokenizamos la tarjeta — esto va DIRECTO al navegador del usuario
+      //    hacia Wompi, nunca pasa por nuestro servidor
+      const resToken = await fetch(`${WOMPI_BASE}/tokens/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${LLAVE_PUBLICA}` },
+        body: JSON.stringify({
+          number: numero.replace(/\s/g, ""),
+          cvc,
+          exp_month: mes.padStart(2, "0"),
+          exp_year: anio.length === 4 ? anio.slice(2) : anio,
+          card_holder: titular,
+        }),
+      });
+      const tokenData = await resToken.json();
+      if (tokenData.status !== "CREATED") {
+        mostrarToast && mostrarToast("No se pudo procesar la tarjeta. Revisá los datos.");
+        setProcesando(false);
+        return;
+      }
+
+      // 3. Recién acá le mandamos el token (no el número de tarjeta) a
+      //    nuestro servidor, para crear la fuente de pago y cobrar
+      const res = await fetch("/api/wompi-crear-suscripcion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: sesion.user.id, email: sesion.user.email, plan: planElegido }),
+        body: JSON.stringify({
+          userId: sesion.user.id,
+          email: sesion.user.email,
+          plan: planElegido,
+          cardToken: tokenData.data.id,
+          acceptanceToken,
+          personalDataToken,
+        }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (data.activa) {
+        mostrarToast && mostrarToast("¡Listo! Tu suscripción ya está activa.");
+        window.location.reload();
       } else {
-        mostrarToast && mostrarToast(data.error || "No se pudo iniciar el pago. Intenta de nuevo.");
+        mostrarToast && mostrarToast(`El pago no se pudo completar (${data.estado || "revisá los datos de la tarjeta"}).`);
         setProcesando(false);
       }
     } catch {
@@ -5266,7 +5329,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
   }
 
   return (
-    <div style={{ maxWidth: 460, margin: "60px auto", textAlign: "center", padding: "0 20px" }}>
+    <div style={{ maxWidth: 460, margin: "40px auto", textAlign: "center", padding: "0 20px" }}>
       <Icono tipo="trofeo" size={40} color={acentoMarca} />
       <h3 style={{ marginTop: 16, marginBottom: 8 }}>Tu prueba gratis de 7 días terminó</h3>
       <p style={{ fontSize: 13, color: tema.textoSuave, marginBottom: 24 }}>
@@ -5303,15 +5366,63 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
         </div>
       </div>
 
+      <div style={{ textAlign: "left", marginBottom: 14 }}>
+        <label style={{ fontSize: 11, color: tema.textoSuave }}>Número de tarjeta</label>
+        <input
+          value={numero}
+          onChange={(e) => setNumero(e.target.value)}
+          placeholder="4242 4242 4242 4242"
+          style={{ width: "100%", padding: 10, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto, fontSize: 13, marginTop: 4 }}
+        />
+      </div>
+
+      <div style={{ textAlign: "left", marginBottom: 14 }}>
+        <label style={{ fontSize: 11, color: tema.textoSuave }}>Nombre del titular</label>
+        <input
+          value={titular}
+          onChange={(e) => setTitular(e.target.value)}
+          placeholder="Como figura en la tarjeta"
+          style={{ width: "100%", padding: 10, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto, fontSize: 13, marginTop: 4 }}
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        <div style={{ flex: 1, textAlign: "left" }}>
+          <label style={{ fontSize: 11, color: tema.textoSuave }}>Mes</label>
+          <input value={mes} onChange={(e) => setMes(e.target.value)} placeholder="MM" maxLength={2}
+            style={{ width: "100%", padding: 10, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto, fontSize: 13, marginTop: 4 }} />
+        </div>
+        <div style={{ flex: 1, textAlign: "left" }}>
+          <label style={{ fontSize: 11, color: tema.textoSuave }}>Año</label>
+          <input value={anio} onChange={(e) => setAnio(e.target.value)} placeholder="AAAA" maxLength={4}
+            style={{ width: "100%", padding: 10, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto, fontSize: 13, marginTop: 4 }} />
+        </div>
+        <div style={{ flex: 1, textAlign: "left" }}>
+          <label style={{ fontSize: 11, color: tema.textoSuave }}>CVC</label>
+          <input value={cvc} onChange={(e) => setCvc(e.target.value)} placeholder="123" maxLength={4}
+            style={{ width: "100%", padding: 10, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto, fontSize: 13, marginTop: 4 }} />
+        </div>
+      </div>
+
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11, color: tema.textoSuave, marginBottom: 18, textAlign: "left", cursor: "pointer" }}>
+        <input type="checkbox" checked={acepto} onChange={(e) => setAcepto(e.target.checked)} style={{ marginTop: 2 }} />
+        <span>
+          Acepto el tratamiento de mis datos personales según{" "}
+          {permalink ? (
+            <a href={permalink} target="_blank" rel="noopener noreferrer" style={{ color: acentoMarca }}>los términos de Wompi</a>
+          ) : "los términos de Wompi"}.
+        </span>
+      </label>
+
       <button
         onClick={suscribirse}
         disabled={procesando}
         style={{ width: "100%", padding: "14px 24px", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", fontSize: 14, cursor: procesando ? "default" : "pointer" }}
       >
-        {procesando ? "Conectando con MercadoPago..." : `Suscribirme — ${planElegido === "mensual" ? "$70.000/mes" : "$714.000/año"}`}
+        {procesando ? "Procesando el pago..." : `Suscribirme — ${planElegido === "mensual" ? "$70.000/mes" : "$714.000/año"}`}
       </button>
       <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 14 }}>
-        El pago se procesa de forma segura a través de MercadoPago. Podés cancelar cuando quieras.
+        El pago se procesa de forma segura a través de Wompi. Podés cancelar cuando quieras.
       </p>
       {onCancelar && (
         <button
