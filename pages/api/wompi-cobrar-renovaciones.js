@@ -49,7 +49,7 @@ export default async function handler(req, res) {
             payment_source_id: perfil.wompi_payment_source_id,
             payment_method: { installments: 1 },
             reference: referencia,
-            signature: firma,
+            signature: { integrity: firma },
           }),
         });
 
