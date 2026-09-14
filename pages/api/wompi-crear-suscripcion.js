@@ -3,7 +3,7 @@
 //    meses/años siguientes sin pedir la tarjeta de nuevo)
 // 2. Cobra la primera transacción con esa fuente
 // 3. Si sale bien, activa la suscripción del usuario en nuestra base
-import { wompiFetch } from "../../lib/wompi";
+import { wompiFetch, firmarTransaccion } from "../../lib/wompi";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
 // $70.000 COP/mes, $714.000 COP/año (15% de descuento sobre pagar mes a mes)
@@ -43,6 +43,7 @@ export default async function handler(req, res) {
 
     // 2. Cobro de la primera transacción, con esa fuente
     const referencia = `jmcs-${userId}-${Date.now()}`;
+    const firma = firmarTransaccion(referencia, monto, "COP");
     const transaccion = await wompiFetch("/transactions", {
       method: "POST",
       body: JSON.stringify({
@@ -53,6 +54,7 @@ export default async function handler(req, res) {
         payment_method: { installments: 1 },
         reference: referencia,
         acceptance_token: acceptanceToken,
+        signature: { integrity: firma },
       }),
     });
 
