@@ -48,6 +48,7 @@ export default async function handler(req, res) {
         currency_id: "COP",
       },
       back_url: `${SITE_URL}/?pago=exito`,
+      notification_url: `${SITE_URL}/api/mercadopago-webhook`,
       status: "pending",
     };
     if (!omitirCorreo) {
