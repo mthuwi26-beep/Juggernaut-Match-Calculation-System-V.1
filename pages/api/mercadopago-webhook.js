@@ -37,7 +37,11 @@ export default async function handler(req, res) {
       if (userId) {
         const { error } = await supabaseAdmin
           .from("perfiles")
-          .update({ suscripcion_activa: activa })
+          .update({
+            suscripcion_activa: activa,
+            suscripcion_fecha_pago: suscripcion.date_created || null,
+            suscripcion_proximo_pago: suscripcion.next_payment_date || null,
+          })
           .eq("user_id", userId);
         if (error) console.error("Error actualizando perfil desde el webhook:", JSON.stringify(error));
       } else {
