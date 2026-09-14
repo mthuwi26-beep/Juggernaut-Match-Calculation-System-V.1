@@ -3969,6 +3969,10 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
   const [planApi, setPlanApi] = useState("gratis");
   const [cambiandoPlan, setCambiandoPlan] = useState(false);
   const [aceptacionTerminos, setAceptacionTerminos] = useState([]);
+  const [busquedaSuscripcion, setBusquedaSuscripcion] = useState("");
+  const [resultadosSuscripcion, setResultadosSuscripcion] = useState([]);
+  const [buscandoSuscripcion, setBuscandoSuscripcion] = useState(false);
+  const [planGratisElegido, setPlanGratisElegido] = useState({});
 
   function cargarTodo() {
     setCargando(true);
@@ -4012,6 +4016,28 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
     setCambiandoPlan(false);
     if (error) mostrarToast && mostrarToast("No se pudo cambiar el plan.");
     else { setPlanApi(nuevo); mostrarToast && mostrarToast(`Plan cambiado a ${nuevo === "pro" ? "Pro" : "Gratis"}.`); }
+  }
+
+  async function buscarSuscripciones() {
+    if (!busquedaSuscripcion.trim()) return;
+    setBuscandoSuscripcion(true);
+    const { data, error } = await supabase.rpc("admin_buscar_usuario", { termino: busquedaSuscripcion.trim() });
+    setBuscandoSuscripcion(false);
+    if (error) mostrarToast && mostrarToast("No se pudo buscar.");
+    else setResultadosSuscripcion(data || []);
+  }
+
+  async function cancelarSuscripcion(userId) {
+    const { error } = await supabase.rpc("admin_cancelar_suscripcion", { usuario_id: userId });
+    if (error) mostrarToast && mostrarToast("No se pudo cancelar.");
+    else { mostrarToast && mostrarToast("Suscripción cancelada."); buscarSuscripciones(); }
+  }
+
+  async function otorgarSuscripcionGratis(userId) {
+    const plan = planGratisElegido[userId] || "mensual";
+    const { error } = await supabase.rpc("admin_otorgar_suscripcion_gratis", { usuario_id: userId, plan });
+    if (error) mostrarToast && mostrarToast(error.message || "No se pudo otorgar.");
+    else { mostrarToast && mostrarToast("Suscripción otorgada sin pago."); buscarSuscripciones(); }
   }
 
   useEffect(() => { cargarTodo(); }, []); // eslint-disable-line
@@ -4195,6 +4221,74 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
             ))}
           </div>
         )}
+      </div>
+
+      <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+        <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="trofeo" size={14} /> Suscripciones de usuarios</h4>
+        <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
+          Buscá por correo o nombre de usuario. Cualquier admin puede cancelar una suscripción.
+          {!esAdminPrincipal && " Otorgar una suscripción sin pago es solo para el admin principal."}
+        </p>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <input
+            value={busquedaSuscripcion}
+            onChange={(e) => setBusquedaSuscripcion(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && buscarSuscripciones()}
+            placeholder="correo@ejemplo.com o nombre de usuario"
+            style={{ flex: 1, padding: 8, fontSize: 12, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto }}
+          />
+          <button
+            onClick={buscarSuscripciones}
+            disabled={buscandoSuscripcion}
+            style={{ padding: "8px 16px", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
+          >
+            {buscandoSuscripcion ? "Buscando..." : "Buscar"}
+          </button>
+        </div>
+
+        {resultadosSuscripcion.map((u) => (
+          <div key={u.user_id} style={{ border: `1px solid ${tema.borde}`, borderRadius: 8, padding: 12, marginBottom: 8, fontSize: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <strong>{u.username || u.email}</strong>
+              <span style={{ color: u.suscripcion_activa ? "#2e9e4f" : "#e05555" }}>
+                {u.suscripcion_activa ? "Activa" : "Inactiva"}
+              </span>
+            </div>
+            <p style={{ color: tema.textoSuave, margin: "0 0 8px" }}>
+              {u.email} — Plan: {u.plan_suscripcion === "anual" ? "Max" : u.plan_suscripcion === "mensual" ? "Pro" : "—"}
+              {u.suscripcion_fecha_pago && ` — Último pago: ${new Date(u.suscripcion_fecha_pago).toLocaleDateString()}`}
+              {u.suscripcion_proximo_pago && ` — Próximo: ${new Date(u.suscripcion_proximo_pago).toLocaleDateString()}`}
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {u.suscripcion_activa && (
+                <button
+                  onClick={() => cancelarSuscripcion(u.user_id)}
+                  style={{ padding: "6px 12px", background: "#e05555", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}
+                >
+                  Cancelar suscripción
+                </button>
+              )}
+              {esAdminPrincipal && (
+                <>
+                  <select
+                    value={planGratisElegido[u.user_id] || "mensual"}
+                    onChange={(e) => setPlanGratisElegido((prev) => ({ ...prev, [u.user_id]: e.target.value }))}
+                    style={{ padding: 6, fontSize: 11, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto }}
+                  >
+                    <option value="mensual">Pro (mensual)</option>
+                    <option value="anual">Max (anual)</option>
+                  </select>
+                  <button
+                    onClick={() => otorgarSuscripcionGratis(u.user_id)}
+                    style={{ padding: "6px 12px", background: "#c9a227", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}
+                  >
+                    Otorgar sin pago
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
@@ -5211,7 +5305,7 @@ function ModalMiPlan({ perfil, tema, acentoMarca, onCerrar }) {
         </button>
 
         <Icono tipo="trofeo" size={36} color={acentoMarca} />
-        <h3 style={{ marginTop: 12, marginBottom: 4 }}>Plan {perfil?.plan_suscripcion === "anual" ? "Anual" : "Mensual"}</h3>
+        <h3 style={{ marginTop: 12, marginBottom: 4 }}>Plan {perfil?.plan_suscripcion === "anual" ? "Max" : "Pro"}</h3>
         <p style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 20 }}>Tenés acceso completo a Estudio, sin límites.</p>
 
         <div style={{ background: tema.panel, borderRadius: 8, padding: 16, textAlign: "left", fontSize: 13 }}>
@@ -5343,7 +5437,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
         <div style={{ background: tema.panel, borderRadius: 8, padding: 16, textAlign: "left", fontSize: 12, marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
             <span style={{ color: tema.textoSuave }}>Plan</span>
-            <strong>{pagoExitoso.plan === "anual" ? "Anual" : "Mensual"}</strong>
+            <strong>{pagoExitoso.plan === "anual" ? "Max" : "Pro"}</strong>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span style={{ color: tema.textoSuave }}>N° de transacción</span>
@@ -5382,7 +5476,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
             background: planElegido === "mensual" ? tema.panel : "transparent",
           }}
         >
-          <div style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 4 }}>Mensual</div>
+          <div style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 4 }}>Pro — Mensual</div>
           <strong style={{ fontSize: 18 }}>$70.000</strong>
           <div style={{ fontSize: 11, color: tema.textoSuave }}>COP / mes</div>
         </div>
@@ -5397,7 +5491,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
           <div style={{ position: "absolute", top: -10, right: 8, background: acentoMarca, color: "#fff", fontSize: 9, padding: "2px 8px", borderRadius: 10, fontWeight: "bold" }}>
             -15%
           </div>
-          <div style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 4 }}>Anual</div>
+          <div style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 4 }}>Max — Anual</div>
           <strong style={{ fontSize: 18 }}>$714.000</strong>
           <div style={{ fontSize: 11, color: tema.textoSuave }}>COP / año</div>
         </div>
@@ -6858,7 +6952,7 @@ function Home() {
                     }}
                   >
                     <Icono tipo="trofeo" size={11} />
-                    Plan {perfil.plan_suscripcion === "anual" ? "Anual" : "Mensual"}
+                    Plan {perfil.plan_suscripcion === "anual" ? "Max" : "Pro"}
                   </button>
                 )}
                 <button
