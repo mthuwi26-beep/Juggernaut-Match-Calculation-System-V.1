@@ -5295,7 +5295,8 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
       });
       const tokenData = await resToken.json();
       if (tokenData.status !== "CREATED") {
-        mostrarToast && mostrarToast("No se pudo procesar la tarjeta. Revisá los datos.");
+        console.error("Error tokenizando tarjeta en Wompi:", tokenData);
+        mostrarToast && mostrarToast(`No se pudo procesar la tarjeta: ${JSON.stringify(tokenData.error || tokenData)}`);
         setProcesando(false);
         return;
       }
@@ -5319,10 +5320,13 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
         mostrarToast && mostrarToast("¡Listo! Tu suscripción ya está activa.");
         window.location.reload();
       } else {
-        mostrarToast && mostrarToast(`El pago no se pudo completar (${data.estado || "revisá los datos de la tarjeta"}).`);
+        const detalle = data.error ? JSON.stringify(data.error) : (data.estado || "sin más detalle");
+        console.error("Respuesta de wompi-crear-suscripcion:", data);
+        mostrarToast && mostrarToast(`El pago no se pudo completar: ${detalle}`);
         setProcesando(false);
       }
-    } catch {
+    } catch (errorFetch) {
+      console.error("Error de red al suscribirse:", errorFetch);
       mostrarToast && mostrarToast("No se pudo conectar con el servidor de pagos.");
       setProcesando(false);
     }
