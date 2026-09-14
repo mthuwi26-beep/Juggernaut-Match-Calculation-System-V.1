@@ -5279,11 +5279,12 @@ function BurbujaPrueba({ diasRestantes, onSuscribirse }) {
   );
 }
 
-function ModalMiPlan({ perfil, tema, acentoMarca, onCerrar }) {
+function ModalMiPlan({ perfil, tema, acentoMarca, diasRestantesPrueba, onCerrar, onSuscribirse }) {
   const [montado, setMontado] = useState(false);
   useEffect(() => { setMontado(true); }, []);
   if (!montado) return null;
 
+  const esGratis = !perfil?.suscripcion_activa;
   const fechaPago = perfil?.suscripcion_fecha_pago ? new Date(perfil.suscripcion_fecha_pago) : null;
   const proximoPago = perfil?.suscripcion_proximo_pago ? new Date(perfil.suscripcion_proximo_pago) : null;
   const diasRestantes = proximoPago ? Math.max(0, Math.ceil((proximoPago.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null;
@@ -5304,30 +5305,50 @@ function ModalMiPlan({ perfil, tema, acentoMarca, onCerrar }) {
           <Icono tipo="cerrar" size={18} />
         </button>
 
-        <Icono tipo="trofeo" size={36} color={acentoMarca} />
-        <h3 style={{ marginTop: 12, marginBottom: 4 }}>Plan {perfil?.plan_suscripcion === "anual" ? "Max" : "Pro"}</h3>
-        <p style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 20 }}>Tenés acceso completo a Estudio, sin límites.</p>
+        {esGratis ? (
+          <>
+            <Icono tipo="calendario" size={36} color={tema.textoSuave} />
+            <h3 style={{ marginTop: 12, marginBottom: 4 }}>Plan gratuito</h3>
+            <p style={{ fontSize: 13, marginBottom: 20 }}>
+              Te quedan <strong style={{ color: acentoMarca }}>{diasRestantesPrueba}</strong> día{diasRestantesPrueba === 1 ? "" : "s"} de tu prueba gratis.
+            </p>
+            {onSuscribirse && (
+              <button
+                onClick={() => { onCerrar(); onSuscribirse(); }}
+                style={{ width: "100%", padding: "12px 20px", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", fontSize: 13, cursor: "pointer" }}
+              >
+                Suscribirme ahora
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <Icono tipo="trofeo" size={36} color={acentoMarca} />
+            <h3 style={{ marginTop: 12, marginBottom: 4 }}>Plan {perfil?.plan_suscripcion === "anual" ? "Max" : "Pro"}</h3>
+            <p style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 20 }}>Tenés acceso completo a Estudio, sin límites.</p>
 
-        <div style={{ background: tema.panel, borderRadius: 8, padding: 16, textAlign: "left", fontSize: 13 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ color: tema.textoSuave }}>Último pago</span>
-            <strong>{fechaPago ? fechaPago.toLocaleDateString() : "Sin datos"}</strong>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ color: tema.textoSuave }}>Próximo cobro</span>
-            <strong>{proximoPago ? proximoPago.toLocaleDateString() : "Sin datos"}</strong>
-          </div>
-          {diasRestantes !== null && (
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: tema.textoSuave }}>Días restantes</span>
-              <strong style={{ color: acentoMarca }}>{diasRestantes}</strong>
+            <div style={{ background: tema.panel, borderRadius: 8, padding: 16, textAlign: "left", fontSize: 13 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ color: tema.textoSuave }}>Último pago</span>
+                <strong>{fechaPago ? fechaPago.toLocaleDateString() : "Sin datos"}</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ color: tema.textoSuave }}>Próximo cobro</span>
+                <strong>{proximoPago ? proximoPago.toLocaleDateString() : "Sin datos"}</strong>
+              </div>
+              {diasRestantes !== null && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: tema.textoSuave }}>Días restantes</span>
+                  <strong style={{ color: acentoMarca }}>{diasRestantes}</strong>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 16 }}>
-          Podés cancelar tu suscripción en cualquier momento desde MercadoPago.
-        </p>
+            <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 16 }}>
+              Podés cancelar tu suscripción en cualquier momento desde Wompi.
+            </p>
+          </>
+        )}
       </div>
     </div>,
     document.body
@@ -6955,6 +6976,17 @@ function Home() {
                     Plan {perfil.plan_suscripcion === "anual" ? "Max" : "Pro"}
                   </button>
                 )}
+                {!perfil?.suscripcion_activa && enPeriodoPrueba && !esAdmin && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setModalPlanAbierto(true); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 20,
+                      background: "transparent", color: tema.textoSuave, border: `1px solid ${tema.borde}`, fontSize: 11, fontWeight: "bold", cursor: "pointer",
+                    }}
+                  >
+                    FREE
+                  </button>
+                )}
                 <button
                   onClick={cerrarSesion}
                   style={{
@@ -7792,7 +7824,14 @@ function Home() {
       )}
 
       {modalPlanAbierto && (
-        <ModalMiPlan perfil={perfil} tema={tema} acentoMarca={acentoMarca} onCerrar={() => setModalPlanAbierto(false)} />
+        <ModalMiPlan
+          perfil={perfil}
+          tema={tema}
+          acentoMarca={acentoMarca}
+          diasRestantesPrueba={diasRestantesPrueba}
+          onCerrar={() => setModalPlanAbierto(false)}
+          onSuscribirse={() => { setVistaActual("estudio"); setSuscripcionManualAbierta(true); }}
+        />
       )}
 
       {resultadoModalFixture && (
