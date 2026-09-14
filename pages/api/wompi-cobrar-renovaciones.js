@@ -2,7 +2,7 @@
 // vigilante de notificaciones) — busca suscripciones a las que ya les toca
 // pagar de nuevo, y las cobra usando la fuente de pago que ya tienen
 // guardada, sin pedirle la tarjeta al usuario de nuevo.
-import { wompiFetch } from "../../lib/wompi";
+import { wompiFetch, firmarTransaccion } from "../../lib/wompi";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
 const PRECIOS = {
@@ -39,6 +39,7 @@ export default async function handler(req, res) {
         if (!email) continue;
 
         const referencia = `jmcs-renovacion-${perfil.user_id}-${Date.now()}`;
+        const firma = firmarTransaccion(referencia, monto, "COP");
         const transaccion = await wompiFetch("/transactions", {
           method: "POST",
           body: JSON.stringify({
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
             payment_source_id: perfil.wompi_payment_source_id,
             payment_method: { installments: 1 },
             reference: referencia,
+            signature: firma,
           }),
         });
 
