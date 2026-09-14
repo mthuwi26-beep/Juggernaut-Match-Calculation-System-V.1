@@ -54,7 +54,7 @@ export default async function handler(req, res) {
         payment_method: { installments: 1 },
         reference: referencia,
         acceptance_token: acceptanceToken,
-        signature: { integrity: firma },
+        signature: firma,
       }),
     });
 
