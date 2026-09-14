@@ -5798,9 +5798,9 @@ function Home() {
   const diasRestantesPrueba = Math.max(0, Math.ceil(DIAS_PRUEBA_SUSCRIPCION - diasDesdeRegistro));
   const [suscripcionManualAbierta, setSuscripcionManualAbierta] = useState(false);
 
-  // Al volver de pagar en MercadoPago, refrescamos el perfil un par de veces
-  // (el aviso de MercadoPago puede tardar unos segundos en llegar y activar la
-  // suscripción del lado del servidor).
+  // Al volver de pagar en MercadoPago, le preguntamos directo a MercadoPago
+  // el estado real (no confiamos solo en que el aviso automático llegue —
+  // así activamos la cuenta aunque el webhook se demore o falle).
   useEffect(() => {
     if (typeof window === "undefined" || !sesion) return;
     // MercadoPago a veces arma la URL de vuelta con un "?" de más en vez de
@@ -5811,10 +5811,19 @@ function Home() {
     let intentos = 0;
     const intervalo = setInterval(() => {
       intentos++;
-      supabase.from("perfiles").select("*").eq("user_id", sesion.user.id).maybeSingle().then(({ data }) => {
-        if (data) setPerfil(data);
-        if (data?.suscripcion_activa || intentos >= 6) clearInterval(intervalo);
-      });
+      fetch(`/api/verificar-suscripcion?userId=${sesion.user.id}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.suscripcion_activa) {
+            supabase.from("perfiles").select("*").eq("user_id", sesion.user.id).maybeSingle().then(({ data: perfilNuevo }) => {
+              if (perfilNuevo) setPerfil(perfilNuevo);
+            });
+            clearInterval(intervalo);
+          } else if (intentos >= 6) {
+            clearInterval(intervalo);
+          }
+        })
+        .catch(() => {});
     }, 2000);
     return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
