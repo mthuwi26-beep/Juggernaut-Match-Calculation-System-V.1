@@ -50,6 +50,7 @@ export default async function handler(req, res) {
         currency: "COP",
         customer_email: email,
         payment_source_id: paymentSourceId,
+        payment_method: { installments: 1 },
         reference: referencia,
         acceptance_token: acceptanceToken,
       }),
