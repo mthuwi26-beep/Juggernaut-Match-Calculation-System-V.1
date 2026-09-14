@@ -23,7 +23,14 @@ export default async function handler(req, res) {
     const suscripcion = await mpFetch(`/preapproval/${perfil.mercadopago_preapproval_id}`);
     const activa = suscripcion.status === "authorized";
 
-    await supabaseAdmin.from("perfiles").update({ suscripcion_activa: activa }).eq("user_id", userId);
+    await supabaseAdmin
+      .from("perfiles")
+      .update({
+        suscripcion_activa: activa,
+        suscripcion_fecha_pago: suscripcion.date_created || null,
+        suscripcion_proximo_pago: suscripcion.next_payment_date || null,
+      })
+      .eq("user_id", userId);
 
     res.status(200).json({ suscripcion_activa: activa, status_mercadopago: suscripcion.status });
   } catch (error) {
