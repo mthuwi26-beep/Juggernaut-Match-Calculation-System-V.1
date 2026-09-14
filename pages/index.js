@@ -5250,6 +5250,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
   const [cvc, setCvc] = useState("");
   const [acepto, setAcepto] = useState(false);
   const [permalink, setPermalink] = useState(null);
+  const [pagoExitoso, setPagoExitoso] = useState(null); // { transaccionId, plan, monto }
 
   const WOMPI_BASE = process.env.NEXT_PUBLIC_WOMPI_BASE_URL || "https://sandbox.wompi.co/v1";
   const LLAVE_PUBLICA = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
@@ -5317,8 +5318,8 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
       });
       const data = await res.json();
       if (data.activa) {
-        mostrarToast && mostrarToast("¡Listo! Tu suscripción ya está activa.");
-        window.location.reload();
+        setPagoExitoso({ transaccionId: data.transaccion_id, plan: planElegido });
+        setProcesando(false);
       } else {
         const detalle = data.error ? JSON.stringify(data.error) : (data.estado || "sin más detalle");
         console.error("Respuesta de wompi-crear-suscripcion:", data);
@@ -5330,6 +5331,38 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
       mostrarToast && mostrarToast("No se pudo conectar con el servidor de pagos.");
       setProcesando(false);
     }
+  }
+
+  if (pagoExitoso) {
+    return (
+      <div style={{ maxWidth: 440, margin: "60px auto", textAlign: "center", padding: "0 20px" }}>
+        <Icono tipo="check" size={48} color="#2e9e4f" />
+        <h3 style={{ marginTop: 16, marginBottom: 6 }}>¡Pago exitoso!</h3>
+        <p style={{ fontSize: 14, marginBottom: 20 }}>Gracias por confiar en JMCS 💚</p>
+
+        <div style={{ background: tema.panel, borderRadius: 8, padding: 16, textAlign: "left", fontSize: 12, marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ color: tema.textoSuave }}>Plan</span>
+            <strong>{pagoExitoso.plan === "anual" ? "Anual" : "Mensual"}</strong>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: tema.textoSuave }}>N° de transacción</span>
+            <strong style={{ fontSize: 11 }}>{pagoExitoso.transaccionId}</strong>
+          </div>
+        </div>
+
+        <p style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 20 }}>
+          Wompi te va a mandar un comprobante por correo automáticamente. Guardá el número de transacción de arriba, por las dudas.
+        </p>
+
+        <button
+          onClick={() => window.location.reload()}
+          style={{ width: "100%", padding: "14px 24px", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", fontSize: 14, cursor: "pointer" }}
+        >
+          Continuar
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -6573,8 +6606,8 @@ function Home() {
 
         .jmcs-burbuja-prueba {
           position: fixed;
-          bottom: 20px;
-          left: 20px;
+          bottom: 108px;
+          right: 20px;
           z-index: 50;
           display: flex;
           flex-direction: column;
@@ -6584,8 +6617,8 @@ function Home() {
 
         @media (max-width: 767px) {
           .jmcs-burbuja-prueba {
-            bottom: 76px;
-            left: 14px;
+            bottom: 142px;
+            right: 14px;
           }
         }
 
