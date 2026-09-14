@@ -27,12 +27,20 @@ export default async function handler(req, res) {
   try {
     const { monto, frecuencia } = PRECIOS[plan];
 
+    // Mientras estemos probando con cuentas de prueba de MercadoPago, el
+    // correo real del usuario logueado en JMCS no sirve como "comprador"
+    // (MercadoPago lo rechaza si no es una cuenta real o de prueba suya).
+    // Si configurás MERCADOPAGO_TEST_BUYER_EMAIL en Vercel, se usa ese en
+    // vez del correo real — SOLO para probar. Cuando pases a cobrar de
+    // verdad, borrá esa variable y vuelve a usar el correo real solo.
+    const payerEmail = process.env.MERCADOPAGO_TEST_BUYER_EMAIL || email;
+
     const suscripcion = await mpFetch("/preapproval", {
       method: "POST",
       body: JSON.stringify({
         reason: `JMCS Plan Pro — ${plan === "anual" ? "Anual" : "Mensual"}`,
         external_reference: userId,
-        payer_email: email,
+        payer_email: payerEmail,
         auto_recurring: {
           frequency: frecuencia,
           frequency_type: "months",
