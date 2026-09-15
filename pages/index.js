@@ -5728,31 +5728,6 @@ function Home() {
   const [equipoVisitante, setEquipoVisitante] = useState(null);
   const [fixturesVisitante, setFixturesVisitante] = useState([]);
 
-  // Registro de cada equipo que se estudia de verdad (no cada tecla que se
-  // escribe al buscar, solo cuando ya se cargó un equipo concreto) — para
-  // poder mostrar después "tus equipos/países más recurrentes" en el perfil.
-  useEffect(() => {
-    if (!sesion || !equipoLocal?.team?.id) return;
-    supabase.from("historial_busquedas_estudio").insert({
-      user_id: sesion.user.id,
-      team_id: equipoLocal.team.id,
-      team_name: equipoLocal.team.name,
-      team_country: equipoLocal.team.country || null,
-    }).then(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, equipoLocal?.team?.id]);
-
-  useEffect(() => {
-    if (!sesion || !equipoVisitante?.team?.id) return;
-    supabase.from("historial_busquedas_estudio").insert({
-      user_id: sesion.user.id,
-      team_id: equipoVisitante.team.id,
-      team_name: equipoVisitante.team.name,
-      team_country: equipoVisitante.team.country || null,
-    }).then(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, equipoVisitante?.team?.id]);
-
   const [modoOscuro, setModoOscuro] = useState(false);
   const yaAplicoTemaGuardado = useRef(false);
 
@@ -5804,6 +5779,32 @@ function Home() {
   const [toqueInicioY, setToqueInicioY] = useState(null);
   const [chatAbierto, setChatAbierto] = useState(false);
   const [sesion, setSesion] = useState(null);
+
+  // Registro de cada equipo que se estudia de verdad (no cada tecla que se
+  // escribe al buscar, solo cuando ya se cargó un equipo concreto) — para
+  // poder mostrar después "tus equipos/países más recurrentes" en el perfil.
+  useEffect(() => {
+    if (!sesion || !equipoLocal?.team?.id) return;
+    supabase.from("historial_busquedas_estudio").insert({
+      user_id: sesion.user.id,
+      team_id: equipoLocal.team.id,
+      team_name: equipoLocal.team.name,
+      team_country: equipoLocal.team.country || null,
+    }).then(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion, equipoLocal?.team?.id]);
+
+  useEffect(() => {
+    if (!sesion || !equipoVisitante?.team?.id) return;
+    supabase.from("historial_busquedas_estudio").insert({
+      user_id: sesion.user.id,
+      team_id: equipoVisitante.team.id,
+      team_name: equipoVisitante.team.name,
+      team_country: equipoVisitante.team.country || null,
+    }).then(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion, equipoVisitante?.team?.id]);
+
   const [cargandoSesion, setCargandoSesion] = useState(true);
   const [authModalAbierto, setAuthModalAbierto] = useState(false);
   const [authModalModo, setAuthModalModo] = useState("login");
