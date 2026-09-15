@@ -39,7 +39,7 @@ export default async function handler(req, res) {
         if (!email) continue;
 
         const referencia = `jmcs-renovacion-${perfil.user_id}-${Date.now()}`;
-        const firma = firmarTransaccion(referencia, monto, "COP");
+        const firma = await firmarTransaccion(referencia, monto, "COP");
         const transaccion = await wompiFetch("/transactions", {
           method: "POST",
           body: JSON.stringify({
