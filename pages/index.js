@@ -3967,6 +3967,8 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
   const [footerForm, setFooterForm] = useState({ quienes_somos: "", instagram_url: "", correo_contacto: "" });
   const [guardandoFooter, setGuardandoFooter] = useState(false);
   const [planApi, setPlanApi] = useState("gratis");
+  const [modoWompiAdmin, setModoWompiAdmin] = useState("prueba");
+  const [cambiandoModoWompi, setCambiandoModoWompi] = useState(false);
   const [cambiandoPlan, setCambiandoPlan] = useState(false);
   const [aceptacionTerminos, setAceptacionTerminos] = useState([]);
   const [busquedaSuscripcion, setBusquedaSuscripcion] = useState("");
@@ -3992,13 +3994,14 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
     });
     supabase
       .from("configuracion_app")
-      .select("mantenimiento, mensaje_mantenimiento, plan_api")
+      .select("mantenimiento, mensaje_mantenimiento, plan_api, wompi_modo")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data }) => {
         setMantenimientoActivo(!!data?.mantenimiento);
         setMensajeMantenimiento(data?.mensaje_mantenimiento || "");
         setPlanApi(data?.plan_api || "gratis");
+        setModoWompiAdmin(data?.wompi_modo || "prueba");
       });
     supabase
       .from("contenido_footer")
@@ -4008,6 +4011,14 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
       .then(({ data }) => {
         if (data) setFooterForm(data);
       });
+  }
+
+  async function cambiarModoWompi(nuevo) {
+    setCambiandoModoWompi(true);
+    const { error } = await supabase.rpc("actualizar_wompi_modo", { nuevo_modo: nuevo });
+    setCambiandoModoWompi(false);
+    if (error) mostrarToast && mostrarToast("No se pudo cambiar el modo de Wompi.");
+    else { setModoWompiAdmin(nuevo); mostrarToast && mostrarToast(`Wompi cambiado a modo ${nuevo === "real" ? "Real" : "Prueba"}.`); }
   }
 
   async function cambiarPlanApi(nuevo) {
@@ -4320,6 +4331,42 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
             Plan Pro API
           </button>
         </div>
+      </div>
+
+      <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+        <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={14} /> Modo de pagos (Wompi)</h4>
+        <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
+          En "Prueba" se usan las claves de sandbox (tarjetas falsas, sin cobrar plata real). En "Real" se usan las claves de producción — ojo, ahí sí se cobra de verdad.
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => cambiarModoWompi("prueba")}
+            disabled={cambiandoModoWompi}
+            style={{
+              padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: cambiandoModoWompi ? "default" : "pointer",
+              background: modoWompiAdmin === "prueba" ? acentoMarca : "transparent", color: modoWompiAdmin === "prueba" ? "#fff" : tema.texto,
+              border: `1px solid ${modoWompiAdmin === "prueba" ? acentoMarca : tema.borde}`,
+            }}
+          >
+            Modo Prueba
+          </button>
+          <button
+            onClick={() => cambiarModoWompi("real")}
+            disabled={cambiandoModoWompi}
+            style={{
+              padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: cambiandoModoWompi ? "default" : "pointer",
+              background: modoWompiAdmin === "real" ? "#e05555" : "transparent", color: modoWompiAdmin === "real" ? "#fff" : tema.texto,
+              border: `1px solid ${modoWompiAdmin === "real" ? "#e05555" : tema.borde}`,
+            }}
+          >
+            Modo Real
+          </button>
+        </div>
+        {modoWompiAdmin === "real" && (
+          <p style={{ fontSize: 11, color: "#e05555", marginTop: 10, marginBottom: 0 }}>
+            ⚠ Estás en modo REAL — cualquier suscripción que se pague ahora cobra plata de verdad.
+          </p>
+        )}
       </div>
 
       <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
@@ -5479,9 +5526,19 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
   const [acepto, setAcepto] = useState(false);
   const [permalink, setPermalink] = useState(null);
   const [pagoExitoso, setPagoExitoso] = useState(null); // { transaccionId, plan, monto }
+  const [modoWompi, setModoWompi] = useState("prueba");
 
-  const WOMPI_BASE = process.env.NEXT_PUBLIC_WOMPI_BASE_URL || "https://sandbox.wompi.co/v1";
-  const LLAVE_PUBLICA = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
+  useEffect(() => {
+    supabase
+      .from("configuracion_app")
+      .select("wompi_modo")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => setModoWompi(data?.wompi_modo === "real" ? "real" : "prueba"));
+  }, []);
+
+  const WOMPI_BASE = modoWompi === "real" ? "https://production.wompi.co/v1" : (process.env.NEXT_PUBLIC_WOMPI_BASE_URL || "https://sandbox.wompi.co/v1");
+  const LLAVE_PUBLICA = modoWompi === "real" ? process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY_REAL : process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
 
   useEffect(() => {
     if (!LLAVE_PUBLICA) return;
@@ -5490,7 +5547,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
       .then((data) => setPermalink(data.data?.presigned_acceptance?.permalink))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [modoWompi]);
 
   async function suscribirse() {
     if (!numero || !titular || !mes || !anio || !cvc) {
@@ -5984,9 +6041,9 @@ function Home() {
     } else if (itemMenu === "ajustes") {
       setMenuAbierto(false);
       setVistaActual("ajustes");
-    } else if (itemMenu === "perfil") {
+    } else if (itemMenu === "verPerfil") {
       setMenuAbierto(false);
-      setVistaActual("perfil");
+      setVistaActual("verPerfil");
     } else {
       mostrarProximamente();
     }
@@ -7173,8 +7230,8 @@ function Home() {
                 }}
               >
                 {[
+                  { clave: "verPerfil", etiqueta: "Perfil" },
                   { clave: "inicio", etiqueta: t("menuInicio") },
-                  { clave: "perfil", etiqueta: "Editar perfil" },
                   { clave: "misEstudios", etiqueta: t("menuMisEstudios") },
                   { clave: "favoritos", etiqueta: t("menuFavoritos") },
                   { clave: "historial", etiqueta: t("menuHistorial") },
