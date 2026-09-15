@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.jmcs.app",
+        "sha256_cert_fingerprints": ["E1:EB:20:E1:21:57:85:AD:13:2C:BA:74:7C:7F:1A:C7:D3:95:31:10:7B:D0:02:89:80:ED:53:C0:64:38:62:02"]
+      }
+    }]
