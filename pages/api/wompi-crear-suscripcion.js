@@ -43,7 +43,7 @@ export default async function handler(req, res) {
 
     // 2. Cobro de la primera transacción, con esa fuente
     const referencia = `jmcs-${userId}-${Date.now()}`;
-    const firma = firmarTransaccion(referencia, monto, "COP");
+    const firma = await firmarTransaccion(referencia, monto, "COP");
     const transaccion = await wompiFetch("/transactions", {
       method: "POST",
       body: JSON.stringify({
