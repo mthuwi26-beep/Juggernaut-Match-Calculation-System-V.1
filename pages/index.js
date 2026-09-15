@@ -5942,6 +5942,25 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
   );
 }
 
+function PantallaSinConexionApp({ onReintentar }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0f1f14", color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24 }}>
+      <Icono tipo="candado" size={40} color="#9fb3a6" />
+      <h2 style={{ fontSize: 18, margin: "16px 0 8px" }}>Sin conexión</h2>
+      <p style={{ fontSize: 13, color: "#9fb3a6", maxWidth: 300, marginBottom: 28 }}>
+        Parece que no tenés internet en este momento. Intentalo más tarde.
+      </p>
+      <button
+        onClick={onReintentar}
+        style={{ width: 56, height: 56, borderRadius: "50%", background: "#2e6b3e", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+        aria-label="Reintentar"
+      >
+        <Icono tipo="refrescar" size={24} color="#fff" />
+      </button>
+    </div>
+  );
+}
+
 function PantallaMantenimiento({ mensaje, onIniciarSesion }) {
   return (
     <div style={{
@@ -6019,6 +6038,25 @@ function Home() {
   const [toqueInicioX, setToqueInicioX] = useState(null);
   const [toqueInicioY, setToqueInicioY] = useState(null);
   const [chatAbierto, setChatAbierto] = useState(false);
+
+  // Sin conexión: para avisar (web) o mostrar una pantalla propia (app instalada)
+  const [sinConexion, setSinConexion] = useState(false);
+  const [esAppInstalada] = useState(
+    () => typeof document !== "undefined" && document.referrer.startsWith("android-app://")
+  );
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    setSinConexion(!navigator.onLine);
+    const marcarSinConexion = () => setSinConexion(true);
+    const marcarConConexion = () => setSinConexion(false);
+    window.addEventListener("offline", marcarSinConexion);
+    window.addEventListener("online", marcarConConexion);
+    return () => {
+      window.removeEventListener("offline", marcarSinConexion);
+      window.removeEventListener("online", marcarConConexion);
+    };
+  }, []);
+
   const [sesion, setSesion] = useState(null);
 
   // Registro de cada equipo que se estudia de verdad (no cada tecla que se
@@ -6867,6 +6905,13 @@ function Home() {
     };
     lambdaGolesLocalReal = calcularValorEsperado(motorGolesLocal, esPartidoLiga);
     lambdaGolesVisitanteReal = calcularValorEsperado(motorGolesVisitante, esPartidoLiga);
+  }
+
+  // Sin conexión Y estamos en la app instalada: pantalla propia, no el
+  // error feo del navegador/WebView. En PC y navegador de celular no se
+  // corta el paso así — ahí solo se avisa con un aviso chico (más abajo).
+  if (esAppInstalada && sinConexion) {
+    return <PantallaSinConexionApp onReintentar={() => window.location.reload()} />;
   }
 
   // Mientras todavía no sabemos si el usuario es admin (o no), no mostramos nada
@@ -8223,6 +8268,19 @@ function Home() {
           diasRestantes={diasRestantesPrueba}
           onSuscribirse={() => { setVistaActual("estudio"); setSuscripcionManualAbierta(true); }}
         />
+      )}
+
+      {sinConexion && !esAppInstalada && (
+        <div
+          style={{
+            position: "fixed", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 400,
+            background: "#e05555", color: "#fff", fontSize: 12, padding: "8px 16px", borderRadius: 20,
+            display: "flex", alignItems: "center", gap: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          }}
+        >
+          <Icono tipo="candado" size={13} color="#fff" />
+          Estás sin conexión — viendo los últimos datos guardados, puede no estar actualizado
+        </div>
       )}
 
       {modalPlanAbierto && (
