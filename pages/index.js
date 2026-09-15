@@ -4475,6 +4475,88 @@ const AVATARES_PREDEFINIDOS = [
   { id: "porteria", src: "/avatars/porteria.png" },
 ];
 
+function VistaRanking({ sesion, tema, acentoMarca }) {
+  const [periodo, setPeriodo] = useState("semana");
+  const [datos, setDatos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    setCargando(true);
+    supabase
+      .rpc("obtener_ranking", { periodo })
+      .then(({ data, error }) => {
+        setDatos(error ? [] : data || []);
+        setCargando(false);
+      });
+  }, [periodo]);
+
+  const miPosicion = sesion ? datos.findIndex((d) => d.user_id === sesion.user.id) : -1;
+
+  return (
+    <div style={{ maxWidth: 500, margin: "0 auto", padding: "0 12px" }}>
+      <h3 style={{ fontSize: 18, marginBottom: 6, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <Icono tipo="corona" size={18} color={acentoMarca} /> Top pronosticadores
+      </h3>
+      <p style={{ fontSize: 11, color: tema.textoSuave, textAlign: "center", marginBottom: 18 }}>
+        Necesitás al menos 3 pronósticos guardados y verificados para aparecer acá.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, justifyContent: "center" }}>
+        {[{ id: "semana", etiqueta: "Semanal" }, { id: "mes", etiqueta: "Mensual" }, { id: "historico", etiqueta: "Histórico" }].map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setPeriodo(p.id)}
+            style={{
+              padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: "bold", cursor: "pointer",
+              background: periodo === p.id ? acentoMarca : "transparent", color: periodo === p.id ? "#fff" : tema.texto,
+              border: `1px solid ${periodo === p.id ? acentoMarca : tema.borde}`,
+            }}
+          >
+            {p.etiqueta}
+          </button>
+        ))}
+      </div>
+
+      {cargando ? (
+        <p style={{ textAlign: "center", color: tema.textoSuave, fontSize: 13 }}>Cargando...</p>
+      ) : datos.length === 0 ? (
+        <p style={{ textAlign: "center", color: tema.textoSuave, fontSize: 13 }}>Todavía no hay suficientes pronósticos verificados en este período.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {datos.map((d, i) => {
+            const soyYo = sesion && d.user_id === sesion.user.id;
+            return (
+              <div
+                key={d.user_id}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8,
+                  background: soyYo ? acentoMarca + "22" : tema.panel,
+                  border: soyYo ? `1px solid ${acentoMarca}` : "none",
+                }}
+              >
+                <strong style={{ width: 24, fontSize: 13, color: i < 3 ? acentoMarca : tema.textoSuave }}>
+                  {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                </strong>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: soyYo ? "bold" : "normal" }}>
+                  {d.nombre_mostrado}{soyYo ? " (vos)" : ""}
+                </span>
+                <span style={{ fontSize: 11, color: tema.textoSuave }}>{d.aciertos}/{d.total}</span>
+                <strong style={{ fontSize: 14, color: acentoMarca, minWidth: 46, textAlign: "right" }}>{d.porcentaje}%</strong>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sesion && miPosicion === -1 && datos.length > 0 && (
+        <p style={{ fontSize: 11, color: tema.textoSuave, textAlign: "center", marginTop: 16 }}>
+          Todavía no aparecés en este ranking — seguí guardando y verificando pronósticos en Estudio.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
   const [predicciones, setPredicciones] = useState([]);
   const [historialBusquedas, setHistorialBusquedas] = useState([]);
@@ -4590,6 +4672,7 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
 
 function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca }) {
   const [username, setUsername] = useState(perfil?.username || "");
+  const [apodoRanking, setApodoRanking] = useState(perfil?.apodo_ranking || "");
   const [avatarSeleccionado, setAvatarSeleccionado] = useState(perfil?.avatar_url || "");
   const [mercadosPreferidos, setMercadosPreferidos] = useState(perfil?.mercados_preferidos || []);
   const [subiendo, setSubiendo] = useState(false);
@@ -4628,6 +4711,7 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
       .from("perfiles")
       .update({
         username: username.trim(), avatar_url: avatarSeleccionado || null,
+        apodo_ranking: apodoRanking.trim() || null,
         mercados_preferidos: mercadosPreferidos.length > 0 ? mercadosPreferidos : null,
         updated_at: new Date().toISOString(),
       })
@@ -4690,6 +4774,18 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
           onChange={(e) => setUsername(e.target.value)}
           required
           maxLength={24}
+          style={{ width: "100%", padding: 10, marginBottom: 20, fontSize: 14, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+        />
+
+        <label style={{ fontSize: 12, color: tema.textoSuave, display: "block", marginBottom: 6 }}>
+          Apodo para el ranking público (opcional — si lo dejás vacío, aparecés como "Pronosticador ####", nunca con tu nombre real)
+        </label>
+        <input
+          type="text"
+          value={apodoRanking}
+          onChange={(e) => setApodoRanking(e.target.value)}
+          maxLength={24}
+          placeholder="Ej: ElOráculo"
           style={{ width: "100%", padding: 10, marginBottom: 20, fontSize: 14, background: tema.panel, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
         />
 
@@ -6029,6 +6125,11 @@ function Home() {
       setVistaActual("estudio");
       return;
     }
+    if (itemMenu === "ranking") {
+      setMenuAbierto(false);
+      setVistaActual("ranking");
+      return;
+    }
     if (!sesion) {
       setMenuAbierto(false);
       abrirLogin();
@@ -7232,6 +7333,7 @@ function Home() {
                 {[
                   { clave: "verPerfil", etiqueta: "Perfil" },
                   { clave: "inicio", etiqueta: t("menuInicio") },
+                  { clave: "ranking", etiqueta: "Ranking" },
                   { clave: "misEstudios", etiqueta: t("menuMisEstudios") },
                   { clave: "favoritos", etiqueta: t("menuFavoritos") },
                   { clave: "historial", etiqueta: t("menuHistorial") },
@@ -7525,6 +7627,12 @@ function Home() {
       {vistaActual === "historial" && (
         <div style={{ margin: "20px auto" }}>
           <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} />
+        </div>
+      )}
+
+      {vistaActual === "ranking" && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaRanking sesion={sesion} tema={tema} acentoMarca={acentoMarca} />
         </div>
       )}
 
