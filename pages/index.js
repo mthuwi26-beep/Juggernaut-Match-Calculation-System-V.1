@@ -6711,18 +6711,18 @@ function Home() {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="JMCS" />
-        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/icon-180.png" />
 
         {/* Cómo se ve cuando alguien comparte el link en WhatsApp, Instagram, etc. */}
         <meta property="og:title" content="JMCS — Juggernaut Match Calculation System" />
         <meta property="og:description" content="Métricas y estadísticas reales de fútbol, con metodología transparente." />
-        <meta property="og:image" content="https://juggernaut-match-calculation-system-nine.vercel.app/logo.png" />
+        <meta property="og:image" content="https://juggernaut-match-calculation-system-nine.vercel.app/icon-512.png" />
         <meta property="og:url" content="https://juggernaut-match-calculation-system-nine.vercel.app" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content="JMCS — Juggernaut Match Calculation System" />
         <meta name="twitter:description" content="Métricas y estadísticas reales de fútbol, con metodología transparente." />
-        <meta name="twitter:image" content="https://juggernaut-match-calculation-system-nine.vercel.app/logo.png" />
+        <meta name="twitter:image" content="https://juggernaut-match-calculation-system-nine.vercel.app/icon-512.png" />
       </Head>
 
       {/* Google Analytics — solo se activa si configurás NEXT_PUBLIC_GA_ID en Vercel.
