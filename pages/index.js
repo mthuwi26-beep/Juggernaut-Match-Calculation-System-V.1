@@ -1576,6 +1576,90 @@ function CalculadoraValor({ opciones, tema, acento }) {
   );
 }
 
+// Dibuja los 11 titulares de un equipo sobre una cancha simple, usando la
+// "grilla" que manda API-Football (formato "fila:columna" — fila 1 es el
+// arquero, filas más altas están más cerca del arco rival).
+function CanchaEquipo({ titulares, formacion, tema, acento, invertido }) {
+  const porFila = {};
+  titulares.forEach((j) => {
+    if (!j.grilla) return;
+    const [fila, columna] = j.grilla.split(":").map(Number);
+    if (!porFila[fila]) porFila[fila] = [];
+    porFila[fila].push({ ...j, columna });
+  });
+  const filas = Object.keys(porFila).map(Number).sort((a, b) => a - b);
+  const maxFila = Math.max(...filas, 1);
+
+  return (
+    <div>
+      {formacion && <p style={{ textAlign: "center", fontSize: 11, color: tema.textoSuave, marginBottom: 6 }}>Formación: {formacion}</p>}
+      <svg viewBox="0 0 300 200" style={{ width: "100%", maxWidth: 320, display: "block", margin: "0 auto", background: "#1c5c33", borderRadius: 8 }}>
+        <rect x="4" y="4" width="292" height="192" fill="none" stroke="#ffffff55" strokeWidth="1.5" />
+        <line x1="4" y1="100" x2="296" y2="100" stroke="#ffffff55" strokeWidth="1.5" />
+        <circle cx="150" cy="100" r="24" fill="none" stroke="#ffffff55" strokeWidth="1.5" />
+        {filas.map((fila) => {
+          const jugadoresFila = porFila[fila].sort((a, b) => a.columna - b.columna);
+          const yBase = invertido
+            ? 14 + ((fila - 1) / maxFila) * 172
+            : 186 - ((fila - 1) / maxFila) * 172;
+          return jugadoresFila.map((j, i) => {
+            const xBase = ((i + 1) / (jugadoresFila.length + 1)) * 292 + 4;
+            return (
+              <g key={j.id}>
+                <circle cx={xBase} cy={yBase} r="11" fill={acento} stroke="#fff" strokeWidth="1.5" />
+                <text x={xBase} y={yBase + 4} fontSize="10" fill="#fff" textAnchor="middle" fontWeight="bold">{j.numero}</text>
+                <text x={xBase} y={yBase + 20} fontSize="7" fill="#fff" textAnchor="middle">{(j.nombre || "").split(" ").pop()}</text>
+              </g>
+            );
+          });
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function PanelAlineaciones({ fixtureIdActual, equipoLocal, equipoVisitante, tema, acento }) {
+  const [datos, setDatos] = useState(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    if (!fixtureIdActual) return;
+    setCargando(true);
+    fetch(`/api/alineaciones?fixtureId=${fixtureIdActual}`)
+      .then((r) => r.json())
+      .then((data) => { setDatos(data); setCargando(false); })
+      .catch(() => setCargando(false));
+  }, [fixtureIdActual]);
+
+  if (!fixtureIdActual) return null;
+
+  return (
+    <div style={{ marginBottom: 20, background: tema.panel, borderRadius: 8, padding: 16 }}>
+      <h4 style={{ fontSize: 13, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+        <Icono tipo="banderin" size={13} /> Alineaciones confirmadas
+      </h4>
+
+      {cargando ? (
+        <p style={{ fontSize: 12, color: tema.textoSuave, textAlign: "center" }}>Buscando alineaciones...</p>
+      ) : !datos?.disponible ? (
+        <p style={{ fontSize: 12, color: tema.textoSuave, textAlign: "center" }}>
+          Todavía no están confirmadas — suelen publicarse entre 20 y 40 minutos antes del partido.
+        </p>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {datos.equipos.map((eq, i) => (
+            <div key={eq.equipo.id}>
+              <p style={{ fontSize: 11, fontWeight: "bold", textAlign: "center", marginBottom: 6 }}>{eq.equipo.nombre}</p>
+              <CanchaEquipo titulares={eq.titulares} formacion={eq.formacion} tema={tema} acento={acento} invertido={i === 1} />
+              {eq.tecnico && <p style={{ fontSize: 10, color: tema.textoSuave, textAlign: "center", marginTop: 6 }}>DT: {eq.tecnico}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual, ignorarCompeticionExacta, setIgnorarCompeticionExacta, fixtureIdActual }) {
   const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
   const [lineaHandicap, setLineaHandicap] = useState(0);
@@ -1774,6 +1858,10 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
             <Icono tipo="flecha" size={13} /> Compartir este pronóstico
           </button>
         </div>
+      )}
+
+      {fixtureIdActual && (
+        <PanelAlineaciones fixtureIdActual={fixtureIdActual} equipoLocal={equipoLocal} equipoVisitante={equipoVisitante} tema={tema} acento={acento} />
       )}
 
       {competicionActual?.nombre ? (
