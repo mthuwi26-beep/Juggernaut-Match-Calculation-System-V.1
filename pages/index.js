@@ -4428,6 +4428,119 @@ const AVATARES_PREDEFINIDOS = [
   { id: "porteria", src: "/avatars/porteria.png" },
 ];
 
+function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
+  const [predicciones, setPredicciones] = useState([]);
+  const [historialBusquedas, setHistorialBusquedas] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    if (!sesion) return;
+    Promise.all([
+      supabase.from("predicciones").select("resultado"),
+      supabase.from("historial_busquedas_estudio").select("team_name, team_country").eq("user_id", sesion.user.id).limit(500),
+    ]).then(([resPred, resHist]) => {
+      setPredicciones(resPred.data || []);
+      setHistorialBusquedas(resHist.data || []);
+      setCargando(false);
+    });
+  }, [sesion]);
+
+  const resueltas = predicciones.filter((p) => p.resultado !== "pendiente");
+  const aciertos = resueltas.filter((p) => p.resultado === "acierto").length;
+  const porcentaje = resueltas.length > 0 ? Math.round((aciertos / resueltas.length) * 100) : null;
+
+  function contarTop(lista, campo, cantidad = 5) {
+    const conteo = {};
+    lista.forEach((item) => {
+      const valor = item[campo];
+      if (!valor) return;
+      conteo[valor] = (conteo[valor] || 0) + 1;
+    });
+    return Object.entries(conteo)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, cantidad);
+  }
+
+  const topEquipos = contarTop(historialBusquedas, "team_name");
+  const topPaises = contarTop(historialBusquedas, "team_country");
+
+  return (
+    <div style={{ maxWidth: 500, margin: "0 auto", padding: "0 12px", textAlign: "center" }}>
+      <img
+        src={perfil?.avatar_url || "/logo.png"}
+        alt=""
+        width={84}
+        height={84}
+        style={{ borderRadius: "50%", objectFit: "cover", border: `2px solid ${acentoMarca}`, marginBottom: 12 }}
+      />
+      <h3 style={{ marginBottom: 4 }}>{perfil?.username || sesion.user.email}</h3>
+      {perfil?.suscripcion_activa && (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 20, background: acentoMarca, color: "#fff", fontSize: 11, fontWeight: "bold", marginBottom: 20 }}>
+          <Icono tipo="trofeo" size={11} /> Plan {perfil.plan_suscripcion === "anual" ? "Max" : "Pro"}
+        </span>
+      )}
+
+      {cargando ? (
+        <p style={{ color: tema.textoSuave, fontSize: 13 }}>Cargando...</p>
+      ) : (
+        <>
+          <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 16, textAlign: "left" }}>
+            <h4 style={{ fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <Icono tipo="grafico" size={13} /> Historial de aciertos
+            </h4>
+            {porcentaje !== null ? (
+              <p style={{ fontSize: 13, margin: 0 }}>
+                <strong style={{ color: acentoMarca }}>{porcentaje}%</strong> de aciertos — {aciertos}/{resueltas.length} pronósticos verificados
+              </p>
+            ) : (
+              <p style={{ fontSize: 12, color: tema.textoSuave, margin: 0 }}>Todavía no verificaste ningún pronóstico guardado.</p>
+            )}
+          </div>
+
+          <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 16, textAlign: "left" }}>
+            <h4 style={{ fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <Icono tipo="banderin" size={13} /> Equipos más recurrentes en Estudio
+            </h4>
+            {topEquipos.length === 0 ? (
+              <p style={{ fontSize: 12, color: tema.textoSuave, margin: 0 }}>Todavía no estudiaste ningún equipo.</p>
+            ) : (
+              topEquipos.map(([nombre, veces]) => (
+                <div key={nombre} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0" }}>
+                  <span>{nombre}</span>
+                  <strong>{veces}×</strong>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24, textAlign: "left" }}>
+            <h4 style={{ fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <Icono tipo="estadio" size={13} /> Países más recurrentes en Estudio
+            </h4>
+            {topPaises.length === 0 ? (
+              <p style={{ fontSize: 12, color: tema.textoSuave, margin: 0 }}>Todavía no hay suficientes datos.</p>
+            ) : (
+              topPaises.map(([nombre, veces]) => (
+                <div key={nombre} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0" }}>
+                  <span>{nombre}</span>
+                  <strong>{veces}×</strong>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      <button
+        onClick={onEditar}
+        style={{ padding: "10px 20px", background: "transparent", border: `1px solid ${acentoMarca}`, color: acentoMarca, borderRadius: 6, fontSize: 13, fontWeight: "bold", cursor: "pointer" }}
+      >
+        Editar perfil
+      </button>
+    </div>
+  );
+}
+
 function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca }) {
   const [username, setUsername] = useState(perfil?.username || "");
   const [avatarSeleccionado, setAvatarSeleccionado] = useState(perfil?.avatar_url || "");
@@ -5614,6 +5727,32 @@ function Home() {
   const [fixturesLocal, setFixturesLocal] = useState([]);
   const [equipoVisitante, setEquipoVisitante] = useState(null);
   const [fixturesVisitante, setFixturesVisitante] = useState([]);
+
+  // Registro de cada equipo que se estudia de verdad (no cada tecla que se
+  // escribe al buscar, solo cuando ya se cargó un equipo concreto) — para
+  // poder mostrar después "tus equipos/países más recurrentes" en el perfil.
+  useEffect(() => {
+    if (!sesion || !equipoLocal?.team?.id) return;
+    supabase.from("historial_busquedas_estudio").insert({
+      user_id: sesion.user.id,
+      team_id: equipoLocal.team.id,
+      team_name: equipoLocal.team.name,
+      team_country: equipoLocal.team.country || null,
+    }).then(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion, equipoLocal?.team?.id]);
+
+  useEffect(() => {
+    if (!sesion || !equipoVisitante?.team?.id) return;
+    supabase.from("historial_busquedas_estudio").insert({
+      user_id: sesion.user.id,
+      team_id: equipoVisitante.team.id,
+      team_name: equipoVisitante.team.name,
+      team_country: equipoVisitante.team.country || null,
+    }).then(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion, equipoVisitante?.team?.id]);
+
   const [modoOscuro, setModoOscuro] = useState(false);
   const yaAplicoTemaGuardado = useRef(false);
 
@@ -5844,6 +5983,9 @@ function Home() {
     } else if (itemMenu === "ajustes") {
       setMenuAbierto(false);
       setVistaActual("ajustes");
+    } else if (itemMenu === "perfil") {
+      setMenuAbierto(false);
+      setVistaActual("perfil");
     } else {
       mostrarProximamente();
     }
@@ -6949,7 +7091,7 @@ function Home() {
             {sesion ? (
               <>
                 <div
-                  onClick={() => setVistaActual("perfil")}
+                  onClick={() => setVistaActual("verPerfil")}
                   style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
                   title="Editar perfil"
                 >
@@ -7325,6 +7467,12 @@ function Home() {
       {vistaActual === "historial" && (
         <div style={{ margin: "20px auto" }}>
           <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} />
+        </div>
+      )}
+
+      {vistaActual === "verPerfil" && sesion && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaVerPerfil sesion={sesion} perfil={perfil} tema={tema} acentoMarca={acentoMarca} onEditar={() => setVistaActual("perfil")} />
         </div>
       )}
 
