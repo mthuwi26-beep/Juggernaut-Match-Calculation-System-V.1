@@ -4,7 +4,7 @@
 // equipos ya cargados en la pantalla principal.
 import { obtenerCache, guardarCache, CACHE_3_MINUTOS, CACHE_PARA_SIEMPRE } from "../../lib/cacheApi";
 
-const ESTADOS_FINALIZADOS = ["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"];
+const ESTADOS_FINALIZADOS = ["FT", "AET", "PEN", "CANC", "AWD", "WO"];
 
 export default async function handler(req, res) {
   const { fixtureId } = req.query;
