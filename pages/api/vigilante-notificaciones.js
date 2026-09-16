@@ -186,13 +186,13 @@ export default async function handler(req, res) {
         if (golesLocal > (previo.goles_local ?? 0)) {
           const destinatarios = usuariosConPreferencia(usuariosAmbos, "notif_gol");
           if (destinatarios.length > 0) {
-            eventosAEnviar.push({ userIds: destinatarios, titulo: `¡Gol de ${nombreLocal}!`, cuerpo: marcador });
+            eventosAEnviar.push({ userIds: destinatarios, titulo: `¡Gol de ${nombreLocal}!`, cuerpo: marcador, tipo: "gol" });
           }
         }
         if (golesVisitante > (previo.goles_visitante ?? 0)) {
           const destinatarios = usuariosConPreferencia(usuariosAmbos, "notif_gol");
           if (destinatarios.length > 0) {
-            eventosAEnviar.push({ userIds: destinatarios, titulo: `¡Gol de ${nombreVisitante}!`, cuerpo: marcador });
+            eventosAEnviar.push({ userIds: destinatarios, titulo: `¡Gol de ${nombreVisitante}!`, cuerpo: marcador, tipo: "gol" });
           }
         }
       }
@@ -334,7 +334,7 @@ export default async function handler(req, res) {
       for (const evento of eventosAEnviar) {
         const subsDelEvento = (suscripciones || []).filter((s) => evento.userIds.includes(s.user_id));
         for (const sub of subsDelEvento) {
-          const resultado = await enviarPush(sub, { titulo: evento.titulo, cuerpo: evento.cuerpo, url: "/" });
+          const resultado = await enviarPush(sub, { titulo: evento.titulo, cuerpo: evento.cuerpo, url: "/", tipo: evento.tipo || "general" });
           if (resultado.ok) enviados++;
           if (resultado.expirada) {
             await supabaseAdmin.from("push_subscriptions").delete().eq("id", sub.id);
