@@ -1,4 +1,4 @@
-// ── Lo de siempre: notificaciones push (SIN TOCAR) ──────────────────────
+// ── Lo de siempre: notificaciones push (con la vibración nueva sumada) ──
 self.addEventListener("push", (event) => {
   let datos = {};
   try {
@@ -7,11 +7,21 @@ self.addEventListener("push", (event) => {
     datos = {};
   }
   const titulo = datos.titulo || "JMCS";
+
+  // Patrón de vibración distinto según el tipo de aviso — más largo y
+  // marcado para un gol de tu equipo favorito, más simple para el resto.
+  // (números en milisegundos: vibra, pausa, vibra...)
+  const vibracionPorTipo = {
+    gol: [200, 80, 200, 80, 400],
+  };
+  const vibrar = vibracionPorTipo[datos.tipo] || [150];
+
   event.waitUntil(
     self.registration.showNotification(titulo, {
       body: datos.cuerpo || "",
       icon: "/logo.png",
       badge: "/logo.png",
+      vibrate: vibrar,
       data: { url: datos.url || "/" },
     })
   );
