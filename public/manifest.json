@@ -7,6 +7,26 @@
   "background_color": "#0f1f14",
   "theme_color": "#2e6b3e",
   "orientation": "portrait-primary",
+  "shortcuts": [
+    {
+      "name": "Partidos de hoy",
+      "short_name": "Hoy",
+      "url": "/?ir=inicio",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Favoritos",
+      "short_name": "Favoritos",
+      "url": "/?ir=favoritos",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Historial",
+      "short_name": "Historial",
+      "url": "/?ir=historial",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",
