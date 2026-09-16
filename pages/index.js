@@ -6052,8 +6052,9 @@ function Home() {
 
   // Sin conexión: para avisar (web) o mostrar una pantalla propia (app instalada).
   // navigator.onLine solo, no alcanza — puede decir "conectado" aunque estés
-  // pegado a un wifi sin internet real. Por eso sumamos un ping propio cada
-  // 15 segundos, que es la comprobación que realmente importa.
+  // pegado a un wifi sin internet real. Por eso sumamos un ping propio: cada
+  // 8 segundos fijo, y además en cada toque de pantalla (sin pasarse de una
+  // vez cada 3 segundos como mucho, para no golpear el servidor de más).
   const [sinConexion, setSinConexion] = useState(false);
   const [esAppInstalada] = useState(
     () => typeof document !== "undefined" && document.referrer.startsWith("android-app://")
@@ -6062,6 +6063,7 @@ function Home() {
     if (typeof navigator === "undefined") return;
 
     let cancelado = false;
+    let ultimaComprobacion = 0;
 
     async function comprobarConexionReal() {
       if (!navigator.onLine) {
@@ -6071,7 +6073,7 @@ function Home() {
       try {
         const controlador = new AbortController();
         const limite = setTimeout(() => controlador.abort(), 5000);
-        await fetch("/manifest.json", { cache: "no-store", signal: controlador.signal });
+        await fetch("/api/ping", { cache: "no-store", signal: controlador.signal });
         clearTimeout(limite);
         if (!cancelado) setSinConexion(false);
       } catch {
@@ -6079,15 +6081,26 @@ function Home() {
       }
     }
 
+    function comprobarPorInteraccion() {
+      const ahora = Date.now();
+      if (ahora - ultimaComprobacion < 3000) return; // no más de una vez cada 3 seg
+      ultimaComprobacion = ahora;
+      comprobarConexionReal();
+    }
+
     comprobarConexionReal();
-    const intervalo = setInterval(comprobarConexionReal, 15000);
+    const intervalo = setInterval(comprobarConexionReal, 8000);
     window.addEventListener("offline", comprobarConexionReal);
     window.addEventListener("online", comprobarConexionReal);
+    window.addEventListener("click", comprobarPorInteraccion);
+    window.addEventListener("touchstart", comprobarPorInteraccion);
 
     return () => {
       cancelado = true;
       clearInterval(intervalo);
       window.removeEventListener("offline", comprobarConexionReal);
+      window.removeEventListener("click", comprobarPorInteraccion);
+      window.removeEventListener("touchstart", comprobarPorInteraccion);
       window.removeEventListener("online", comprobarConexionReal);
     };
   }, []);
@@ -8461,3 +8474,4 @@ export default function HomeConTrampaDeErrores() {
     </TrampaDeErrores>
   );
 }
+
