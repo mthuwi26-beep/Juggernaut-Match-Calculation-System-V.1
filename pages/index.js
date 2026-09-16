@@ -6050,21 +6050,45 @@ function Home() {
   const [toqueInicioY, setToqueInicioY] = useState(null);
   const [chatAbierto, setChatAbierto] = useState(false);
 
-  // Sin conexión: para avisar (web) o mostrar una pantalla propia (app instalada)
+  // Sin conexión: para avisar (web) o mostrar una pantalla propia (app instalada).
+  // navigator.onLine solo, no alcanza — puede decir "conectado" aunque estés
+  // pegado a un wifi sin internet real. Por eso sumamos un ping propio cada
+  // 15 segundos, que es la comprobación que realmente importa.
   const [sinConexion, setSinConexion] = useState(false);
   const [esAppInstalada] = useState(
     () => typeof document !== "undefined" && document.referrer.startsWith("android-app://")
   );
   useEffect(() => {
     if (typeof navigator === "undefined") return;
-    setSinConexion(!navigator.onLine);
-    const marcarSinConexion = () => setSinConexion(true);
-    const marcarConConexion = () => setSinConexion(false);
-    window.addEventListener("offline", marcarSinConexion);
-    window.addEventListener("online", marcarConConexion);
+
+    let cancelado = false;
+
+    async function comprobarConexionReal() {
+      if (!navigator.onLine) {
+        if (!cancelado) setSinConexion(true);
+        return;
+      }
+      try {
+        const controlador = new AbortController();
+        const limite = setTimeout(() => controlador.abort(), 5000);
+        await fetch("/manifest.json", { cache: "no-store", signal: controlador.signal });
+        clearTimeout(limite);
+        if (!cancelado) setSinConexion(false);
+      } catch {
+        if (!cancelado) setSinConexion(true);
+      }
+    }
+
+    comprobarConexionReal();
+    const intervalo = setInterval(comprobarConexionReal, 15000);
+    window.addEventListener("offline", comprobarConexionReal);
+    window.addEventListener("online", comprobarConexionReal);
+
     return () => {
-      window.removeEventListener("offline", marcarSinConexion);
-      window.removeEventListener("online", marcarConConexion);
+      cancelado = true;
+      clearInterval(intervalo);
+      window.removeEventListener("offline", comprobarConexionReal);
+      window.removeEventListener("online", comprobarConexionReal);
     };
   }, []);
 
