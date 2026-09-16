@@ -518,6 +518,17 @@ function construirFuentesEquipo(fixturesCompletos, teamId, statsMap, competicion
 
 // El motor de pesos dinámicos: recibe las 7 fuentes de UNA estadística y devuelve
 // el valor esperado ya ponderado y normalizado, según la metodología del documento.
+// "Hoy" en el huso horario del usuario, no en UTC — new Date().toISOString()
+// usa UTC, así que de noche (pasada cierta hora según el país) devolvía el
+// día siguiente por error. Esta función arma la fecha con los valores
+// locales del navegador, no los de UTC.
+function fechaLocalHoy() {
+  const d = new Date();
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
 function calcularValorEsperado(fuentesStat, esPartidoLiga) {
   const conf = (n, ref) => Math.min(1, n / ref);
 
@@ -1857,7 +1868,7 @@ function PanelAnaliticaPartido({ fixtureIdActual, equipoLocal, equipoVisitante, 
     if (!estadoPartido || !TERMINADO.includes(estadoPartido)) return;
     if (!equipoLocal?.team?.name || !equipoVisitante?.team?.name) return;
     setBuscandoPitchApi(true);
-    const fecha = new Date().toISOString().slice(0, 10);
+    const fecha = fechaLocalHoy();
     fetch(`/api/pitchapi-partido?fecha=${fecha}&nombreLocal=${encodeURIComponent(equipoLocal.team.name)}&nombreVisitante=${encodeURIComponent(equipoVisitante.team.name)}`)
       .then((r) => r.json())
       .then((data) => setDatosPitchApi(data))
@@ -2464,7 +2475,7 @@ function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos, mos
 }
 
 function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfil, mostrarToast }) {
-  const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
+  const [fecha, setFecha] = useState(fechaLocalHoy());
   const [partidos, setPartidos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -4051,7 +4062,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   const [paisFiltro, setPaisFiltro] = useState(null);
 
   useEffect(() => {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = fechaLocalHoy();
     setLoading(true);
     fetch(`/api/partidos-por-fecha?date=${hoy}`)
       .then((r) => r.json())
@@ -7020,8 +7031,8 @@ function Home() {
 
   const mensajeEstudio =
     equipoLocal?.team && equipoVisitante?.team
-      ? `Estudio: ${equipoLocal.team.name} vs ${equipoVisitante.team.name} — historial de temporada 2024 (plan gratis de API-Football)`
-      : "Modo prueba: historial de temporada 2024 (plan gratis de API-Football). El calendario de la izquierda sí trae partidos reales.";
+      ? `Estudio: ${equipoLocal.team.name} vs ${equipoVisitante.team.name}`
+      : "Modo prueba: elegí un equipo local y otro visitante para empezar. El calendario de la izquierda sí trae partidos reales.";
 
   async function cargarDatosPuntuales() {
     if (!equipoLocal?.team || !equipoVisitante?.team) return;
