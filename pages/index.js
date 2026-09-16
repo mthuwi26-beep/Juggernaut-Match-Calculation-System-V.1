@@ -1618,6 +1618,303 @@ function CanchaEquipo({ titulares, formacion, tema, acento, invertido }) {
   );
 }
 
+// ── Comentario en vivo, minuto a minuto (API-Football) ──────────────────
+function PanelComentarioVivo({ fixtureIdActual, tema, acento }) {
+  const [eventos, setEventos] = useState([]);
+  const [disponible, setDisponible] = useState(false);
+
+  useEffect(() => {
+    if (!fixtureIdActual) return;
+    function cargar() {
+      fetch(`/api/eventos-vivo?fixtureId=${fixtureIdActual}`)
+        .then((r) => r.json())
+        .then((data) => { setEventos(data.eventos || []); setDisponible(!!data.disponible); })
+        .catch(() => {});
+    }
+    cargar();
+    const intervalo = setInterval(cargar, 20000);
+    return () => clearInterval(intervalo);
+  }, [fixtureIdActual]);
+
+  if (!disponible || eventos.length === 0) return null;
+
+  const iconoPorTipo = (tipo, detalle) => {
+    if (tipo === "Goal") return "⚽";
+    if (tipo === "Card" && detalle?.includes("Yellow")) return "🟨";
+    if (tipo === "Card") return "🟥";
+    if (tipo === "subst") return "🔄";
+    return "•";
+  };
+
+  return (
+    <div style={{ marginBottom: 20, background: tema.panel, borderRadius: 8, padding: 16 }}>
+      <h4 style={{ fontSize: 13, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+        <Icono tipo="campana" size={13} /> Comentario en vivo
+      </h4>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 260, overflowY: "auto" }}>
+        {[...eventos].reverse().map((e, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "flex-start" }}>
+            <strong style={{ color: acento, minWidth: 34 }}>{e.minuto}'{e.minutoExtra ? `+${e.minutoExtra}` : ""}</strong>
+            <span>{iconoPorTipo(e.tipo, e.detalle)}</span>
+            <span style={{ color: tema.texto }}>
+              {e.jugador} <span style={{ color: tema.textoSuave }}>({e.equipo})</span>
+              {e.asistencia && <span style={{ color: tema.textoSuave }}> — asist. {e.asistencia}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Momentum en vivo: nuestra aproximación, a partir de fotos periódicas ─
+function PanelMomentumVivo({ fixtureIdActual, nombreLocal, nombreVisitante, tema, acento }) {
+  const [puntos, setPuntos] = useState([]);
+
+  useEffect(() => {
+    if (!fixtureIdActual) return;
+
+    function sacarFoto() {
+      fetch("/api/momentum-snapshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fixtureId: fixtureIdActual }),
+      }).catch(() => {});
+    }
+
+    function cargarPuntos() {
+      fetch(`/api/momentum-snapshot?fixtureId=${fixtureIdActual}`)
+        .then((r) => r.json())
+        .then((data) => {
+          const snapshots = data.snapshots || [];
+          const calculados = [];
+          for (let i = 1; i < snapshots.length; i++) {
+            const a = snapshots[i - 1];
+            const b = snapshots[i];
+            const deltaLocal = (b.tiros_local - a.tiros_local) + (b.corners_local - a.corners_local) * 0.5;
+            const deltaVisitante = (b.tiros_visitante - a.tiros_visitante) + (b.corners_visitante - a.corners_visitante) * 0.5;
+            const diffPosesion = (b.posesion_local - a.posesion_local) * 0.3;
+            let valor = (deltaLocal - deltaVisitante) * 25 + diffPosesion;
+            valor = Math.max(-100, Math.min(100, valor));
+            calculados.push({ minuto: b.minuto, valor });
+          }
+          setPuntos(calculados);
+        })
+        .catch(() => {});
+    }
+
+    sacarFoto();
+    cargarPuntos();
+    const intervaloFoto = setInterval(sacarFoto, 90 * 1000);
+    const intervaloCarga = setInterval(cargarPuntos, 60 * 1000);
+    return () => { clearInterval(intervaloFoto); clearInterval(intervaloCarga); };
+  }, [fixtureIdActual]);
+
+  return (
+    <GraficoMomentum
+      puntos={puntos}
+      nombreLocal={nombreLocal}
+      nombreVisitante={nombreVisitante}
+      tema={tema}
+      acento={acento}
+      titulo="Momentum en vivo (aproximado por nosotros)"
+      nota="Estimado a partir de tiros, córners y posesión — no es el cálculo oficial, es nuestra aproximación mientras el partido está en curso."
+    />
+  );
+}
+
+// ── Momentum real, post-partido (PitchAPI) ───────────────────────────────
+function GraficoMomentum({ puntos, nombreLocal, nombreVisitante, tema, acento, titulo, nota }) {
+  if (!puntos || puntos.length === 0) {
+    return (
+      <div style={{ marginBottom: 20, background: tema.panel, borderRadius: 8, padding: 16 }}>
+        <h4 style={{ fontSize: 13, marginBottom: 6 }}>{titulo}</h4>
+        <p style={{ fontSize: 12, color: tema.textoSuave, textAlign: "center" }}>Todavía no hay suficientes datos para graficar.</p>
+      </div>
+    );
+  }
+
+  const anchoSvg = 300, altoSvg = 120, mitad = altoSvg / 2;
+  const minutoMax = Math.max(...puntos.map((p) => p.minuto), 90);
+  const puntosSvg = puntos.map((p) => {
+    const x = (p.minuto / minutoMax) * anchoSvg;
+    const y = mitad - (p.valor / 100) * mitad;
+    return `${x},${y}`;
+  }).join(" ");
+
+  return (
+    <div style={{ marginBottom: 20, background: tema.panel, borderRadius: 8, padding: 16 }}>
+      <h4 style={{ fontSize: 13, marginBottom: 4 }}>{titulo}</h4>
+      <p style={{ fontSize: 10, color: tema.textoSuave, marginBottom: 10 }}>
+        <span style={{ color: acento }}>●</span> {nombreLocal} &nbsp;|&nbsp; <span style={{ color: "#e05555" }}>●</span> {nombreVisitante}
+      </p>
+      <svg viewBox={`0 0 ${anchoSvg} ${altoSvg}`} style={{ width: "100%", display: "block" }}>
+        <line x1="0" y1={mitad} x2={anchoSvg} y2={mitad} stroke={tema.borde} strokeWidth="1" strokeDasharray="4 3" />
+        <polyline points={puntosSvg} fill="none" stroke={acento} strokeWidth="2" />
+      </svg>
+      {nota && <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 8 }}>{nota}</p>}
+    </div>
+  );
+}
+
+// ── Mapa de tiros, post-partido (PitchAPI) ───────────────────────────────
+function PanelMapaTiros({ tiros, idEquipoLocal, idEquipoVisitante, nombreLocal, nombreVisitante, tema, acento }) {
+  const todosLosTiros = (tiros || []).flatMap((periodo) => periodo.shots || []);
+  if (todosLosTiros.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 20, background: tema.panel, borderRadius: 8, padding: 16 }}>
+      <h4 style={{ fontSize: 13, marginBottom: 4 }}>Mapa de tiros</h4>
+      <p style={{ fontSize: 10, color: tema.textoSuave, marginBottom: 10 }}>
+        <span style={{ color: acento }}>●</span> {nombreLocal} &nbsp;|&nbsp; <span style={{ color: "#e05555" }}>●</span> {nombreVisitante} — tamaño según probabilidad de gol (xG)
+      </p>
+      <svg viewBox="0 0 300 200" style={{ width: "100%", background: "#1c5c33", borderRadius: 8, display: "block" }}>
+        <rect x="4" y="4" width="292" height="192" fill="none" stroke="#ffffff55" strokeWidth="1.5" />
+        <line x1="150" y1="4" x2="150" y2="196" stroke="#ffffff55" strokeWidth="1.5" />
+        <circle cx="150" cy="100" r="24" fill="none" stroke="#ffffff55" strokeWidth="1.5" />
+        {todosLosTiros.map((t, i) => {
+          const esLocal = t.team_id === idEquipoLocal;
+          // Cancha horizontal 300x200: cada equipo ataca hacia el arco contrario.
+          // PitchAPI ya normaliza x=105 como el arco rival, así que si es local
+          // lo dibujamos atacando a la derecha, si es visitante, a la izquierda.
+          const x = esLocal ? (t.x / 105) * 150 + 150 : 150 - (t.x / 105) * 150;
+          const y = (t.y / 68) * 192 + 4;
+          const radio = 3 + (t.expected_goals || 0) * 10;
+          return (
+            <circle
+              key={i} cx={x} cy={y} r={radio}
+              fill={t.event_type === "Goal" ? "#ffd700" : esLocal ? acento : "#e05555"}
+              stroke="#fff" strokeWidth="0.8" opacity={t.event_type === "Goal" ? 1 : 0.7}
+            />
+          );
+        })}
+      </svg>
+      <p style={{ fontSize: 10, color: "#ffd700", marginTop: 6 }}>● Amarillo = gol</p>
+    </div>
+  );
+}
+
+// ── Mapa de calor, post-partido (PitchAPI) — bonus ───────────────────────
+function PanelMapaCalor({ mapaCalor, idEquipoLocal, tema, acento }) {
+  if (!mapaCalor?.teams || mapaCalor.teams.length === 0) return null;
+
+  function dibujarEquipo(equipo, color) {
+    const maxAcciones = Math.max(...equipo.cells.map((c) => c[2]), 1);
+    return equipo.cells.map(([cx, cy, acciones], i) => {
+      const opacidad = Math.min(0.85, (acciones / maxAcciones) * 0.85 + 0.1);
+      const x = (cx / 16) * 300;
+      const y = (cy / 12) * 200;
+      return <rect key={i} x={x} y={y} width={300 / 16} height={200 / 12} fill={color} opacity={opacidad} />;
+    });
+  }
+
+  const local = mapaCalor.teams.find((t) => t.side === "home");
+  const visitante = mapaCalor.teams.find((t) => t.side === "away");
+
+  return (
+    <div style={{ marginBottom: 20, background: tema.panel, borderRadius: 8, padding: 16 }}>
+      <h4 style={{ fontSize: 13, marginBottom: 10 }}>Mapa de calor</h4>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {local && (
+          <div>
+            <p style={{ fontSize: 10, textAlign: "center", marginBottom: 4 }}>{local.team.name}</p>
+            <svg viewBox="0 0 300 200" style={{ width: "100%", background: "#1c5c33", borderRadius: 6 }}>
+              {dibujarEquipo(local, acento)}
+            </svg>
+          </div>
+        )}
+        {visitante && (
+          <div>
+            <p style={{ fontSize: 10, textAlign: "center", marginBottom: 4 }}>{visitante.team.name}</p>
+            <svg viewBox="0 0 300 200" style={{ width: "100%", background: "#1c5c33", borderRadius: 6 }}>
+              {dibujarEquipo(visitante, "#e05555")}
+            </svg>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Orquestador: decide qué mostrar según el estado del partido ─────────
+function PanelAnaliticaPartido({ fixtureIdActual, equipoLocal, equipoVisitante, tema, acento }) {
+  const [estadoPartido, setEstadoPartido] = useState(null);
+  const [datosPitchApi, setDatosPitchApi] = useState(null);
+  const [buscandoPitchApi, setBuscandoPitchApi] = useState(false);
+
+  const ENVIVO = ["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT"];
+  const TERMINADO = ["FT", "AET", "PEN"];
+
+  useEffect(() => {
+    if (!fixtureIdActual) return;
+    fetch(`/api/partido-por-id?fixtureId=${fixtureIdActual}`)
+      .then((r) => r.json())
+      .then((data) => setEstadoPartido(data?.fixture?.status?.short || null))
+      .catch(() => {});
+  }, [fixtureIdActual]);
+
+  useEffect(() => {
+    if (!estadoPartido || !TERMINADO.includes(estadoPartido)) return;
+    if (!equipoLocal?.team?.name || !equipoVisitante?.team?.name) return;
+    setBuscandoPitchApi(true);
+    const fecha = new Date().toISOString().slice(0, 10);
+    fetch(`/api/pitchapi-partido?fecha=${fecha}&nombreLocal=${encodeURIComponent(equipoLocal.team.name)}&nombreVisitante=${encodeURIComponent(equipoVisitante.team.name)}`)
+      .then((r) => r.json())
+      .then((data) => setDatosPitchApi(data))
+      .catch(() => {})
+      .finally(() => setBuscandoPitchApi(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoPartido]);
+
+  if (!fixtureIdActual || !estadoPartido) return null;
+
+  const enVivo = ENVIVO.includes(estadoPartido);
+  const terminado = TERMINADO.includes(estadoPartido);
+
+  if (enVivo) {
+    return (
+      <>
+        <PanelComentarioVivo fixtureIdActual={fixtureIdActual} tema={tema} acento={acento} />
+        <PanelMomentumVivo
+          fixtureIdActual={fixtureIdActual}
+          nombreLocal={equipoLocal?.team?.name}
+          nombreVisitante={equipoVisitante?.team?.name}
+          tema={tema} acento={acento}
+        />
+      </>
+    );
+  }
+
+  if (terminado) {
+    if (buscandoPitchApi) {
+      return <p style={{ fontSize: 12, color: tema.textoSuave, textAlign: "center", marginBottom: 16 }}>Buscando análisis detallado del partido...</p>;
+    }
+    if (!datosPitchApi?.encontrado) return null; // no hay dato real disponible, no mostramos nada a medias
+    return (
+      <>
+        <GraficoMomentum
+          puntos={datosPitchApi.momentum}
+          nombreLocal={equipoLocal?.team?.name}
+          nombreVisitante={equipoVisitante?.team?.name}
+          tema={tema} acento={acento}
+          titulo="Momentum real del partido"
+        />
+        <PanelMapaTiros
+          tiros={datosPitchApi.tiros}
+          idEquipoLocal={datosPitchApi.idEquipoLocal}
+          idEquipoVisitante={datosPitchApi.idEquipoVisitante}
+          nombreLocal={equipoLocal?.team?.name}
+          nombreVisitante={equipoVisitante?.team?.name}
+          tema={tema} acento={acento}
+        />
+        <PanelMapaCalor mapaCalor={datosPitchApi.mapaCalor} idEquipoLocal={datosPitchApi.idEquipoLocal} tema={tema} acento={acento} />
+      </>
+    );
+  }
+
+  return null;
+}
+
 function PanelAlineaciones({ fixtureIdActual, equipoLocal, equipoVisitante, tema, acento }) {
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -1861,7 +2158,10 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       )}
 
       {fixtureIdActual && (
-        <PanelAlineaciones fixtureIdActual={fixtureIdActual} equipoLocal={equipoLocal} equipoVisitante={equipoVisitante} tema={tema} acento={acento} />
+        <>
+          <PanelAlineaciones fixtureIdActual={fixtureIdActual} equipoLocal={equipoLocal} equipoVisitante={equipoVisitante} tema={tema} acento={acento} />
+          <PanelAnaliticaPartido fixtureIdActual={fixtureIdActual} equipoLocal={equipoLocal} equipoVisitante={equipoVisitante} tema={tema} acento={acento} />
+        </>
       )}
 
       {competicionActual?.nombre ? (
