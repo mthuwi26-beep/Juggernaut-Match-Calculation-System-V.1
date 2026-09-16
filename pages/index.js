@@ -5964,10 +5964,19 @@ function PantallaSinConexionApp({ onReintentar }) {
         style={{ width: 56, height: 56, borderRadius: "50%", background: "#2e6b3e", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
         aria-label="Reintentar"
       >
-        <span style={{ display: "flex", animation: verificando ? "jmcsGirar 1s linear infinite" : "none" }}>
+        <span className={verificando ? "jmcs-girando" : ""} style={{ display: "flex" }}>
           <Icono tipo="refrescar" size={24} color="#fff" />
         </span>
       </button>
+      <style jsx>{`
+        @keyframes jmcsGirarSolo {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .jmcs-girando {
+          animation: jmcsGirarSolo 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }
