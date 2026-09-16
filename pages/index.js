@@ -770,7 +770,7 @@ function FilaStat({ etiqueta, valor }) {
   );
 }
 
-function MiniTabla({ fixtures, tema, idioma = "es" }) {
+function MiniTabla({ fixtures, tema, idioma = "es", onSeleccionarPartido }) {
   if (!fixtures || fixtures.length === 0) {
     return <p style={{ color: tema.textoSuave, fontSize: 12 }}>{traducir("sinPartidos")}</p>;
   }
@@ -785,9 +785,19 @@ function MiniTabla({ fixtures, tema, idioma = "es" }) {
       </thead>
       <tbody>
         {fixtures.map((f) => (
-          <tr key={f.fixture.id} style={{ borderBottom: `1px solid ${tema.filaBorde}` }}>
+          <tr
+            key={f.fixture.id}
+            onClick={() => onSeleccionarPartido && onSeleccionarPartido(f)}
+            style={{ borderBottom: `1px solid ${tema.filaBorde}`, cursor: onSeleccionarPartido ? "pointer" : "default" }}
+          >
             <td style={{ padding: 4 }}>{new Date(f.fixture.date).toLocaleDateString(idioma === "en" ? "en-US" : "es-ES")}</td>
-            <td style={{ padding: 4 }}>{f.teams.home.name} vs {f.teams.away.name}</td>
+            <td style={{ padding: 4 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <img src={corregirEscudo(f.teams.home.logo)} alt="" width={16} height={16} onError={manejarErrorEscudo} />
+                {f.teams.home.name} vs {f.teams.away.name}
+                <img src={corregirEscudo(f.teams.away.logo)} alt="" width={16} height={16} onError={manejarErrorEscudo} />
+              </span>
+            </td>
             <td style={{ padding: 4 }}>{f.goals.home}-{f.goals.away}</td>
           </tr>
         ))}
@@ -802,7 +812,7 @@ function esLiga(fixture) {
   return !palabrasNoLiga.some((p) => nombre.includes(p));
 }
 
-function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento, idioma = "es" }) {
+function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento, idioma = "es", onSeleccionarPartido }) {
   const statsGoles = calcularEstadisticasGoles(fixtures, teamId);
   const statsPuntuales = calcularEstadisticasPuntuales(fixtures, teamId, statsMap);
 
@@ -828,7 +838,7 @@ function SubPanel({ titulo, fixtures, teamId, statsMap, tema, acento, idioma = "
       ) : (
         <p style={{ color: tema.textoSuave, fontSize: 12 }}>{traducir("sinDatos")}</p>
       )}
-      <MiniTabla fixtures={fixtures} tema={tema} idioma={idioma} />
+      <MiniTabla fixtures={fixtures} tema={tema} idioma={idioma} onSeleccionarPartido={onSeleccionarPartido} />
     </div>
   );
 }
@@ -4172,7 +4182,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   );
 }
 
-function TablaProximosEncuentros({ partidos, tema }) {
+function TablaProximosEncuentros({ partidos, tema, onSeleccionarPartido }) {
   if (!partidos || partidos.length === 0) {
     return <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay próximos encuentros programados por ahora.</p>;
   }
@@ -4187,10 +4197,20 @@ function TablaProximosEncuentros({ partidos, tema }) {
       </thead>
       <tbody>
         {partidos.map((f) => (
-          <tr key={f.fixture.id} style={{ borderBottom: `1px solid ${tema.filaBorde}` }}>
+          <tr
+            key={f.fixture.id}
+            onClick={() => onSeleccionarPartido && onSeleccionarPartido(f)}
+            style={{ borderBottom: `1px solid ${tema.filaBorde}`, cursor: onSeleccionarPartido ? "pointer" : "default" }}
+          >
             <td style={{ padding: 6 }}>{new Date(f.fixture.date).toLocaleDateString("es-ES")}</td>
             <td style={{ padding: 6 }}>{f.league.name}</td>
-            <td style={{ padding: 6 }}>{f.teams.home.name} vs {f.teams.away.name}</td>
+            <td style={{ padding: 6 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <img src={corregirEscudo(f.teams.home.logo)} alt="" width={17} height={17} onError={manejarErrorEscudo} />
+                {f.teams.home.name} vs {f.teams.away.name}
+                <img src={corregirEscudo(f.teams.away.logo)} alt="" width={17} height={17} onError={manejarErrorEscudo} />
+              </span>
+            </td>
           </tr>
         ))}
       </tbody>
@@ -5512,7 +5532,7 @@ function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
   );
 }
 
-function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mostrarToast }) {
+function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mostrarToast, onSeleccionarPartido }) {
   const [fixtures, setFixtures] = useState([]);
   const [proximos, setProximos] = useState([]);
   const [errorProximos, setErrorProximos] = useState("");
@@ -5565,18 +5585,18 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mos
       ) : (
         <>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 30 }}>
-            <SubPanel titulo={traducir("comoLocal")} fixtures={categorias.local} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.local} />
-            <SubPanel titulo={traducir("comoVisitante")} fixtures={categorias.visitante} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.visitante} />
-            <SubPanel titulo={traducir("ligaActual")} fixtures={categorias.liga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.liga} />
-            <SubPanel titulo={traducir("noLiga")} fixtures={categorias.noLiga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} />
-            <SubPanel titulo={traducir("formaReciente")} fixtures={categorias.forma} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.forma} />
+            <SubPanel titulo={traducir("comoLocal")} fixtures={categorias.local} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.local} onSeleccionarPartido={onSeleccionarPartido} />
+            <SubPanel titulo={traducir("comoVisitante")} fixtures={categorias.visitante} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.visitante} onSeleccionarPartido={onSeleccionarPartido} />
+            <SubPanel titulo={traducir("ligaActual")} fixtures={categorias.liga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.liga} onSeleccionarPartido={onSeleccionarPartido} />
+            <SubPanel titulo={traducir("noLiga")} fixtures={categorias.noLiga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} onSeleccionarPartido={onSeleccionarPartido} />
+            <SubPanel titulo={traducir("formaReciente")} fixtures={categorias.forma} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.forma} onSeleccionarPartido={onSeleccionarPartido} />
           </div>
 
           <h3 style={{ fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="calendario" size={16} /> Próximos encuentros</h3>
           {errorProximos && (
             <p style={{ color: "#e05555", fontSize: 12, marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} /> {errorProximos}</p>
           )}
-          <TablaProximosEncuentros partidos={proximos} tema={tema} />
+          <TablaProximosEncuentros partidos={proximos} tema={tema} onSeleccionarPartido={onSeleccionarPartido} />
         </>
       )}
     </div>
@@ -8126,6 +8146,7 @@ function Home() {
             onPedirLogin={abrirLogin}
             onVolver={() => setVistaActual(vistaAnterior)}
             mostrarToast={mostrarToast}
+            onSeleccionarPartido={(p) => { seleccionarPartidoDelCalendario(p); setVistaActual("estudio"); }}
           />
         </div>
       )}
