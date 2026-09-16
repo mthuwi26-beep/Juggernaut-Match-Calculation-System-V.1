@@ -64,6 +64,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // /api/ping es la comprobación real de "¿hay internet de verdad?" que usa
+  // la app — si nosotros mismos le contestáramos desde el caché, la app
+  // creería que hay conexión aunque no la haya. Por eso a este pedido en
+  // particular ni lo tocamos: que la red conteste, o que falle de verdad.
+  if (new URL(request.url).pathname === "/api/ping") {
+    return;
+  }
+
   const esNavegacion = request.mode === "navigate";
 
   event.respondWith(
