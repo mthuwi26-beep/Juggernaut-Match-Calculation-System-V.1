@@ -38,7 +38,7 @@
     function reintentar() {
       const boton = document.getElementById("btnReintentar");
       boton.classList.add("girando");
-      fetch("/", { cache: "no-store" })
+      fetch("/api/ping", { cache: "no-store" })
         .then(() => location.reload())
         .catch(() => {
           // Sigue sin conexión — dejamos de girar para que se note que
