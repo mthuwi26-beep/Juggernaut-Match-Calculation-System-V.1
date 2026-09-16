@@ -5947,7 +5947,7 @@ function PantallaSinConexionApp({ onReintentar }) {
 
   function reintentar() {
     setVerificando(true);
-    fetch("/", { cache: "no-store" })
+    fetch("/api/ping", { cache: "no-store" })
       .then(() => onReintentar())
       .catch(() => setTimeout(() => setVerificando(false), 800));
   }
