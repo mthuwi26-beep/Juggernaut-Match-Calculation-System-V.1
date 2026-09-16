@@ -5940,6 +5940,29 @@ function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
   );
 }
 
+// Indicador lateral con el % de partidos que sí tienen datos puntuales
+// (córners, tarjetas, faltas) cargados para el estudio actual. Reemplaza
+// al botón manual de antes — ahora la carga es automática, esto solo
+// informa qué tan completa quedó.
+function IndicadorCoberturaDatos({ porcentaje, cargando }) {
+  if (porcentaje === null) return null;
+  const color = porcentaje >= 70 ? "#2e9e4f" : porcentaje >= 40 ? "#c9a227" : "#e0955c";
+  return (
+    <div
+      style={{
+        position: "fixed", left: 12, top: "50%", transform: "translateY(-50%)", zIndex: 45,
+        background: "#1a1a1a", border: `2px solid ${color}`, borderRadius: 20,
+        padding: "8px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+      }}
+      title="Porcentaje de partidos con córners/tarjetas/faltas cargados para este estudio"
+    >
+      <span style={{ fontSize: 13, fontWeight: "bold", color }}>{cargando ? "…" : `${porcentaje}%`}</span>
+      <span style={{ fontSize: 8, color: "#ccc", writingMode: "vertical-rl", textOrientation: "mixed" }}>datos</span>
+    </div>
+  );
+}
+
 function BurbujaPrueba({ diasRestantes, onSuscribirse }) {
   const color = diasRestantes >= 4 ? "#2e9e4f" : diasRestantes >= 2 ? "#c9a227" : "#e05555";
   return (
@@ -6345,6 +6368,7 @@ function Home() {
   const [statsMap, setStatsMap] = useState({});
   const [cargandoPuntuales, setCargandoPuntuales] = useState(false);
   const [progreso, setProgreso] = useState("");
+  const [progresoNum, setProgresoNum] = useState({ hecho: 0, total: 0 });
   const [datosPuntualesListos, setDatosPuntualesListos] = useState(false);
   const [resumenCarga, setResumenCarga] = useState("");
   const [coberturaPuntuales, setCoberturaPuntuales] = useState(null);
@@ -7066,12 +7090,14 @@ function Home() {
     setCargandoPuntuales(true);
     setDatosPuntualesListos(false);
     setCoberturaPuntuales(null);
+    setProgresoNum({ hecho: 0, total: entradas.length });
     const nuevoMapa = {};
     let exitos = 0;
 
     for (let i = 0; i < entradas.length; i++) {
       const [fixtureId, homeTeamId] = entradas[i];
       setProgreso(`Cargando ${i + 1}/${entradas.length}...`);
+      setProgresoNum({ hecho: i + 1, total: entradas.length });
       try {
         const res = await fetch(`/api/estadisticas-partido?fixtureId=${fixtureId}`);
         const data = await res.json();
@@ -7095,6 +7121,23 @@ function Home() {
     setCoberturaPuntuales({ exitos, total: entradas.length });
     setProgreso("");
   }
+
+  // Antes había que tocar un botón para esto — ahora que el plan de
+  // API-Football ya soporta el uso normal de la app, se dispara solo. Espera
+  // a que los partidos de los dos equipos ya hayan cargado (si no, arrancaría
+  // vacío), y no repite la carga si ya se hizo para este mismo par de equipos.
+  const paresConDatosCargados = useRef(new Set());
+  useEffect(() => {
+    const idLocal = equipoLocal?.team?.id;
+    const idVisitante = equipoVisitante?.team?.id;
+    if (!idLocal || !idVisitante) return;
+    if (fixturesLocal.length === 0 || fixturesVisitante.length === 0) return;
+    const clave = `${idLocal}-${idVisitante}`;
+    if (paresConDatosCargados.current.has(clave)) return;
+    paresConDatosCargados.current.add(clave);
+    cargarDatosPuntuales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [equipoLocal?.team?.id, equipoVisitante?.team?.id, fixturesLocal.length, fixturesVisitante.length]);
 
   const posesionLocal = equipoLocal?.team ? calcularPosesionPromedio(fixturesLocal, equipoLocal.team.id, statsMap) : null;
   const posesionVisitante = equipoVisitante?.team ? calcularPosesionPromedio(fixturesVisitante, equipoVisitante.team.id, statsMap) : null;
@@ -8406,33 +8449,6 @@ function Home() {
             />
           </div>
 
-          {equipoLocal?.team && equipoVisitante?.team && !datosPuntualesListos && (
-            <button
-              onClick={cargarDatosPuntuales}
-              disabled={cargandoPuntuales}
-              style={{
-                width: "100%", marginTop: 24, padding: "14px", fontSize: 15, fontWeight: "bold",
-                background: cargandoPuntuales ? tema.panel : acento, color: cargandoPuntuales ? tema.texto : "#fff",
-                border: "none", borderRadius: 8, cursor: cargandoPuntuales ? "default" : "pointer",
-              }}
-            >
-              {cargandoPuntuales
-                ? progreso
-                : <><Icono tipo="barras" size={13} /> {`Cargar datos puntuales (córners, tarjetas, faltas) — ${equipoLocal.team.name} y ${equipoVisitante.team.name}`}</>}
-            </button>
-          )}
-
-          {datosPuntualesListos && (
-            <p style={{ textAlign: "center", marginTop: 20, color: "#2e9e4f", fontWeight: "bold" }}>
-              <Icono tipo="check" size={14} color="#2e9e4f" /> Datos puntuales cargados para este encuentro
-              {resumenCarga && (
-                <span style={{ display: "block", fontWeight: "normal", fontSize: 12, color: tema.textoSuave, marginTop: 4 }}>
-                  ({resumenCarga})
-                </span>
-              )}
-            </p>
-          )}
-
           <PanelHeadToHead
             h2h={h2h}
             nombreLocal={equipoLocal?.team?.name}
@@ -8656,6 +8672,19 @@ function Home() {
       )}
 
       <Footer contenido={contenidoFooter} tema={tema} acentoMarca={acentoMarca} />
+
+      {vistaActual === "estudio" && equipoLocal?.team && equipoVisitante?.team && (
+        <IndicadorCoberturaDatos
+          cargando={cargandoPuntuales}
+          porcentaje={
+            coberturaPuntuales
+              ? Math.round((coberturaPuntuales.exitos / coberturaPuntuales.total) * 100)
+              : progresoNum.total > 0
+              ? Math.round((progresoNum.hecho / progresoNum.total) * 100)
+              : null
+          }
+        />
+      )}
 
       {sesion && !esAdmin && enPeriodoPrueba && !perfil?.suscripcion_activa && (
         <BurbujaPrueba
