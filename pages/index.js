@@ -5943,19 +5943,30 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
 }
 
 function PantallaSinConexionApp({ onReintentar }) {
+  const [verificando, setVerificando] = useState(false);
+
+  function reintentar() {
+    setVerificando(true);
+    fetch("/", { cache: "no-store" })
+      .then(() => onReintentar())
+      .catch(() => setTimeout(() => setVerificando(false), 800));
+  }
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0f1f14", color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24 }}>
       <Icono tipo="candado" size={40} color="#9fb3a6" />
       <h2 style={{ fontSize: 18, margin: "16px 0 8px" }}>Sin conexión</h2>
       <p style={{ fontSize: 13, color: "#9fb3a6", maxWidth: 300, marginBottom: 28 }}>
-        Parece que no tenés internet en este momento. Intentalo más tarde.
+        Sin acceso a internet para continuar navegando y realizando estudios. Comprueba tu conexión.
       </p>
       <button
-        onClick={onReintentar}
+        onClick={reintentar}
         style={{ width: 56, height: 56, borderRadius: "50%", background: "#2e6b3e", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
         aria-label="Reintentar"
       >
-        <Icono tipo="refrescar" size={24} color="#fff" />
+        <span style={{ display: "flex", animation: verificando ? "jmcsGirar 1s linear infinite" : "none" }}>
+          <Icono tipo="refrescar" size={24} color="#fff" />
+        </span>
       </button>
     </div>
   );
@@ -7117,6 +7128,11 @@ function Home() {
         @keyframes jmcsToastEntrar {
           from { transform: translateX(-120%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes jmcsGirar {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
 
         @keyframes jmcsToastSalir {
