@@ -1,5 +1,10 @@
 import { obtenerCache, guardarCache, CACHE_3_MINUTOS, CACHE_PARA_SIEMPRE } from "../../lib/cacheApi";
 
+// Estados que todavía pueden cambiar — un partido aplazado (PST) puede
+// terminar jugándose en OTRA fecha más adelante, así que ese día viejo no
+// es seguro cachearlo para siempre; hay que seguir revisando cada tanto.
+const ESTADOS_NO_DEFINITIVOS = ["PST", "TBD", "SUSP", "INT", "ABD"];
+
 export default async function handler(req, res) {
   const { date } = req.query;
 
@@ -7,12 +12,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Falta la fecha" });
   }
 
-  // Un día que ya pasó no cambia más (los resultados quedan fijos) — lo cacheamos para
-  // siempre. Hoy o un día futuro sí puede cambiar de un minuto a otro (partidos que
-  // arrancan, resultados que se actualizan), así que ahí el caché dura solo 3 minutos.
   const hoy = new Date().toISOString().slice(0, 10);
   const esFechaPasada = date < hoy;
-  const ttl = esFechaPasada ? CACHE_PARA_SIEMPRE : CACHE_3_MINUTOS;
 
   const clave = `partidos-fecha:${date}`;
   const cacheado = await obtenerCache(clave);
@@ -34,6 +35,14 @@ export default async function handler(req, res) {
 
     // Limitamos a 50 para no saturar la pantalla (partidos de todo el mundo en un solo día pueden ser cientos)
     const resultado = (data.response || []).slice(0, 50);
+
+    // Un día pasado solo se cachea para siempre si TODOS sus partidos ya
+    // quedaron en un estado definitivo — si alguno sigue "aplazado" o
+    // similar, puede terminar jugándose en otra fecha, así que revisamos
+    // de nuevo pronto en vez de congelarlo para siempre.
+    const hayPartidosNoDefinitivos = resultado.some((p) => ESTADOS_NO_DEFINITIVOS.includes(p.fixture?.status?.short));
+    const ttl = esFechaPasada && !hayPartidosNoDefinitivos ? CACHE_PARA_SIEMPRE : CACHE_3_MINUTOS;
+
     await guardarCache(clave, resultado, ttl);
     res.status(200).json(resultado);
   } catch (error) {
