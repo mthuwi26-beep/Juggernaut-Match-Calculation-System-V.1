@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JMCS — Sin conexión</title>
+<style>
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: #0f1f14; color: #fff; font-family: system-ui, -apple-system, sans-serif;
+    padding: 24px;
+  }
+  img { width: 72px; height: 72px; margin-bottom: 16px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  p { font-size: 13px; color: #9fb3a6; margin: 0 0 28px; max-width: 320px; }
+  button {
+    width: 56px; height: 56px; border-radius: 50%; background: #2e6b3e; border: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  button svg { transition: transform 0.2s; }
+  button.girando svg { animation: girar 1s linear infinite; }
+  @keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <img src="/icon-192.png" alt="JMCS" />
+  <h1>Sin conexión</h1>
+  <p>Sin acceso a internet para continuar navegando y realizando estudios. Comprueba tu conexión.</p>
+  <button id="btnReintentar" onclick="reintentar()" aria-label="Reintentar">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <polyline points="21 3 21 9 15 9" />
+    </svg>
+  </button>
+
+  <script>
+    function reintentar() {
+      const boton = document.getElementById("btnReintentar");
+      boton.classList.add("girando");
+      fetch("/", { cache: "no-store" })
+        .then(() => location.reload())
+        .catch(() => {
+          // Sigue sin conexión — dejamos de girar para que se note que
+          // terminó de intentar, en vez de girar para siempre
+          setTimeout(() => boton.classList.remove("girando"), 800);
+        });
+    }
+  </script>
+</body>
+</html>
