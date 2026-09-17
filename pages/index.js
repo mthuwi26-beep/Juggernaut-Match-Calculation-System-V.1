@@ -5083,11 +5083,36 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
       : "";
 
   function copiar(texto, cual) {
-    if (typeof navigator === "undefined" || !navigator.clipboard) return;
-    navigator.clipboard.writeText(texto).then(() => {
+    if (!texto) return;
+    function marcarCopiado() {
       setCopiado(cual);
       setTimeout(() => setCopiado(""), 1800);
-    });
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(texto).then(marcarCopiado).catch(() => copiarConRespaldo(texto, marcarCopiado));
+    } else {
+      copiarConRespaldo(texto, marcarCopiado);
+    }
+  }
+
+  // Respaldo para navegadores/WebViews donde navigator.clipboard falla o
+  // no existe (ya nos pasó con detalles así de comportamiento en Android).
+  function copiarConRespaldo(texto, alCopiar) {
+    if (typeof document === "undefined") return;
+    const areaTexto = document.createElement("textarea");
+    areaTexto.value = texto;
+    areaTexto.style.position = "fixed";
+    areaTexto.style.opacity = "0";
+    document.body.appendChild(areaTexto);
+    areaTexto.focus();
+    areaTexto.select();
+    try {
+      document.execCommand("copy");
+      alCopiar();
+    } catch {
+      // si tampoco funciona esto, no hay más nada que intentar
+    }
+    document.body.removeChild(areaTexto);
   }
 
   const resueltas = predicciones.filter((p) => p.resultado !== "pendiente");
@@ -6665,7 +6690,20 @@ function Home() {
       .maybeSingle()
       .then(async ({ data }) => {
         if (data) {
-          setPerfil(data);
+          if (!data.codigo_referido) {
+            // Cuenta que ya existía antes del sistema de referidos — le
+            // generamos el código ahora, la primera vez que la vemos.
+            const codigoNuevo = await crearCodigoReferidoUnico(data.username || sesion.user.email.split("@")[0]);
+            const { data: perfilActualizado } = await supabase
+              .from("perfiles")
+              .update({ codigo_referido: codigoNuevo })
+              .eq("user_id", sesion.user.id)
+              .select()
+              .maybeSingle();
+            setPerfil(perfilActualizado || { ...data, codigo_referido: codigoNuevo });
+          } else {
+            setPerfil(data);
+          }
         } else {
           // Cuentas creadas por Google/enlace mágico no pasan por el formulario de registro —
           // les creamos un perfil básico automáticamente para que todo funcione igual.
