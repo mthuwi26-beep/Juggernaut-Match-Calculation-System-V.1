@@ -6429,6 +6429,8 @@ function Home() {
     return () => clearInterval(intervalo);
   }, [esAppInstalada, equipoLocal?.team?.id, equipoVisitante?.team?.id, tarjetaActivaMovil]);
 
+  const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
+
   // Menú por gesto: solo en la app instalada, y solo estando parado en
   // Inicio (ahí no hay ningún otro elemento que use el deslizar horizontal,
   // así que no hay conflicto). Deslizar desde pegado al borde izquierdo
@@ -6730,7 +6732,6 @@ function Home() {
 
   const [favoritosPanelAbierto, setFavoritosPanelAbierto] = useState(false);
   const [contextoFavoritosIA, setContextoFavoritosIA] = useState("");
-  const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
 
   // Conecta la navegación con el historial real del navegador, para que el
   // botón "Atrás" vuelva a la pestaña anterior (o cierre el modal de resultado)
