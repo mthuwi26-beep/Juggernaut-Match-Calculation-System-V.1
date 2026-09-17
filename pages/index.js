@@ -64,6 +64,39 @@ function BanderaPais({ pais, url, size = 16 }) {
 
 // Íconos propios en SVG (línea fina, estilo consistente) para reemplazar los emoji sueltos.
 // La idea: mismo significado, pero con un trazo propio de la marca en vez del emoji del sistema operativo.
+// ============================================
+// Sistema de referidos
+// ============================================
+// Al que invita se le dan estos días gratis cuando su referido se suscribe
+// (paga) — el premio en sí se otorga desde el webhook de Wompi, no desde acá.
+const DIAS_RECOMPENSA_REFERIDOR = 7;
+// Al invitado se le suman estos días extra a su período de prueba apenas
+// se registra con un código válido.
+const DIAS_PRUEBA_EXTRA_REFERIDO = 5;
+
+// Genera un código de referido a partir de un texto base (username o el
+// nombre antes del @ del correo) + un sufijo al azar para evitar choques.
+function generarCodigoReferido(base) {
+  const limpio = (base || "jugador")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // saca tildes
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 10) || "jugador";
+  const sufijo = Math.random().toString(36).slice(2, 6);
+  return (limpio + sufijo).toUpperCase();
+}
+
+// Intenta unos cuantos códigos hasta encontrar uno que no exista todavía.
+async function crearCodigoReferidoUnico(base) {
+  for (let intento = 0; intento < 5; intento++) {
+    const candidato = generarCodigoReferido(base);
+    const { data } = await supabase.from("perfiles").select("user_id").eq("codigo_referido", candidato).maybeSingle();
+    if (!data) return candidato;
+  }
+  return Math.random().toString(36).slice(2, 10).toUpperCase(); // último recurso
+}
+
 const ICONOS_SVG = {
   hogar: <><path d="M3 10.5L12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9.5 21v-6h5v6" /></>,
   barras: <><rect x="3.5" y="12" width="4" height="8.5" /><rect x="10" y="7" width="4" height="13.5" /><rect x="16.5" y="3" width="4" height="17.5" /></>,
@@ -3720,11 +3753,20 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [codigoReferido, setCodigoReferido] = useState("");
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [cargandoGoogle, setCargandoGoogle] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
+
+  // Si llegó por un link de referido (?ref=CODIGO), lo dejamos precargado
+  // pero editable — por si la persona prefiere poner otro código a mano.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pendiente = localStorage.getItem("jmcs_codigo_referido_pendiente");
+    if (pendiente) setCodigoReferido(pendiente);
+  }, []);
 
   async function manejarSubmit(e) {
     e.preventDefault();
@@ -3737,7 +3779,35 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         if (data.user) {
-          await supabase.from("perfiles").insert({ user_id: data.user.id, username: username.trim() || null });
+          const codigoPropio = await crearCodigoReferidoUnico(username.trim() || email.split("@")[0]);
+
+          let referidorId = null;
+          const codigoIngresado = codigoReferido.trim().toUpperCase();
+          if (codigoIngresado) {
+            const { data: referidor } = await supabase
+              .from("perfiles")
+              .select("user_id")
+              .eq("codigo_referido", codigoIngresado)
+              .maybeSingle();
+            if (referidor) referidorId = referidor.user_id;
+          }
+
+          await supabase.from("perfiles").insert({
+            user_id: data.user.id,
+            username: username.trim() || null,
+            codigo_referido: codigoPropio,
+            referido_por: referidorId,
+            dias_prueba_extra: referidorId ? DIAS_PRUEBA_EXTRA_REFERIDO : 0,
+          });
+
+          if (referidorId) {
+            await supabase.from("referidos").insert({
+              referidor_id: referidorId,
+              referido_id: data.user.id,
+              codigo_usado: codigoIngresado,
+            });
+            if (typeof window !== "undefined") localStorage.removeItem("jmcs_codigo_referido_pendiente");
+          }
         }
         setMensaje("¡Cuenta creada! Verifica tu cuenta desde tu bandeja de entrada (revisa spam si no la ves) para poder iniciar sesión.");
       } else if (modo === "login") {
@@ -3836,6 +3906,16 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
               onChange={(e) => setUsername(e.target.value)}
               required
               maxLength={24}
+              style={{ width: "100%", padding: 10, marginBottom: 10, fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
+            />
+          )}
+          {modo === "registro" && (
+            <input
+              type="text"
+              placeholder="Código de referido (opcional)"
+              value={codigoReferido}
+              onChange={(e) => setCodigoReferido(e.target.value.toUpperCase())}
+              maxLength={20}
               style={{ width: "100%", padding: 10, marginBottom: 10, fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
             />
           )}
@@ -4980,18 +5060,35 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
   const [predicciones, setPredicciones] = useState([]);
   const [historialBusquedas, setHistorialBusquedas] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [referidos, setReferidos] = useState([]);
+  const [copiado, setCopiado] = useState(""); // "" | "codigo" | "link"
 
   useEffect(() => {
     if (!sesion) return;
     Promise.all([
       supabase.from("predicciones").select("resultado"),
       supabase.from("historial_busquedas_estudio").select("team_name, team_country").eq("user_id", sesion.user.id).limit(500),
-    ]).then(([resPred, resHist]) => {
+      supabase.from("referidos").select("recompensa_referidor_dada").eq("referidor_id", sesion.user.id),
+    ]).then(([resPred, resHist, resReferidos]) => {
       setPredicciones(resPred.data || []);
       setHistorialBusquedas(resHist.data || []);
+      setReferidos(resReferidos.data || []);
       setCargando(false);
     });
   }, [sesion]);
+
+  const linkReferido =
+    perfil?.codigo_referido && typeof window !== "undefined"
+      ? `${window.location.origin}/?ref=${perfil.codigo_referido}`
+      : "";
+
+  function copiar(texto, cual) {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    navigator.clipboard.writeText(texto).then(() => {
+      setCopiado(cual);
+      setTimeout(() => setCopiado(""), 1800);
+    });
+  }
 
   const resueltas = predicciones.filter((p) => p.resultado !== "pendiente");
   const aciertos = resueltas.filter((p) => p.resultado === "acierto").length;
@@ -5075,6 +5172,45 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
                 </div>
               ))
             )}
+          </div>
+
+          <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24, textAlign: "left" }}>
+            <h4 style={{ fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <Icono tipo="apreton" size={13} /> Mis referidos
+            </h4>
+            <p style={{ fontSize: 11, color: tema.textoSuave, marginTop: 0, marginBottom: 10 }}>
+              Invitá amigos con tu código — cuando se suscriban, ganás {DIAS_RECOMPENSA_REFERIDOR} días gratis.
+            </p>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div style={{ flex: 1, background: tema.fondo, border: `1px solid ${tema.borde}`, borderRadius: 6, padding: "8px 10px", fontSize: 13, fontWeight: "bold", letterSpacing: 1 }}>
+                {perfil?.codigo_referido || "—"}
+              </div>
+              <button
+                onClick={() => copiar(perfil?.codigo_referido || "", "codigo")}
+                disabled={!perfil?.codigo_referido}
+                style={{ padding: "8px 10px", background: "transparent", border: `1px solid ${acentoMarca}`, color: acentoMarca, borderRadius: 6, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                {copiado === "codigo" ? "¡Copiado!" : "Copiar código"}
+              </button>
+            </div>
+
+            <button
+              onClick={() => copiar(linkReferido, "link")}
+              disabled={!linkReferido}
+              style={{ width: "100%", padding: "8px 10px", background: acentoMarca, border: "none", color: "#fff", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", marginBottom: 12 }}
+            >
+              {copiado === "link" ? "¡Link copiado!" : "Copiar link de invitación"}
+            </button>
+
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span>Amigos invitados</span>
+              <strong>{referidos.length}</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+              <span>Ya se suscribieron (premio ganado)</span>
+              <strong style={{ color: acentoMarca }}>{referidos.filter((r) => r.recompensa_referidor_dada).length}</strong>
+            </div>
           </div>
         </>
       )}
@@ -6534,11 +6670,41 @@ function Home() {
           // Cuentas creadas por Google/enlace mágico no pasan por el formulario de registro —
           // les creamos un perfil básico automáticamente para que todo funcione igual.
           const nombrePorDefecto = sesion.user.email.split("@")[0];
+          const codigoPropio = await crearCodigoReferidoUnico(nombrePorDefecto);
+
+          let referidorId = null;
+          const codigoIngresado =
+            typeof window !== "undefined" ? (localStorage.getItem("jmcs_codigo_referido_pendiente") || "").trim().toUpperCase() : "";
+          if (codigoIngresado) {
+            const { data: referidor } = await supabase
+              .from("perfiles")
+              .select("user_id")
+              .eq("codigo_referido", codigoIngresado)
+              .maybeSingle();
+            if (referidor) referidorId = referidor.user_id;
+          }
+
           const { data: nuevo } = await supabase
             .from("perfiles")
-            .insert({ user_id: sesion.user.id, username: nombrePorDefecto })
+            .insert({
+              user_id: sesion.user.id,
+              username: nombrePorDefecto,
+              codigo_referido: codigoPropio,
+              referido_por: referidorId,
+              dias_prueba_extra: referidorId ? DIAS_PRUEBA_EXTRA_REFERIDO : 0,
+            })
             .select()
             .maybeSingle();
+
+          if (referidorId) {
+            await supabase.from("referidos").insert({
+              referidor_id: referidorId,
+              referido_id: sesion.user.id,
+              codigo_usado: codigoIngresado,
+            });
+            if (typeof window !== "undefined") localStorage.removeItem("jmcs_codigo_referido_pendiente");
+          }
+
           setPerfil(nuevo || { user_id: sesion.user.id, username: nombrePorDefecto, avatar_url: null });
         }
       });
@@ -6859,6 +7025,15 @@ function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Link de referido: si llega con ?ref=CODIGO, lo guardamos para usarlo al
+  // registrarse — así funciona también con Google/enlace mágico, que no
+  // pasan por el formulario donde se puede tipear el código a mano.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) localStorage.setItem("jmcs_codigo_referido_pendiente", ref.trim().toUpperCase());
+  }, []);
+
   // Prueba gratis de Estudio sin cuenta: 5 minutos por sesión del navegador
   // (se resetea si cierra el navegador o la pestaña, no es acumulado entre días).
   // El reloj corre SOLO mientras está parado en Estudio — si se va a Inicio,
@@ -6903,8 +7078,10 @@ function Home() {
 
   // 7 días de prueba gratis desde que se registró (lo sabemos por la fecha de
   // creación de su cuenta, ya la trae la sesión de Supabase) — pasado ese
-  // tiempo, necesita una suscripción activa para seguir usando Estudio.
-  const DIAS_PRUEBA_SUSCRIPCION = 7;
+  // tiempo, necesita una suscripción activa para seguir usando Estudio. Si
+  // se registró con un código de referido válido, suma los días extra
+  // (perfil.dias_prueba_extra) que le dio ese bono.
+  const DIAS_PRUEBA_SUSCRIPCION = 7 + (perfil?.dias_prueba_extra || 0);
   const diasDesdeRegistro = sesion?.user?.created_at
     ? (Date.now() - new Date(sesion.user.created_at).getTime()) / (1000 * 60 * 60 * 24)
     : 0;
