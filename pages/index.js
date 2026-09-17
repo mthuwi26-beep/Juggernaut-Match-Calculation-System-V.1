@@ -6296,45 +6296,6 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
   );
 }
 
-function PantallaSinConexionApp({ onReintentar }) {
-  const [verificando, setVerificando] = useState(false);
-
-  function reintentar() {
-    setVerificando(true);
-    fetch("/api/ping", { cache: "no-store" })
-      .then(() => onReintentar())
-      .catch(() => setTimeout(() => setVerificando(false), 800));
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 500, background: "#0f1f14", color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24 }}>
-      <Icono tipo="candado" size={40} color="#9fb3a6" />
-      <h2 style={{ fontSize: 18, margin: "16px 0 8px" }}>Sin conexión</h2>
-      <p style={{ fontSize: 13, color: "#9fb3a6", maxWidth: 300, marginBottom: 28 }}>
-        Sin acceso a internet para continuar navegando y realizando estudios. Comprueba tu conexión.
-      </p>
-      <button
-        onClick={reintentar}
-        style={{ width: 56, height: 56, borderRadius: "50%", background: "#2e6b3e", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-        aria-label="Reintentar"
-      >
-        <span className={verificando ? "jmcs-girando" : ""} style={{ display: "flex" }}>
-          <Icono tipo="refrescar" size={24} color="#fff" />
-        </span>
-      </button>
-      <style jsx>{`
-        @keyframes jmcsGirarSolo {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .jmcs-girando {
-          animation: jmcsGirarSolo 1s linear infinite;
-        }
-      `}</style>
-    </div>
-  );
-}
-
 function PantallaMantenimiento({ mensaje, onIniciarSesion }) {
   return (
     <div style={{
@@ -6410,56 +6371,12 @@ function Home() {
   const t = traducir;
   const [notaProximamente, setNotaProximamente] = useState(false);
   const [tarjetaActivaMovil, setTarjetaActivaMovil] = useState("local");
-  const [mostrarAsomo, setMostrarAsomo] = useState(null); // null | "derecha" | "izquierda"
-  const [esAppInstalada] = useState(
-    () => typeof document !== "undefined" && document.referrer.startsWith("android-app://")
-  );
-
-  // Animación de "asomo": solo en la app instalada (ver esAppInstalada más
-  // abajo), reemplaza al texto "desliza para ver..." — cada tanto, se ve un
-  // pedacito de la otra tarjeta y vuelve, para que se entienda sin leer nada.
-  useEffect(() => {
-    if (!esAppInstalada) return;
-    if (!equipoLocal?.team || !equipoVisitante?.team) return;
-    const intervalo = setInterval(() => {
-      const direccion = tarjetaActivaMovil === "local" ? "derecha" : "izquierda";
-      setMostrarAsomo(direccion);
-      setTimeout(() => setMostrarAsomo(null), 900);
-    }, 18000);
-    return () => clearInterval(intervalo);
-  }, [esAppInstalada, equipoLocal?.team?.id, equipoVisitante?.team?.id, tarjetaActivaMovil]);
-
   const [vistaActual, setVistaActual] = useState("inicio"); // "inicio" | "estudio" | "favoritos" | "equipo"
-
-  // Menú por gesto: solo en la app instalada, y solo estando parado en
-  // Inicio (ahí no hay ningún otro elemento que use el deslizar horizontal,
-  // así que no hay conflicto). Deslizar desde pegado al borde izquierdo
-  // hacia la derecha abre el mismo menú que antes abría el botón "Más".
-  useEffect(() => {
-    if (!esAppInstalada) return;
-    let inicioX = null;
-    function alTocar(e) {
-      const x = e.touches[0].clientX;
-      inicioX = x < 24 && vistaActual === "inicio" ? x : null;
-    }
-    function alSoltar(e) {
-      if (inicioX === null) return;
-      const deltaX = e.changedTouches[0].clientX - inicioX;
-      if (deltaX > 60) setMenuAbierto(true);
-      inicioX = null;
-    }
-    window.addEventListener("touchstart", alTocar);
-    window.addEventListener("touchend", alSoltar);
-    return () => {
-      window.removeEventListener("touchstart", alTocar);
-      window.removeEventListener("touchend", alSoltar);
-    };
-  }, [esAppInstalada, vistaActual]);
   const [toqueInicioX, setToqueInicioX] = useState(null);
   const [toqueInicioY, setToqueInicioY] = useState(null);
   const [chatAbierto, setChatAbierto] = useState(false);
 
-  // Sin conexión: para avisar (web) o mostrar una pantalla propia (app instalada).
+  // Sin conexión: aviso discreto abajo de la pantalla (ver más abajo).
   // navigator.onLine solo, no alcanza — puede decir "conectado" aunque estés
   // pegado a un wifi sin internet real. Por eso sumamos un ping propio: cada
   // 8 segundos fijo, y además en cada toque de pantalla (sin pasarse de una
@@ -6942,20 +6859,6 @@ function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Accesos directos del ícono de la app (mantener apretado el ícono en
-  // Android): cada uno abre la app con ?ir=algo en la URL.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const ir = new URLSearchParams(window.location.search).get("ir");
-    if (!ir) return;
-    const destinosValidos = ["inicio", "favoritos", "historial"];
-    if (destinosValidos.includes(ir)) {
-      if (ir === "inicio") setVistaActual("inicio");
-      else accederOPedirCuenta(ir);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Prueba gratis de Estudio sin cuenta: 5 minutos por sesión del navegador
   // (se resetea si cierra el navegador o la pestaña, no es acumulado entre días).
   // El reloj corre SOLO mientras está parado en Estudio — si se va a Inicio,
@@ -7391,13 +7294,6 @@ function Home() {
     };
     lambdaGolesLocalReal = calcularValorEsperado(motorGolesLocal, esPartidoLiga);
     lambdaGolesVisitanteReal = calcularValorEsperado(motorGolesVisitante, esPartidoLiga);
-  }
-
-  // Sin conexión Y estamos en la app instalada: pantalla propia, no el
-  // error feo del navegador/WebView. En PC y navegador de celular no se
-  // corta el paso así — ahí solo se avisa con un aviso chico (más abajo).
-  if (esAppInstalada && sinConexion) {
-    return <PantallaSinConexionApp onReintentar={() => window.location.reload()} />;
   }
 
   // Mientras todavía no sabemos si el usuario es admin (o no), no mostramos nada
@@ -8406,8 +8302,7 @@ function Home() {
             className="jmcs-carrusel-contenedor"
             style={{
               display: "flex", gap: 30, flexWrap: "wrap",
-              transform: mostrarAsomo === "derecha" ? "translateX(-16%)" : mostrarAsomo === "izquierda" ? "translateX(16%)" : "none",
-              transition: "transform 0.45s ease",
+
             }}
             onTouchStart={(e) => {
               e.stopPropagation();
@@ -8430,7 +8325,7 @@ function Home() {
               setToqueInicioY(null);
             }}
           >
-            <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "local" ? "true" : "false"} style={{ flex: 1, minWidth: 320, display: mostrarAsomo ? "block" : undefined }}>
+            <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "local" ? "true" : "false"} style={{ flex: 1, minWidth: 320 }}>
               <BuscadorEquipo
                 etiqueta={t("local")}
                 tema={tema}
@@ -8452,7 +8347,7 @@ function Home() {
                 }}
               />
             </div>
-            <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "visitante" ? "true" : "false"} style={{ flex: 1, minWidth: 320, display: mostrarAsomo ? "block" : undefined }}>
+            <div className="jmcs-carrusel-item" data-activo={tarjetaActivaMovil === "visitante" ? "true" : "false"} style={{ flex: 1, minWidth: 320 }}>
               <BuscadorEquipo
                 etiqueta={t("visitante")}
                 tema={tema}
@@ -8492,11 +8387,9 @@ function Home() {
               }}
             />
           </div>
-          {!esAppInstalada && (
-            <p className="jmcs-carrusel-nav" style={{ justifyContent: "center", fontSize: 11, color: tema.textoSuave, marginTop: 4 }}>
-              <Icono tipo="flecha" size={12} /> Desliza para ver {tarjetaActivaMovil === "local" ? "el Visitante" : "el Local"}
-            </p>
-          )}
+          <p className="jmcs-carrusel-nav" style={{ justifyContent: "center", fontSize: 11, color: tema.textoSuave, marginTop: 4 }}>
+            <Icono tipo="flecha" size={12} /> Desliza para ver {tarjetaActivaMovil === "local" ? "el Visitante" : "el Local"}
+          </p>
 
           <div className="jmcs-espejo-desktop" style={{ marginTop: 20 }}>
             <SeccionEspejo
@@ -8680,17 +8573,15 @@ function Home() {
             {item.etiqueta}
           </button>
         ))}
-        {!esAppInstalada && (
-          <button
-            ref={masBtnRef}
-            className="jmcs-nav-movil-item"
-            onClick={() => setMenuAbierto(!menuAbierto)}
-            style={{ color: tema.textoSuave }}
-          >
-            <Icono tipo="menu" size={18} />
-            Más
-          </button>
-        )}
+        <button
+          ref={masBtnRef}
+          className="jmcs-nav-movil-item"
+          onClick={() => setMenuAbierto(!menuAbierto)}
+          style={{ color: tema.textoSuave }}
+        >
+          <Icono tipo="menu" size={18} />
+          Más
+        </button>
       </div>
 
       {estudioClimaticoAbierto && ajustesClima && climaOficialNorm && equipoLocal?.team && equipoVisitante?.team && (
@@ -8756,7 +8647,7 @@ function Home() {
         />
       )}
 
-      {sinConexion && !esAppInstalada && (
+      {sinConexion && (
         <div
           style={{
             position: "fixed", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 400,
