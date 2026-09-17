@@ -562,6 +562,19 @@ function fechaLocalHoy() {
   return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
+// La API de partidos filtra "el día X" en UTC por defecto, lo cual no
+// coincide con el día local del usuario (por ejemplo, en Colombia —
+// UTC-5 — un partido que arranca a las 7pm ya cae en el día siguiente en
+// UTC). Le mandamos la zona horaria real del dispositivo para que filtre
+// por el día calendario correcto según donde esté parado el usuario.
+function zonaHorariaUsuario() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Bogota";
+  } catch {
+    return "America/Bogota";
+  }
+}
+
 function calcularValorEsperado(fuentesStat, esPartidoLiga) {
   const conf = (n, ref) => Math.min(1, n / ref);
 
@@ -2534,7 +2547,7 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
     setBuscado(true);
     setPaisFiltro(null);
     try {
-      const res = await fetch(`/api/partidos-por-fecha?date=${fecha}`);
+      const res = await fetch(`/api/partidos-por-fecha?date=${fecha}&timezone=${encodeURIComponent(zonaHorariaUsuario())}`);
       const data = await res.json();
       if (data.error) {
         setError(data.error);
@@ -4154,7 +4167,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   useEffect(() => {
     const hoy = fechaLocalHoy();
     setLoading(true);
-    fetch(`/api/partidos-por-fecha?date=${hoy}`)
+    fetch(`/api/partidos-por-fecha?date=${hoy}&timezone=${encodeURIComponent(zonaHorariaUsuario())}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) { setError(data.error); mostrarToast && mostrarToast(data.error); }
