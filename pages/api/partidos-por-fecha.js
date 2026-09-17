@@ -5,23 +5,41 @@ import { obtenerCache, guardarCache, CACHE_3_MINUTOS, CACHE_PARA_SIEMPRE } from 
 // es seguro cachearlo para siempre; hay que seguir revisando cada tanto.
 const ESTADOS_NO_DEFINITIVOS = ["PST", "TBD", "SUSP", "INT", "ABD"];
 
+// Por si llega una zona horaria vacía o con caracteres raros (no debería,
+// pero mejor no mandarle basura a la API externa).
+function zonaHorariaValida(tz) {
+  if (!tz || typeof tz !== "string" || tz.length > 60) return "America/Bogota";
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz }); // tira si no es una zona real
+    return tz;
+  } catch {
+    return "America/Bogota";
+  }
+}
+
 export default async function handler(req, res) {
   const { date } = req.query;
+  const timezone = zonaHorariaValida(req.query.timezone);
 
   if (!date) {
     return res.status(400).json({ error: "Falta la fecha" });
   }
 
-  const hoy = new Date().toISOString().slice(0, 10);
+  // "Hoy" también calculado en la zona horaria del usuario, no en UTC del
+  // servidor — si no, un partido de anoche (hora del usuario) podía
+  // quedar marcado como "fecha pasada" o "de hoy" de forma inconsistente.
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: timezone }); // en-CA da YYYY-MM-DD
   const esFechaPasada = date < hoy;
 
-  const clave = `partidos-fecha:${date}`;
+  // La zona horaria es parte de la clave: la misma fecha "2026-09-17" trae
+  // partidos distintos según se pida en hora de Colombia o de otro país.
+  const clave = `partidos-fecha:${date}:${timezone}`;
   const cacheado = await obtenerCache(clave);
   if (cacheado) return res.status(200).json(cacheado);
 
   try {
     const response = await fetch(
-      `https://v3.football.api-sports.io/fixtures?date=${date}`,
+      `https://v3.football.api-sports.io/fixtures?date=${date}&timezone=${encodeURIComponent(timezone)}`,
       {
         headers: { "x-apisports-key": process.env.API_FOOTBALL_KEY },
       }
