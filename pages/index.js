@@ -7534,6 +7534,7 @@ function Home() {
     <>
       <Head>
         <title>JMCS — Juggernaut Match Calculation System</title>
+        <meta name="google-site-verification" content="NhdbltMwdU5Pm4BzoKGsaQOo2W757doNNNvt-8ObXys" />
         <meta name="description" content="Métricas y estadísticas reales de fútbol: rendimiento como local/visitante, enfrentamientos directos, y probabilidades por competición. La herramienta te da los datos, tú sacas tus propias conclusiones." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="manifest" href="/manifest.json" />
