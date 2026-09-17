@@ -2198,7 +2198,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
               } else {
                 try {
                   await navigator.clipboard.writeText(url);
-                  mostrarToast && mostrarToast("Link copiado — ya lo podés pegar donde quieras.");
+                  mostrarToast && mostrarToast("Link copiado — ya lo puedes pegar donde quieras.");
                 } catch {
                   mostrarToast && mostrarToast("No se pudo copiar el link.");
                 }
@@ -5037,7 +5037,7 @@ function VistaRanking({ sesion, tema, acentoMarca }) {
                   {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
                 </strong>
                 <span style={{ flex: 1, fontSize: 13, fontWeight: soyYo ? "bold" : "normal" }}>
-                  {d.nombre_mostrado}{soyYo ? " (vos)" : ""}
+                  {d.nombre_mostrado}{soyYo ? " (tú)" : ""}
                 </span>
                 <span style={{ fontSize: 11, color: tema.textoSuave }}>{d.aciertos}/{d.total}</span>
                 <strong style={{ fontSize: 14, color: acentoMarca, minWidth: 46, textAlign: "right" }}>{d.porcentaje}%</strong>
@@ -5049,7 +5049,7 @@ function VistaRanking({ sesion, tema, acentoMarca }) {
 
       {sesion && miPosicion === -1 && datos.length > 0 && (
         <p style={{ fontSize: 11, color: tema.textoSuave, textAlign: "center", marginTop: 16 }}>
-          Todavía no aparecés en este ranking — seguí guardando y verificando pronósticos en Estudio.
+          Todavía no apareces en este ranking — sigue guardando y verificando pronósticos en Estudio.
         </p>
       )}
     </div>
@@ -5358,7 +5358,7 @@ function VistaPerfil({ sesion, perfil, onPerfilActualizado, tema, acentoMarca })
         />
 
         <label style={{ fontSize: 12, color: tema.textoSuave, display: "block", marginBottom: 6 }}>
-          Apodo para el ranking público (opcional — si lo dejás vacío, aparecés como "Pronosticador ####", nunca con tu nombre real)
+          Apodo para el ranking público (opcional — si lo dejas vacío, apareces como "Pronosticador ####", nunca con tu nombre real)
         </label>
         <input
           type="text"
@@ -5881,7 +5881,7 @@ JMCS no se hace responsable por pérdidas económicas, decisiones de apuesta, o 
 Este servicio está dirigido a mayores de 18 años.
 
 6. Cuenta de usuario
-Al registrarte, aceptás brindar información real y sos responsable de la actividad en tu cuenta. Podemos suspender cuentas que hagan mal uso de la plataforma.
+Al registrarte, aceptas brindar información real y eres responsable de la actividad en tu cuenta. Podemos suspender cuentas que hagan mal uso de la plataforma.
 
 7. Cambios en el servicio y estos términos
 Podemos modificar la app o estos términos en cualquier momento. Si hacemos un cambio importante, lo vamos a anunciar dentro de la propia app.
@@ -5896,7 +5896,7 @@ Si te registrás: tu correo, un nombre de usuario, y opcionalmente una foto de p
 Tus equipos favoritos, tus pronósticos guardados, tu historial de aciertos, tus preferencias de mercados y notificaciones, y el tema (claro/oscuro) que elegiste. Todo esto se guarda para que la app funcione como la dejaste la última vez — no lo vendemos ni lo compartimos con nadie.
 
 3. Notificaciones push
-Si activás las notificaciones, guardamos la información técnica necesaria para poder enviártelas (una "suscripción" del navegador). La podés desactivar cuando quieras desde Ajustes, y ahí se borra.
+Si activas las notificaciones, guardamos la información técnica necesaria para poder enviártelas (una "suscripción" del navegador). La puedes desactivar cuando quieras desde Ajustes, y ahí se borra.
 
 4. Terceros que usamos
 API-Football (datos de partidos y estadísticas) y Open-Meteo (clima). Estos servicios no reciben tu información personal — solo les pedimos datos deportivos y climáticos, no datos tuyos.
@@ -5919,7 +5919,7 @@ const PREGUNTAS_FRECUENTES = [
   { p: "¿Por qué a veces dice 'S/D'?", r: "Significa 'sin datos'. Preferimos mostrarte que no tenemos esa información en vez de ocultarla o inventarla." },
   { p: "¿Necesito cuenta para usar Estudio?", r: "Podés usar Estudio libremente sin cuenta por un tiempo limitado. Después de eso, te pedimos iniciar sesión (es gratis) para seguir usándolo sin límite." },
   { p: "¿Qué pasa si cierro el navegador durante la prueba gratis?", r: "El tiempo de prueba se reinicia — es por sesión del navegador, no acumulado entre días." },
-  { p: "¿Cómo activo las notificaciones?", r: "Desde el menú → Ajustes → Preferencias de notificaciones. Podés elegir avisos de gol, inicio/fin de partido, tarjetas, y semáforo en verde, por cada equipo que marques con la campana en Favoritos." },
+  { p: "¿Cómo activo las notificaciones?", r: "Desde el menú → Ajustes → Preferencias de notificaciones. Puedes elegir avisos de gol, inicio/fin de partido, tarjetas, y semáforo en verde, por cada equipo que marques con la campana en Favoritos." },
   { p: "¿Puedo usar JMCS en mi celular como una app?", r: "Sí — desde el navegador, buscá la opción \"Agregar a pantalla de inicio\" (Android) o \"Añadir a inicio\" en Safari (iPhone, versión 16.4 o más nueva)." },
   { p: "¿Tienen plan pago?", r: "Todavía no — por ahora todo es gratis con cuenta. Si en el futuro hay un plan pago, te lo vamos a avisar dentro de la propia app con tiempo." },
 ];
@@ -7010,7 +7010,7 @@ function Home() {
     setPartidoCalendario(p);
   }
 
-  // Cuando tocás un V/E/D de "Últimos 5": en PC se abre una pestaña nueva
+  // Cuando tocas un V/E/D de "Últimos 5": en PC se abre una pestaña nueva
   // (no interrumpe el Estudio que ya tenías armado), en celular se abre una
   // ventana superpuesta encima de lo que ya estabas viendo.
   const [resultadoModalFixture, setResultadoModalFixture] = useState(null);
@@ -7534,7 +7534,7 @@ function Home() {
     <>
       <Head>
         <title>JMCS — Juggernaut Match Calculation System</title>
-        <meta name="description" content="Métricas y estadísticas reales de fútbol: rendimiento como local/visitante, enfrentamientos directos, y probabilidades por competición. La herramienta te da los datos, vos sacás tus propias conclusiones." />
+        <meta name="description" content="Métricas y estadísticas reales de fútbol: rendimiento como local/visitante, enfrentamientos directos, y probabilidades por competición. La herramienta te da los datos, tú sacas tus propias conclusiones." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#2e6b3e" />
