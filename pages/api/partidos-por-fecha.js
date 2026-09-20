@@ -75,8 +75,13 @@ export default async function handler(req, res) {
       })
       .map((x) => x.p);
 
-    // Limitamos a 50 para no saturar la pantalla (partidos de todo el mundo en un solo día pueden ser cientos)
-    const resultado = ordenados.slice(0, 50);
+    // Límite alto a propósito: en simultáneo puede haber más de 100
+    // partidos en vivo en el mundo entre todas las ligas (grandes,
+    // chicas, femeninas, juveniles) — con 50 se quedaban afuera partidos
+    // importantes como un Atlético-Real Madrid solo porque otros países
+    // "llenaban el cupo" antes. 200 da mucho más margen sin disparar el
+    // tamaño de la respuesta a algo descontrolado.
+    const resultado = ordenados.slice(0, 200);
 
     // Un día pasado solo se cachea para siempre si TODOS sus partidos ya
     // quedaron en un estado definitivo — si alguno sigue "aplazado" o
