@@ -16,7 +16,7 @@
 // cuota de API-Football de todo este archivo.
 
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
-import { enviarPush } from "../../lib/push";
+import { enviarPush, enviarPushFcm } from "../../lib/push";
 const motor = require("../../lib/motor");
 
 const ESTADOS_FINALIZADOS = ["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"];
@@ -322,22 +322,37 @@ export default async function handler(req, res) {
       }
     }
 
-    // 5) Mandar los push
+    // 5) Mandar los push — a la web (navegador) y a la app Android nativa
     let enviados = 0;
     const userIdsAEnviar = [...new Set(eventosAEnviar.flatMap((e) => e.userIds))];
     if (userIdsAEnviar.length > 0) {
-      const { data: suscripciones } = await supabaseAdmin
-        .from("push_subscriptions")
-        .select("*")
-        .in("user_id", userIdsAEnviar);
+      const [{ data: suscripciones }, { data: tokensFcm }] = await Promise.all([
+        supabaseAdmin.from("push_subscriptions").select("*").in("user_id", userIdsAEnviar),
+        supabaseAdmin.from("fcm_tokens").select("*").in("user_id", userIdsAEnviar),
+      ]);
 
       for (const evento of eventosAEnviar) {
+        // Web: navegador (Chrome, Safari, etc.)
         const subsDelEvento = (suscripciones || []).filter((s) => evento.userIds.includes(s.user_id));
         for (const sub of subsDelEvento) {
           const resultado = await enviarPush(sub, { titulo: evento.titulo, cuerpo: evento.cuerpo, url: "/", tipo: evento.tipo || "general" });
           if (resultado.ok) enviados++;
           if (resultado.expirada) {
             await supabaseAdmin.from("push_subscriptions").delete().eq("id", sub.id);
+          }
+        }
+
+        // App Android nativa (Firebase Cloud Messaging)
+        const tokensDelEvento = (tokensFcm || []).filter((t) => evento.userIds.includes(t.user_id));
+        for (const fila of tokensDelEvento) {
+          const resultado = await enviarPushFcm(fila.token, {
+            titulo: evento.titulo,
+            cuerpo: evento.cuerpo,
+            data: { tipo: evento.tipo || "general" },
+          });
+          if (resultado.ok) enviados++;
+          if (resultado.expirada) {
+            await supabaseAdmin.from("fcm_tokens").delete().eq("id", fila.id);
           }
         }
       }
