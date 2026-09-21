@@ -11,7 +11,7 @@ export default async function handler(req, res) {
 
   const prompt = `Eres un analista deportivo experto en fútbol, trabajando dentro de la aplicación JMCS (Juggernaut Match Calculation System). 
 Tu tarea es interpretar los datos estadísticos que ya se calcularon (no inventes números nuevos, usa solo los que te doy).
-Sé directo, con lenguaje natural, sin repetir los números tal cual como una lista — dale contexto y lectura futbolística.
+Sé directo, con lenguaje natural, sin repetir los números tal cual como una lista — aporta contexto y lectura futbolística.
 Aclara siempre que esto es un modelo estadístico de tendencias, no una certeza.
 
 DATOS DEL ESTUDIO:
