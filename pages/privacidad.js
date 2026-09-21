@@ -30,34 +30,34 @@ export default function Privacidad() {
 
         <p style={estiloP}>
           JMCS (Juggernaut Match Calculation System) es una herramienta de análisis y pronósticos de fútbol.
-          Esta política explica qué información recolectamos, para qué la usamos y qué control tenés sobre ella.
+          Esta política explica qué información recolectamos, para qué la usamos y qué control tienes sobre ella.
         </p>
 
         <h2 style={estiloH2}>1. Qué información recolectamos</h2>
         <p style={estiloP}>
-          Cuando creás una cuenta (por correo, Google o enlace mágico) guardamos tu correo electrónico, un nombre
-          de usuario, y opcionalmente una foto de perfil. Si iniciás sesión con Google, recibimos tu nombre y
+          Cuando creas una cuenta (por correo, Google o enlace mágico) guardamos tu correo electrónico, un nombre
+          de usuario, y opcionalmente una foto de perfil. Si inicias sesión con Google, recibimos tu nombre y
           correo asociados a esa cuenta, según los permisos que apruebes en ese momento — no accedemos a ningún
           otro dato de tu cuenta de Google.
         </p>
         <p style={estiloP}>
-          También guardamos la actividad relacionada con el uso de la app: equipos y países que consultás en
-          Estudio, pronósticos que guardás y su resultado, equipos que marcás como favoritos, y tu progreso en el
+          También guardamos la actividad relacionada con el uso de la app: equipos y países que consultas en
+          Estudio, pronósticos que guardas y su resultado, equipos que marcas como favoritos, y tu progreso en el
           ranking de aciertos.
         </p>
         <p style={estiloP}>
-          Si activás las notificaciones, guardamos la información técnica necesaria para poder enviártelas (una
-          "suscripción" de notificaciones de tu navegador). Se borra apenas las desactivás.
+          Si activas las notificaciones, guardamos la información técnica necesaria para poder enviártelas (una
+          "suscripción" de notificaciones de tu navegador). Se borra apenas las desactivas.
         </p>
         <p style={estiloP}>
-          Si te suscribís a un plan pago, el procesamiento del pago lo hace Wompi directamente — nosotros no
+          Si te suscribes a un plan pago, el procesamiento del pago lo hace Wompi directamente — nosotros no
           almacenamos el número completo de tu tarjeta en ningún momento. Guardamos únicamente una referencia a
           la suscripción y el estado del pago que Wompi nos confirma.
         </p>
 
         <h2 style={estiloH2}>2. Para qué usamos tu información</h2>
         <p style={estiloP}>
-          Para darte acceso a tu cuenta y tus datos guardados, procesar tu suscripción si tenés una, mostrarte tu
+          Para darte acceso a tu cuenta y tus datos guardados, procesar tu suscripción si tienes una, mostrarte tu
           historial y estadísticas de aciertos, y — si activaste las notificaciones — avisarte sobre los partidos
           de tus equipos favoritos.
         </p>
@@ -69,15 +69,15 @@ export default function Privacidad() {
         </p>
         <p style={estiloP}>
           <strong>Supabase</strong> (base de datos, autenticación y almacenamiento de archivos), <strong>Wompi</strong>
-          {" "}(procesamiento de pagos), <strong>Google</strong> (si elegís iniciar sesión con esa opción), y
+          {" "}(procesamiento de pagos), <strong>Google</strong> (si eliges iniciar sesión con esa opción), y
           proveedores de datos deportivos (<strong>API-Football</strong> y <strong>PitchAPI</strong>) que reciben
           consultas sobre partidos, pero no reciben tu información personal.
         </p>
 
         <h2 style={estiloH2}>4. Tus derechos</h2>
         <p style={estiloP}>
-          Podés pedirnos en cualquier momento que te mostremos, corrijamos o borremos tu información. Para
-          eliminar tu cuenta y todos los datos asociados, escribinos a través del correo de contacto que figura
+          Puedes pedirnos en cualquier momento que te mostremos, corrijamos o borremos tu información. Para
+          eliminar tu cuenta y todos los datos asociados, escríbenos a través del correo de contacto que figura
           más abajo.
         </p>
 
@@ -88,12 +88,12 @@ export default function Privacidad() {
 
         <h2 style={estiloH2}>6. Cambios a esta política</h2>
         <p style={estiloP}>
-          Si hacemos cambios importantes a esta política, los vamos a reflejar acá con la fecha de actualización.
+          Si hacemos cambios importantes a esta política, los vamos a reflejar aquí con la fecha de actualización.
         </p>
 
         <h2 style={estiloH2}>7. Contacto</h2>
         <p style={estiloP}>
-          Ante cualquier duda sobre esta política o tus datos, escribinos a{" "}
+          Ante cualquier duda sobre esta política o tus datos, escríbenos a{" "}
           <a href="mailto:jmcsystem26@gmail.com" style={{ color: "#f5c542" }}>jmcsystem26@gmail.com</a>.
         </p>
       </div>
