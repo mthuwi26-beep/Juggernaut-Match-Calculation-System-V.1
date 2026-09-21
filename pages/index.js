@@ -68,7 +68,7 @@ function BanderaPais({ pais, url, size = 16 }) {
 // Sistema de referidos
 // ============================================
 // Al que invita se le dan estos días gratis cuando su referido se suscribe
-// (paga) — el premio en sí se otorga desde el webhook de Wompi, no desde acá.
+// (paga) — el premio en sí se otorga desde el webhook de Wompi, no desde aquí.
 const DIAS_RECOMPENSA_REFERIDOR = 7;
 // Al invitado se le suman estos días extra a su período de prueba apenas
 // se registra con un código válido.
@@ -252,7 +252,7 @@ const TEXTOS = {
     tutEstudioTexto: "Elige un partido del calendario a la izquierda, o busca Local y Visitante a mano abajo. Comparamos sus estadísticas reales y calculamos un semáforo de probabilidades — verde es más probable, rojo menos.",
     ajustesTitulo: "Ajustes", prefsNotifTitulo: "Preferencias de notificaciones",
     prefsNotifDesc: "Avisos de los partidos de tus equipos favoritos que tengan la campana activada. Funciona mientras el navegador esté instalado o abierto — en iPhone, solo si agregaste la app a tu pantalla de inicio (Safari 16.4 o más nuevo).",
-    notifNoSoportado: "Tu navegador no soporta notificaciones push. Probá desde Chrome o Firefox en Android, o instalando la app en la pantalla de inicio en iPhone (Safari 16.4+).",
+    notifNoSoportado: "Tu navegador no soporta notificaciones push. Prueba desde Chrome o Firefox en Android, o instalando la app en la pantalla de inicio en iPhone (Safari 16.4+).",
     notifSinPermiso: "No diste permiso de notificaciones — no vamos a poder avisarte.",
     notifActivadasMsg: "Notificaciones activadas.", notifErrorActivar: "No se pudieron activar las notificaciones. Intenta de nuevo.",
     notifDesactivadasMsg: "Notificaciones desactivadas.", notifErrorDesactivar: "No se pudo desactivar. Intenta de nuevo.",
@@ -712,7 +712,7 @@ const LINEAS_HANDICAP = [-2, -1.5, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1
 
 // Hándicap asiático — metodología estándar de casas de apuestas: en líneas "enteras" (0, ±1, ±2...)
 // puede haber "push" (se devuelve la apuesta si el resultado ajustado queda exacto en 0). En líneas
-// de cuarto (.25/.75) la apuesta se reparte 50/50 entre las dos líneas vecinas de .5 — acá mostramos
+// de cuarto (.25/.75) la apuesta se reparte 50/50 entre las dos líneas vecinas de .5 — aquí mostramos
 // el promedio de cubrir esas dos líneas, que es la forma simplificada en la que lo mostramos (no es
 // una simulación exacta de devolución de apuesta, es nuestra forma de resumirlo en un solo %).
 function probabilidadHandicapAsiatico(lambdaLocal, lambdaVisitante, lineaLocal, maxGoles = 10) {
@@ -1052,7 +1052,7 @@ function PanelFavoritosPagina({ sesion, tema, acentoMarca, onAbrirPerfil, mostra
 
   async function alternarNotificar(teamId, valorActual) {
     if (!valorActual && !notifActivadas) {
-      mostrarToast && mostrarToast("Primero activá las notificaciones en Ajustes > Preferencias de notificaciones.");
+      mostrarToast && mostrarToast("Primero activa las notificaciones en Ajustes > Preferencias de notificaciones.");
       return;
     }
     setFavoritos((prev) => prev.map((f) => (f.team_id === teamId ? { ...f, notificar: !valorActual } : f)));
@@ -2205,7 +2205,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
           <button
             onClick={async () => {
               const url = `${window.location.origin}${window.location.pathname}?fixtureId=${fixtureIdActual}`;
-              const texto = `Mirá el pronóstico de ${equipoLocal.team.name} vs ${equipoVisitante.team.name} en JMCS`;
+              const texto = `Mira el pronóstico de ${equipoLocal.team.name} vs ${equipoVisitante.team.name} en JMCS`;
               if (navigator.share) {
                 try { await navigator.share({ title: "JMCS", text: texto, url }); } catch {}
               } else {
@@ -3310,7 +3310,7 @@ function MarcadorEnVivo({ fixtureId, equipoLocal, equipoVisitante, tema, acentoM
       if (!vigilando) {
         const { data: perfilData } = await supabase.from("perfiles").select("notif_activadas").eq("user_id", sesion.user.id).maybeSingle();
         if (!perfilData?.notif_activadas) {
-          mostrarToast && mostrarToast("Primero activá las notificaciones en Ajustes > Preferencias de notificaciones.");
+          mostrarToast && mostrarToast("Primero activa las notificaciones en Ajustes > Preferencias de notificaciones.");
           setCargandoVigilancia(false);
           return;
         }
@@ -4749,7 +4749,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
       <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
         <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="trofeo" size={14} /> Suscripciones de usuarios</h4>
         <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
-          Buscá por correo o nombre de usuario. Cualquier admin puede cancelar una suscripción.
+          Busca por correo o nombre de usuario. Cualquier admin puede cancelar una suscripción.
           {!esAdminPrincipal && " Otorgar una suscripción sin pago es solo para el admin principal."}
         </p>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -4817,7 +4817,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
       <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
         <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={14} /> Plan de API-Football</h4>
         <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
-          Cuando actives tu plan pagado en API-Football, cambiá esto a "Pro" — el motor pasa solo a usar la temporada actual en vez de la fija de 2024, sin que necesites subir código nuevo.
+          Cuando actives tu plan pagado en API-Football, cambia esto a "Pro" — el motor pasa solo a usar la temporada actual en vez de la fija de 2024, sin que necesites subir código nuevo.
         </p>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -4848,7 +4848,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
       <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
         <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={14} /> Modo de pagos (Wompi)</h4>
         <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
-          En "Prueba" se usan las claves de sandbox (tarjetas falsas, sin cobrar plata real). En "Real" se usan las claves de producción — ojo, ahí sí se cobra de verdad.
+          En "Prueba" se usan las claves de sandbox (tarjetas falsas, sin cobrar dinero real). En "Real" se usan las claves de producción — ojo, ahí sí se cobra de verdad.
         </p>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -4876,7 +4876,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
         </div>
         {modoWompiAdmin === "real" && (
           <p style={{ fontSize: 11, color: "#e05555", marginTop: 10, marginBottom: 0 }}>
-            ⚠ Estás en modo REAL — cualquier suscripción que se pague ahora cobra plata de verdad.
+            ⚠ Estás en modo REAL — cualquier suscripción que se pague ahora cobra dinero de verdad.
           </p>
         )}
       </div>
@@ -5010,7 +5010,7 @@ function VistaRanking({ sesion, tema, acentoMarca }) {
         <Icono tipo="corona" size={18} color={acentoMarca} /> Top pronosticadores
       </h3>
       <p style={{ fontSize: 11, color: tema.textoSuave, textAlign: "center", marginBottom: 18 }}>
-        Necesitás al menos 3 pronósticos guardados y verificados para aparecer acá.
+        Necesitas al menos 3 pronósticos guardados y verificados para aparecer aquí.
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 18, justifyContent: "center" }}>
@@ -5217,7 +5217,7 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
               <Icono tipo="apreton" size={13} /> Mis referidos
             </h4>
             <p style={{ fontSize: 11, color: tema.textoSuave, marginTop: 0, marginBottom: 10 }}>
-              Invitá amigos con tu código — cuando se suscriban, ganás {DIAS_RECOMPENSA_REFERIDOR} días gratis.
+              Invita amigos con tu código — cuando se suscriban, ganas {DIAS_RECOMPENSA_REFERIDOR} días gratis.
             </p>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -5636,7 +5636,7 @@ function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
       >
         <button
           onClick={onCerrar}
-          title="Cerrar — seguís en tu Estudio, solo estabas viendo este partido"
+          title="Cerrar — sigues en tu Estudio, solo estabas viendo este partido"
           style={{ position: "absolute", top: 10, right: 10, background: "transparent", border: "none", cursor: "pointer", color: tema.textoSuave }}
         >
           <Icono tipo="cerrar" size={18} />
@@ -5888,7 +5888,7 @@ JMCS no es una casa de apuestas, no opera ni promueve apuestas, y no recibe comi
 Nuestras cifras salen de promedios y tendencias sobre partidos ya jugados (rendimiento como local/visitante, forma reciente, enfrentamientos directos, distribución de Poisson para convertir esos promedios en probabilidad). Cuando un valor es una estimación propia nuestra —no un dato validado externamente—, lo identificamos como tal dentro de la app. Estos cálculos dependen de datos de terceros (API-Football para estadísticas, Open-Meteo para clima) que pueden tener errores, demoras o estar incompletos.
 
 4. Sin responsabilidad por pérdidas o mal uso
-JMCS no se hace responsable por pérdidas económicas, decisiones de apuesta, o cualquier otro uso que el usuario le dé a la información acá presentada. La herramienta se ofrece "tal cual", sin garantía de exactitud, disponibilidad continua, o resultado.
+JMCS no se hace responsable por pérdidas económicas, decisiones de apuesta, o cualquier otro uso que el usuario le dé a la información aquí presentada. La herramienta se ofrece "tal cual", sin garantía de exactitud, disponibilidad continua, o resultado.
 
 5. Edad mínima
 Este servicio está dirigido a mayores de 18 años.
@@ -5903,9 +5903,9 @@ Podemos modificar la app o estos términos en cualquier momento. Si hacemos un c
 Dudas sobre estos términos: jmcsystem26@gmail.com`;
 
 const TEXTO_PRIVACIDAD = `1. Qué datos guardamos
-Si te registrás: tu correo, un nombre de usuario, y opcionalmente una foto de perfil. Si usás la app sin cuenta, no guardamos ningún dato que te identifique — solo un contador de tiempo de uso en tu propio navegador (no en nuestros servidores).
+Si te registras: tu correo, un nombre de usuario, y opcionalmente una foto de perfil. Si usas la app sin cuenta, no guardamos ningún dato que te identifique — solo un contador de tiempo de uso en tu propio navegador (no en nuestros servidores).
 
-2. Qué guardamos cuando usás la app
+2. Qué guardamos cuando usas la app
 Tus equipos favoritos, tus pronósticos guardados, tu historial de aciertos, tus preferencias de mercados y notificaciones, y el tema (claro/oscuro) que elegiste. Todo esto se guarda para que la app funcione como la dejaste la última vez — no lo vendemos ni lo compartimos con nadie.
 
 3. Notificaciones push
@@ -5915,10 +5915,10 @@ Si activas las notificaciones, guardamos la información técnica necesaria para
 API-Football (datos de partidos y estadísticas) y Open-Meteo (clima). Estos servicios no reciben tu información personal — solo les pedimos datos deportivos y climáticos, no datos tuyos.
 
 5. Errores técnicos
-Si algo se rompe mientras usás la app, guardamos el error técnico (para poder arreglarlo) junto con tu ID de usuario si tenías sesión iniciada, para poder investigar qué pasó. Nunca compartimos esto con nadie fuera del equipo de JMCS.
+Si algo se rompe mientras usas la app, guardamos el error técnico (para poder arreglarlo) junto con tu ID de usuario si tenías sesión iniciada, para poder investigar qué pasó. Nunca compartimos esto con nadie fuera del equipo de JMCS.
 
 6. Tus derechos
-Podés pedirnos en cualquier momento que borremos tu cuenta y todos tus datos, escribiéndonos a jmcsystem26@gmail.com.
+Puedes pedirnos en cualquier momento que borremos tu cuenta y todos tus datos, escribiéndonos a jmcsystem26@gmail.com.
 
 7. Cambios
 Si cambiamos esta política de forma importante, te lo vamos a avisar dentro de la propia app.
@@ -5930,10 +5930,10 @@ const PREGUNTAS_FRECUENTES = [
   { p: "¿JMCS es una casa de apuestas?", r: "No. No operamos apuestas, no recibimos comisión de ninguna casa de apuestas, y no te recomendamos apostar. Somos una herramienta de métricas — lo que hagas con esa información es tu decisión." },
   { p: "¿De dónde salen los datos?", r: "De API-Football (estadísticas de partidos) y Open-Meteo (clima). Nosotros los procesamos y los organizamos en indicadores." },
   { p: "¿Por qué a veces dice 'S/D'?", r: "Significa 'sin datos'. Preferimos mostrarte que no tenemos esa información en vez de ocultarla o inventarla." },
-  { p: "¿Necesito cuenta para usar Estudio?", r: "Podés usar Estudio libremente sin cuenta por un tiempo limitado. Después de eso, te pedimos iniciar sesión (es gratis) para seguir usándolo sin límite." },
+  { p: "¿Necesito cuenta para usar Estudio?", r: "Puedes usar Estudio libremente sin cuenta por un tiempo limitado. Después de eso, te pedimos iniciar sesión (es gratis) para seguir usándolo sin límite." },
   { p: "¿Qué pasa si cierro el navegador durante la prueba gratis?", r: "El tiempo de prueba se reinicia — es por sesión del navegador, no acumulado entre días." },
   { p: "¿Cómo activo las notificaciones?", r: "Desde el menú → Ajustes → Preferencias de notificaciones. Puedes elegir avisos de gol, inicio/fin de partido, tarjetas, y semáforo en verde, por cada equipo que marques con la campana en Favoritos." },
-  { p: "¿Puedo usar JMCS en mi celular como una app?", r: "Sí — desde el navegador, buscá la opción \"Agregar a pantalla de inicio\" (Android) o \"Añadir a inicio\" en Safari (iPhone, versión 16.4 o más nueva)." },
+  { p: "¿Puedo usar JMCS en mi celular como una app?", r: "Sí — desde el navegador, busca la opción \"Agregar a pantalla de inicio\" (Android) o \"Añadir a inicio\" en Safari (iPhone, versión 16.4 o más nueva)." },
   { p: "¿Tienen plan pago?", r: "Todavía no — por ahora todo es gratis con cuenta. Si en el futuro hay un plan pago, te lo vamos a avisar dentro de la propia app con tiempo." },
 ];
 
@@ -6197,7 +6197,7 @@ function ModalMiPlan({ perfil, tema, acentoMarca, diasRestantesPrueba, onCerrar,
           <>
             <Icono tipo="trofeo" size={36} color={acentoMarca} />
             <h3 style={{ marginTop: 12, marginBottom: 4 }}>Plan {perfil?.plan_suscripcion === "anual" ? "Max" : "Pro"}</h3>
-            <p style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 20 }}>Tenés acceso completo a Estudio, sin límites.</p>
+            <p style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 20 }}>Tienes acceso completo a Estudio, sin límites.</p>
 
             <div style={{ background: tema.panel, borderRadius: 8, padding: 16, textAlign: "left", fontSize: 13 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -6217,7 +6217,7 @@ function ModalMiPlan({ perfil, tema, acentoMarca, diasRestantesPrueba, onCerrar,
             </div>
 
             <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 16 }}>
-              Podés cancelar tu suscripción en cualquier momento desde Wompi.
+              Puedes cancelar tu suscripción en cualquier momento desde Wompi.
             </p>
           </>
         )}
@@ -6263,11 +6263,11 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
 
   async function suscribirse() {
     if (!numero || !titular || !mes || !anio || !cvc) {
-      mostrarToast && mostrarToast("Completá todos los datos de la tarjeta.");
+      mostrarToast && mostrarToast("Completa todos los datos de la tarjeta.");
       return;
     }
     if (!acepto) {
-      mostrarToast && mostrarToast("Tenés que aceptar los términos de tratamiento de datos.");
+      mostrarToast && mostrarToast("Tienes que aceptar los términos de tratamiento de datos.");
       return;
     }
     setProcesando(true);
@@ -6299,7 +6299,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
         return;
       }
 
-      // 3. Recién acá le mandamos el token (no el número de tarjeta) a
+      // 3. Recién aquí le mandamos el token (no el número de tarjeta) a
       //    nuestro servidor, para crear la fuente de pago y cobrar
       const res = await fetch("/api/wompi-crear-suscripcion", {
         method: "POST",
@@ -6349,7 +6349,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
         </div>
 
         <p style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 20 }}>
-          Wompi te va a mandar un comprobante por correo automáticamente. Guardá el número de transacción de arriba, por las dudas.
+          Wompi te va a mandar un comprobante por correo automáticamente. Guarda el número de transacción de arriba, por si acaso.
         </p>
 
         <button
@@ -6367,7 +6367,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
       <Icono tipo="trofeo" size={40} color={acentoMarca} />
       <h3 style={{ marginTop: 16, marginBottom: 8 }}>Tu prueba gratis de 7 días terminó</h3>
       <p style={{ fontSize: 13, color: tema.textoSuave, marginBottom: 24 }}>
-        Suscribite para seguir disfrutando de nuestros pronósticos, con acceso completo a Estudio.
+        Suscríbete para seguir disfrutando de nuestros pronósticos, con acceso completo a Estudio.
       </p>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
@@ -6456,7 +6456,7 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
         {procesando ? "Procesando el pago..." : `Suscribirme — ${planElegido === "mensual" ? "$70.000/mes" : "$714.000/año"}`}
       </button>
       <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 14 }}>
-        El pago se procesa de forma segura a través de Wompi. Podés cancelar cuando quieras.
+        El pago se procesa de forma segura a través de Wompi. Puedes cancelar cuando quieras.
       </p>
       {onCancelar && (
         <button
@@ -7149,7 +7149,7 @@ function Home() {
     if (typeof window === "undefined" || !sesion) return;
     // MercadoPago a veces arma la URL de vuelta con un "?" de más en vez de
     // "&" (ej: ?pago=exito?preapproval_id=...) — por eso no confiamos en
-    // URLSearchParams acá, buscamos directo en el texto completo de la URL.
+    // URLSearchParams aquí, buscamos directo en el texto completo de la URL.
     if (!window.location.href.includes("pago=exito")) return;
     mostrarToast("¡Gracias! Estamos confirmando tu pago...");
     let intentos = 0;
@@ -7262,7 +7262,7 @@ function Home() {
   const mensajeEstudio =
     equipoLocal?.team && equipoVisitante?.team
       ? `Estudio: ${equipoLocal.team.name} vs ${equipoVisitante.team.name}`
-      : "Modo prueba: elegí un equipo local y otro visitante para empezar. El calendario de la izquierda sí trae partidos reales.";
+      : "Modo prueba: elige un equipo local y otro visitante para empezar. El calendario de la izquierda sí trae partidos reales.";
 
   async function cargarDatosPuntuales() {
     if (!equipoLocal?.team || !equipoVisitante?.team) return;
@@ -7570,8 +7570,8 @@ function Home() {
         <meta name="twitter:image" content="https://juggernaut-match-calculation-system-nine.vercel.app/icon-512.png" />
       </Head>
 
-      {/* Google Analytics — solo se activa si configurás NEXT_PUBLIC_GA_ID en Vercel.
-          Si no lo configurás, esto simplemente no hace nada, no rompe nada. */}
+      {/* Google Analytics — solo se activa si configuras NEXT_PUBLIC_GA_ID en Vercel.
+          Si no lo configuras, esto simplemente no hace nada, no rompe nada. */}
       {process.env.NEXT_PUBLIC_GA_ID && (
         <>
           <Script src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`} strategy="afterInteractive" />
@@ -8415,7 +8415,7 @@ function Home() {
           <Icono tipo="candado" size={40} color={acentoMarca} />
           <h3 style={{ marginTop: 16, marginBottom: 8 }}>Se acabó tu tiempo de prueba</h3>
           <p style={{ fontSize: 13, color: tema.textoSuave, marginBottom: 20 }}>
-            Ya usaste tus 5 minutos gratis de Estudio sin cuenta. Iniciá sesión (es gratis) para seguir usándolo sin límite.
+            Ya usaste tus 5 minutos gratis de Estudio sin cuenta. Inicia sesión (es gratis) para seguir usándolo sin límite.
           </p>
           <button
             onClick={abrirLogin}
