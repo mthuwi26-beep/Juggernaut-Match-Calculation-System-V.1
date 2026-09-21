@@ -29,7 +29,7 @@ export default function Terminos() {
         <p style={{ ...estiloP, color: "#8fae97" }}>Última actualización: septiembre de 2026</p>
 
         <p style={estiloP}>
-          Al crear una cuenta o usar JMCS (Juggernaut Match Calculation System), aceptás estos términos. Si no
+          Al crear una cuenta o usar JMCS (Juggernaut Match Calculation System), aceptas estos términos. Si no
           estás de acuerdo, por favor no uses la app.
         </p>
 
@@ -50,8 +50,8 @@ export default function Terminos() {
         <h2 style={estiloH2}>3. Suscripciones y pagos</h2>
         <p style={estiloP}>
           Los planes "Pro" y "Max" son suscripciones pagas con cobro automático (mensual o anual, según el plan
-          elegido) a través de Wompi. Podés cancelar tu suscripción en cualquier momento desde tu perfil — la
-          cancelación aplica a partir del próximo ciclo de cobro, y seguís teniendo acceso hasta el final del
+          elegido) a través de Wompi. Puedes cancelar tu suscripción en cualquier momento desde tu perfil — la
+          cancelación aplica a partir del próximo ciclo de cobro, y sigues teniendo acceso hasta el final del
           período ya pagado.
         </p>
 
@@ -77,12 +77,12 @@ export default function Terminos() {
         <h2 style={estiloH2}>7. Cambios a estos términos</h2>
         <p style={estiloP}>
           Podemos actualizar estos términos con el tiempo. Si hacemos cambios importantes, los vamos a reflejar
-          acá con la fecha de actualización.
+          aquí con la fecha de actualización.
         </p>
 
         <h2 style={estiloH2}>8. Contacto</h2>
         <p style={estiloP}>
-          Ante cualquier duda sobre estos términos, escribinos a{" "}
+          Ante cualquier duda sobre estos términos, escríbenos a{" "}
           <a href="mailto:jmcsystem26@gmail.com" style={{ color: "#f5c542" }}>jmcsystem26@gmail.com</a>.
         </p>
       </div>
