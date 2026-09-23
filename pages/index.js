@@ -8234,6 +8234,13 @@ function Home() {
             setToqueJalarY(null);
           }}
         >
+          {!sesion && (
+            <p style={{ fontSize: 13, color: tema.textoSuave, lineHeight: 1.5, margin: "0 0 16px", maxWidth: 640 }}>
+              JMCS organiza estadísticas reales de fútbol — rendimiento como local y visitante, enfrentamientos
+              directos y probabilidades por competición — en un semáforo claro, para que cada usuario haga su
+              propio análisis.
+            </p>
+          )}
           <TutorialFlotante
             id="inicio"
             titulo={traducir("tutInicioTitulo")}
