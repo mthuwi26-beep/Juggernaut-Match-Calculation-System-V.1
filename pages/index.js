@@ -127,6 +127,7 @@ const ICONOS_SVG = {
   foco: <><path d="M9.3 18h5.4" /><path d="M10 21h4" /><path d="M12 3.5a6.2 6.2 0 0 0-4 11c.7.6 1 1.3 1 2.4h6c0-1.1.3-1.8 1-2.4a6.2 6.2 0 0 0-4-11z" /></>,
   grafico: <><polyline points="3 17 9 11 13 15 21 6" /><polyline points="15 6 21 6 21 12" /></>,
   check: <polyline points="4 12.5 9 17.5 20 6" />,
+  ordenar: <><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="15" y2="12" /><line x1="4" y1="17" x2="10" y2="17" /></>,
   sol: <><circle cx="12" cy="12" r="4" /><line x1="12" y1="2.5" x2="12" y2="5.3" /><line x1="12" y1="18.7" x2="12" y2="21.5" /><line x1="2.5" y1="12" x2="5.3" y2="12" /><line x1="18.7" y1="12" x2="21.5" y2="12" /><line x1="4.9" y1="4.9" x2="6.9" y2="6.9" /><line x1="17.1" y1="17.1" x2="19.1" y2="19.1" /><line x1="4.9" y1="19.1" x2="6.9" y2="17.1" /><line x1="17.1" y1="6.9" x2="19.1" y2="4.9" /></>,
   luna: <path d="M20.5 13.2A8.8 8.8 0 1 1 10.8 3.5a7 7 0 0 0 9.7 9.7z" />,
   refrescar: <><path d="M20.5 12a8.5 8.5 0 1 1-2.8-6.3" /><polyline points="20.5 3 20.5 8.5 15 8.5" /></>,
@@ -4197,6 +4198,10 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   // resto por país). Si no es null, es la etiqueta exacta de una de
   // COMPETICIONES_TOP.
   const [filtroCompeticion, setFiltroCompeticion] = useState(null);
+  // true = competencias importantes primero (por defecto). false = todo
+  // agrupado por país, alfabético — el orden de siempre, elegido a mano.
+  const [ordenPorImportancia, setOrdenPorImportancia] = useState(true);
+  const [menuOrdenAbierto, setMenuOrdenAbierto] = useState(false);
 
   useEffect(() => {
     const hoy = fechaLocalHoy();
@@ -4229,7 +4234,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   const top = [];
   const resto = [];
   partidosFiltrados.forEach((p) => {
-    if (competicionDe(p.league?.name, p.league?.country)) top.push(p);
+    if (ordenPorImportancia && competicionDe(p.league?.name, p.league?.country)) top.push(p);
     else resto.push(p);
   });
 
@@ -4283,33 +4288,81 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     <div>
       <h3 style={{ fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}><Icono tipo="balon" size={16} /> {traducir("partidosDeHoy")}</h3>
 
-      {competicionesConPartidos.length > 0 && (
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, marginBottom: 14 }}>
-          <button
-            onClick={() => setFiltroCompeticion(null)}
-            style={{
-              flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
-              background: !filtroCompeticion ? acentoMarca : "transparent", color: !filtroCompeticion ? "#fff" : tema.texto,
-              border: `1px solid ${!filtroCompeticion ? acentoMarca : tema.borde}`,
-            }}
-          >
-            {traducir("todos")}
-          </button>
-          {competicionesConPartidos.map((c) => (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        {competicionesConPartidos.length > 0 && (
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, flex: 1 }}>
             <button
-              key={c.etiqueta}
-              onClick={() => setFiltroCompeticion(c.etiqueta === filtroCompeticion ? null : c.etiqueta)}
+              onClick={() => setFiltroCompeticion(null)}
               style={{
                 flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
-                background: filtroCompeticion === c.etiqueta ? acentoMarca : "transparent", color: filtroCompeticion === c.etiqueta ? "#fff" : tema.texto,
-                border: `1px solid ${filtroCompeticion === c.etiqueta ? acentoMarca : tema.borde}`,
+                background: !filtroCompeticion ? acentoMarca : "transparent", color: !filtroCompeticion ? "#fff" : tema.texto,
+                border: `1px solid ${!filtroCompeticion ? acentoMarca : tema.borde}`,
               }}
             >
-              {c.etiqueta}
+              {traducir("todos")}
             </button>
-          ))}
+            {competicionesConPartidos.map((c) => (
+              <button
+                key={c.etiqueta}
+                onClick={() => setFiltroCompeticion(c.etiqueta === filtroCompeticion ? null : c.etiqueta)}
+                style={{
+                  flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+                  background: filtroCompeticion === c.etiqueta ? acentoMarca : "transparent", color: filtroCompeticion === c.etiqueta ? "#fff" : tema.texto,
+                  border: `1px solid ${filtroCompeticion === c.etiqueta ? acentoMarca : tema.borde}`,
+                }}
+              >
+                {c.etiqueta}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ position: "relative", flexShrink: 0, marginLeft: competicionesConPartidos.length > 0 ? 0 : "auto" }}>
+          <button
+            onClick={() => setMenuOrdenAbierto((v) => !v)}
+            title="Ordenar partidos"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 32, height: 32, borderRadius: "50%", cursor: "pointer",
+              background: "transparent", border: `1px solid ${tema.borde}`,
+              color: ordenPorImportancia ? tema.textoSuave : acentoMarca,
+            }}
+          >
+            <Icono tipo="ordenar" size={15} />
+          </button>
+          {menuOrdenAbierto && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 9 }} onClick={() => setMenuOrdenAbierto(false)} />
+              <div style={{
+                position: "absolute", right: 0, top: 38, zIndex: 10, minWidth: 220,
+                background: tema.panel, border: `1px solid ${tema.borde}`, borderRadius: 8,
+                boxShadow: "0 4px 14px rgba(0,0,0,0.3)", overflow: "hidden",
+              }}>
+                <button
+                  onClick={() => { setOrdenPorImportancia(true); setMenuOrdenAbierto(false); }}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 13,
+                    background: ordenPorImportancia ? `${acentoMarca}22` : "transparent", color: tema.texto,
+                    border: "none", cursor: "pointer",
+                  }}
+                >
+                  Competencias importantes primero
+                </button>
+                <button
+                  onClick={() => { setOrdenPorImportancia(false); setMenuOrdenAbierto(false); }}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 13,
+                    background: !ordenPorImportancia ? `${acentoMarca}22` : "transparent", color: tema.texto,
+                    border: "none", cursor: "pointer",
+                  }}
+                >
+                  Solo por país (A-Z)
+                </button>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {loading && <p style={{ color: tema.textoSuave, fontSize: 13 }}>Cargando partidos...</p>}
       {error && <p style={{ color: "#e05555", fontSize: 13 }}>{error}</p>}
