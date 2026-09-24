@@ -4198,6 +4198,9 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   // resto por país). Si no es null, es la etiqueta exacta de una de
   // COMPETICIONES_TOP.
   const [filtroCompeticion, setFiltroCompeticion] = useState(null);
+  // El mismo filtro rápido de siempre, pero por país — solo tiene efecto
+  // cuando ordenPorImportancia === false.
+  const [filtroPais, setFiltroPais] = useState(null);
   // true = competencias importantes primero (por defecto). false = todo
   // agrupado por país, alfabético — el orden de siempre, elegido a mano.
   const [ordenPorImportancia, setOrdenPorImportancia] = useState(true);
@@ -4216,9 +4219,11 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
       .finally(() => setLoading(false));
   }, []);
 
-  const partidosFiltrados = filtroCompeticion
-    ? partidos.filter((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === filtroCompeticion)
-    : partidos;
+  const partidosFiltrados = !ordenPorImportancia
+    ? (filtroPais ? partidos.filter((p) => p.league?.country === filtroPais) : partidos)
+    : (filtroCompeticion
+        ? partidos.filter((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === filtroCompeticion)
+        : partidos);
 
   // Orden dentro de cada bloque: en vivo primero, luego por jugar, jugados al final
   function prioridadPartido(p) {
@@ -4283,41 +4288,74 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   const competicionesConPartidos = COMPETICIONES_TOP.filter((c) =>
     partidos.some((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === c.etiqueta)
   );
+  // Lo mismo, pero para el modo "solo por país" — los países populares que de verdad tienen partido hoy.
+  const paisesPopularesConPartidos = PAISES_POPULARES.filter((pais) => partidos.some((p) => p.league?.country === pais));
 
   return (
     <div>
       <h3 style={{ fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}><Icono tipo="balon" size={16} /> {traducir("partidosDeHoy")}</h3>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        {competicionesConPartidos.length > 0 && (
+        {(ordenPorImportancia ? competicionesConPartidos.length > 0 : paisesPopularesConPartidos.length > 0) && (
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, flex: 1 }}>
-            <button
-              onClick={() => setFiltroCompeticion(null)}
-              style={{
-                flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
-                background: !filtroCompeticion ? acentoMarca : "transparent", color: !filtroCompeticion ? "#fff" : tema.texto,
-                border: `1px solid ${!filtroCompeticion ? acentoMarca : tema.borde}`,
-              }}
-            >
-              {traducir("todos")}
-            </button>
-            {competicionesConPartidos.map((c) => (
-              <button
-                key={c.etiqueta}
-                onClick={() => setFiltroCompeticion(c.etiqueta === filtroCompeticion ? null : c.etiqueta)}
-                style={{
-                  flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
-                  background: filtroCompeticion === c.etiqueta ? acentoMarca : "transparent", color: filtroCompeticion === c.etiqueta ? "#fff" : tema.texto,
-                  border: `1px solid ${filtroCompeticion === c.etiqueta ? acentoMarca : tema.borde}`,
-                }}
-              >
-                {c.etiqueta}
-              </button>
-            ))}
+            {ordenPorImportancia ? (
+              <>
+                <button
+                  onClick={() => setFiltroCompeticion(null)}
+                  style={{
+                    flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+                    background: !filtroCompeticion ? acentoMarca : "transparent", color: !filtroCompeticion ? "#fff" : tema.texto,
+                    border: `1px solid ${!filtroCompeticion ? acentoMarca : tema.borde}`,
+                  }}
+                >
+                  {traducir("todos")}
+                </button>
+                {competicionesConPartidos.map((c) => (
+                  <button
+                    key={c.etiqueta}
+                    onClick={() => setFiltroCompeticion(c.etiqueta === filtroCompeticion ? null : c.etiqueta)}
+                    style={{
+                      flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+                      background: filtroCompeticion === c.etiqueta ? acentoMarca : "transparent", color: filtroCompeticion === c.etiqueta ? "#fff" : tema.texto,
+                      border: `1px solid ${filtroCompeticion === c.etiqueta ? acentoMarca : tema.borde}`,
+                    }}
+                  >
+                    {c.etiqueta}
+                  </button>
+                ))}
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setFiltroPais(null)}
+                  style={{
+                    flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+                    background: !filtroPais ? acentoMarca : "transparent", color: !filtroPais ? "#fff" : tema.texto,
+                    border: `1px solid ${!filtroPais ? acentoMarca : tema.borde}`,
+                  }}
+                >
+                  {traducir("todos")}
+                </button>
+                {paisesPopularesConPartidos.map((pais) => (
+                  <button
+                    key={pais}
+                    onClick={() => setFiltroPais(pais === filtroPais ? null : pais)}
+                    style={{
+                      flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+                      background: filtroPais === pais ? acentoMarca : "transparent", color: filtroPais === pais ? "#fff" : tema.texto,
+                      border: `1px solid ${filtroPais === pais ? acentoMarca : tema.borde}`,
+                    }}
+                  >
+                    <BanderaPais pais={pais} url={partidos.find((x) => x.league?.country === pais)?.league?.flag} size={16} />
+                    {pais}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         )}
 
-        <div style={{ position: "relative", flexShrink: 0, marginLeft: competicionesConPartidos.length > 0 ? 0 : "auto" }}>
+        <div style={{ position: "relative", flexShrink: 0, marginLeft: (ordenPorImportancia ? competicionesConPartidos.length : paisesPopularesConPartidos.length) > 0 ? 0 : "auto" }}>
           <button
             onClick={() => setMenuOrdenAbierto((v) => !v)}
             title="Ordenar partidos"
@@ -4339,7 +4377,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
                 boxShadow: "0 4px 14px rgba(0,0,0,0.3)", overflow: "hidden",
               }}>
                 <button
-                  onClick={() => { setOrdenPorImportancia(true); setMenuOrdenAbierto(false); }}
+                  onClick={() => { setOrdenPorImportancia(true); setFiltroCompeticion(null); setFiltroPais(null); setMenuOrdenAbierto(false); }}
                   style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 13,
                     background: ordenPorImportancia ? `${acentoMarca}22` : "transparent", color: tema.texto,
@@ -4349,7 +4387,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
                   Competencias importantes primero
                 </button>
                 <button
-                  onClick={() => { setOrdenPorImportancia(false); setMenuOrdenAbierto(false); }}
+                  onClick={() => { setOrdenPorImportancia(false); setFiltroCompeticion(null); setFiltroPais(null); setMenuOrdenAbierto(false); }}
                   style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 13,
                     background: !ordenPorImportancia ? `${acentoMarca}22` : "transparent", color: tema.texto,
