@@ -173,6 +173,7 @@ const PAISES_POPULARES = [
 // hace falta, también por país — "Serie A" es a la vez Italia y Brasil, así
 // que ahí sí hace falta el país para no confundirlas).
 const COMPETICIONES_TOP = [
+  { etiqueta: "Mundial", nivel: 1, coincide: (n) => n.includes("world cup") && !n.includes("qualif") },
   { etiqueta: "Champions League", nivel: 1, coincide: (n) => n.includes("champions league") },
   { etiqueta: "Copa Libertadores", nivel: 1, coincide: (n) => n.includes("libertadores") },
   { etiqueta: "Premier League", nivel: 2, coincide: (n, p) => n.includes("premier league") && p === "england" },
@@ -4284,10 +4285,14 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     return a.localeCompare(b);
   });
 
-  // Solo mostramos en la fila de accesos rápidos las competiciones top que sí tienen partidos hoy.
-  const competicionesConPartidos = COMPETICIONES_TOP.filter((c) =>
-    partidos.some((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === c.etiqueta)
-  );
+  // Solo mostramos en la fila de accesos rápidos las competiciones top que sí tienen partidos hoy,
+  // cada una con el escudo tomado del primer partido que la representa hoy.
+  const competicionesConPartidos = COMPETICIONES_TOP
+    .filter((c) => partidos.some((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === c.etiqueta))
+    .map((c) => ({
+      ...c,
+      logo: partidos.find((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === c.etiqueta)?.league?.logo,
+    }));
   // Lo mismo, pero para el modo "solo por país" — los países populares que de verdad tienen partido hoy.
   const paisesPopularesConPartidos = PAISES_POPULARES.filter((pais) => partidos.some((p) => p.league?.country === pais));
 
@@ -4315,11 +4320,20 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
                     key={c.etiqueta}
                     onClick={() => setFiltroCompeticion(c.etiqueta === filtroCompeticion ? null : c.etiqueta)}
                     style={{
-                      flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+                      flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
                       background: filtroCompeticion === c.etiqueta ? acentoMarca : "transparent", color: filtroCompeticion === c.etiqueta ? "#fff" : tema.texto,
                       border: `1px solid ${filtroCompeticion === c.etiqueta ? acentoMarca : tema.borde}`,
                     }}
                   >
+                    {c.logo && (
+                      <img
+                        src={c.logo}
+                        alt=""
+                        width={16}
+                        style={{ height: "auto", verticalAlign: "middle", display: "inline-block" }}
+                        onError={(e) => { e.target.style.display = "none"; }}
+                      />
+                    )}
                     {c.etiqueta}
                   </button>
                 ))}
