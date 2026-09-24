@@ -180,6 +180,7 @@ export default async function handler(req, res) {
             userIds: destinatarios,
             titulo: "Arrancó el partido",
             cuerpo: `${nombreLocal} vs ${nombreVisitante} ya está en juego`,
+            tipo: "empieza",
           });
         }
       } else {
@@ -222,6 +223,7 @@ export default async function handler(req, res) {
               userIds: interesadosEnSemaforo,
               titulo: "Semáforo en verde",
               cuerpo: `${marcador}\n${item.mercado} Over ${item.linea}: ${Math.round(item.prob * 100)}%`,
+              tipo: "semaforo",
             });
           }
         } catch {
@@ -246,13 +248,13 @@ export default async function handler(req, res) {
           if (previo && tarjetasLocalAhora > (previo.tarjetas_local ?? 0)) {
             const destinatarios = usuariosConPreferencia(usuariosLocal, "notif_tarjetas");
             if (destinatarios.length > 0) {
-              eventosAEnviar.push({ userIds: destinatarios, titulo: `Tarjeta para ${nombreLocal}`, cuerpo: marcador });
+              eventosAEnviar.push({ userIds: destinatarios, titulo: `Tarjeta para ${nombreLocal}`, cuerpo: marcador, tipo: "tarjeta" });
             }
           }
           if (previo && tarjetasVisitanteAhora > (previo.tarjetas_visitante ?? 0)) {
             const destinatarios = usuariosConPreferencia(usuariosVisitante, "notif_tarjetas");
             if (destinatarios.length > 0) {
-              eventosAEnviar.push({ userIds: destinatarios, titulo: `Tarjeta para ${nombreVisitante}`, cuerpo: marcador });
+              eventosAEnviar.push({ userIds: destinatarios, titulo: `Tarjeta para ${nombreVisitante}`, cuerpo: marcador, tipo: "tarjeta" });
             }
           }
 
@@ -309,7 +311,7 @@ export default async function handler(req, res) {
           const usuariosAmbos = [...new Set([...usuariosLocal, ...usuariosVisitante])];
           const destinatarios = usuariosConPreferencia(usuariosAmbos, "notif_termina");
           if (destinatarios.length > 0) {
-            eventosAEnviar.push({ userIds: destinatarios, titulo: "Partido finalizado", cuerpo: marcador });
+            eventosAEnviar.push({ userIds: destinatarios, titulo: "Partido finalizado", cuerpo: marcador, tipo: "termina" });
           }
 
           await supabaseAdmin
