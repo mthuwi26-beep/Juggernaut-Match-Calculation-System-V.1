@@ -2470,6 +2470,8 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         datos={{
           equipo_local: equipoLocal.team.name,
           equipo_visitante: equipoVisitante.team.name,
+          equipo_local_id: equipoLocal.team.id,
+          equipo_visitante_id: equipoVisitante.team.id,
           goles_esperados: lambdaGolesTotal !== null ? Number(lambdaGolesTotal.toFixed(2)) : null,
           prob_over25: lambdaGolesTotal !== null ? Math.round(probabilidadOver(lambdaGolesTotal, 2.5) * 100) : null,
           prob_btts: probBTTS !== null ? Math.round(probBTTS * 100) : null,
@@ -2500,6 +2502,8 @@ function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos, mos
       user_id: sesion.user.id,
       equipo_local: datos.equipo_local,
       equipo_visitante: datos.equipo_visitante,
+      equipo_local_id: datos.equipo_local_id,
+      equipo_visitante_id: datos.equipo_visitante_id,
       goles_esperados: datos.goles_esperados,
       prob_over25: datos.prob_over25,
       prob_btts: datos.prob_btts,
@@ -7390,6 +7394,8 @@ function Home() {
       user_id: sesion.user.id,
       equipo_local: equipoLocal?.team?.name || "",
       equipo_visitante: equipoVisitante?.team?.name || "",
+      equipo_local_id: equipoLocal?.team?.id || null,
+      equipo_visitante_id: equipoVisitante?.team?.id || null,
       ajuste_climatico: {
         activo: climaAjuste.activo,
         equipos: ajustesClima,
