@@ -166,6 +166,33 @@ const PAISES_POPULARES = [
   "France", "Portugal", "Mexico", "Colombia", "Chile", "Uruguay",
 ];
 
+// Competiciones "top", de más a menos importante — decide el orden natural
+// de Inicio (estas primero, el resto por país después) y arma los botones
+// del filtro rápido de arriba. Se reconoce por nombre de la liga (y, cuando
+// hace falta, también por país — "Serie A" es a la vez Italia y Brasil, así
+// que ahí sí hace falta el país para no confundirlas).
+const COMPETICIONES_TOP = [
+  { etiqueta: "Champions League", nivel: 1, coincide: (n) => n.includes("champions league") },
+  { etiqueta: "Copa Libertadores", nivel: 1, coincide: (n) => n.includes("libertadores") },
+  { etiqueta: "Premier League", nivel: 2, coincide: (n, p) => n.includes("premier league") && p === "england" },
+  { etiqueta: "La Liga", nivel: 2, coincide: (n, p) => n === "la liga" && p === "spain" },
+  { etiqueta: "Serie A", nivel: 2, coincide: (n, p) => n === "serie a" && p === "italy" },
+  { etiqueta: "Bundesliga", nivel: 2, coincide: (n, p) => n.includes("bundesliga") && p === "germany" && !n.includes("2.") },
+  { etiqueta: "Ligue 1", nivel: 2, coincide: (n, p) => n === "ligue 1" && p === "france" },
+  { etiqueta: "Brasileirão", nivel: 2, coincide: (n, p) => n === "serie a" && p === "brazil" },
+  { etiqueta: "Europa League", nivel: 3, coincide: (n) => n.includes("europa league") },
+  { etiqueta: "Copa Sudamericana", nivel: 3, coincide: (n) => n.includes("sudamericana") },
+  { etiqueta: "Liga MX", nivel: 3, coincide: (n, p) => n.includes("liga mx") && p === "mexico" },
+  { etiqueta: "Primera Argentina", nivel: 3, coincide: (n, p) => (n.includes("primera división") || n.includes("liga profesional")) && p === "argentina" },
+];
+// A qué competición top pertenece este partido, o null si es de nivel 4
+// (todo lo demás, incluida la Primera A de Colombia y cualquier liga menor).
+function competicionDe(nombreLiga, pais) {
+  const n = (nombreLiga || "").trim().toLowerCase();
+  const p = (pais || "").toLowerCase();
+  return COMPETICIONES_TOP.find((c) => c.coincide(n, p)) || null;
+}
+
 // El usuario busca en español; la API guarda el país en inglés — esta tabla los conecta
 const PAISES_ES_A_EN = {
   colombia: "Colombia", argentina: "Argentina", brasil: "Brazil", brazil: "Brazil",
@@ -4166,7 +4193,10 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   const [partidos, setPartidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [paisFiltro, setPaisFiltro] = useState(null);
+  // null = "Todos" (orden natural: competiciones top primero, después el
+  // resto por país). Si no es null, es la etiqueta exacta de una de
+  // COMPETICIONES_TOP.
+  const [filtroCompeticion, setFiltroCompeticion] = useState(null);
 
   useEffect(() => {
     const hoy = fechaLocalHoy();
@@ -4181,9 +4211,11 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
       .finally(() => setLoading(false));
   }, []);
 
-  const partidosFiltrados = paisFiltro ? partidos.filter((p) => p.league?.country === paisFiltro) : partidos;
+  const partidosFiltrados = filtroCompeticion
+    ? partidos.filter((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === filtroCompeticion)
+    : partidos;
 
-  // Orden dentro de cada país: en vivo primero, luego por jugar, jugados al final
+  // Orden dentro de cada bloque: en vivo primero, luego por jugar, jugados al final
   function prioridadPartido(p) {
     const estado = p.fixture?.status?.short;
     if (ESTADOS_EN_VIVO.includes(estado)) return 0;
@@ -4191,8 +4223,31 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     return 1;
   }
 
-  const grupos = {};
+  // Separar en "competiciones top" (Champions, Libertadores, las 5 grandes de
+  // Europa, Brasileirão, Europa League, Sudamericana, Liga MX, Argentina) y
+  // "el resto" — este segundo grupo sigue agrupado por país, como antes.
+  const top = [];
+  const resto = [];
   partidosFiltrados.forEach((p) => {
+    if (competicionDe(p.league?.name, p.league?.country)) top.push(p);
+    else resto.push(p);
+  });
+
+  const gruposTop = {};
+  top.forEach((p) => {
+    const comp = competicionDe(p.league?.name, p.league?.country);
+    if (!gruposTop[comp.etiqueta]) gruposTop[comp.etiqueta] = { nivel: comp.nivel, partidos: [] };
+    gruposTop[comp.etiqueta].partidos.push(p);
+  });
+  Object.values(gruposTop).forEach((g) => g.partidos.sort((a, b) => prioridadPartido(a) - prioridadPartido(b)));
+  // Nivel 1 primero, después nivel 2, después nivel 3 — alfabético entre las del mismo nivel.
+  const competicionesOrdenadas = Object.keys(gruposTop).sort((a, b) => {
+    if (gruposTop[a].nivel !== gruposTop[b].nivel) return gruposTop[a].nivel - gruposTop[b].nivel;
+    return a.localeCompare(b);
+  });
+
+  const grupos = {};
+  resto.forEach((p) => {
     const pais = p.league?.country || "Otros";
     if (!grupos[pais]) grupos[pais] = [];
     grupos[pais].push(p);
@@ -4219,37 +4274,38 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     return a.localeCompare(b);
   });
 
-  // Solo mostramos en la fila de accesos rápidos los países populares que sí tienen partidos hoy
-  const paisesPopularesConPartidos = PAISES_POPULARES.filter((pais) => partidos.some((p) => p.league?.country === pais));
+  // Solo mostramos en la fila de accesos rápidos las competiciones top que sí tienen partidos hoy.
+  const competicionesConPartidos = COMPETICIONES_TOP.filter((c) =>
+    partidos.some((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === c.etiqueta)
+  );
 
   return (
     <div>
       <h3 style={{ fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}><Icono tipo="balon" size={16} /> {traducir("partidosDeHoy")}</h3>
 
-      {paisesPopularesConPartidos.length > 0 && (
+      {competicionesConPartidos.length > 0 && (
         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, marginBottom: 14 }}>
           <button
-            onClick={() => setPaisFiltro(null)}
+            onClick={() => setFiltroCompeticion(null)}
             style={{
               flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
-              background: !paisFiltro ? acentoMarca : "transparent", color: !paisFiltro ? "#fff" : tema.texto,
-              border: `1px solid ${!paisFiltro ? acentoMarca : tema.borde}`,
+              background: !filtroCompeticion ? acentoMarca : "transparent", color: !filtroCompeticion ? "#fff" : tema.texto,
+              border: `1px solid ${!filtroCompeticion ? acentoMarca : tema.borde}`,
             }}
           >
             {traducir("todos")}
           </button>
-          {paisesPopularesConPartidos.map((pais) => (
+          {competicionesConPartidos.map((c) => (
             <button
-              key={pais}
-              onClick={() => setPaisFiltro(pais === paisFiltro ? null : pais)}
+              key={c.etiqueta}
+              onClick={() => setFiltroCompeticion(c.etiqueta === filtroCompeticion ? null : c.etiqueta)}
               style={{
-                flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
-                background: paisFiltro === pais ? acentoMarca : "transparent", color: paisFiltro === pais ? "#fff" : tema.texto,
-                border: `1px solid ${paisFiltro === pais ? acentoMarca : tema.borde}`,
+                flexShrink: 0, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
+                background: filtroCompeticion === c.etiqueta ? acentoMarca : "transparent", color: filtroCompeticion === c.etiqueta ? "#fff" : tema.texto,
+                border: `1px solid ${filtroCompeticion === c.etiqueta ? acentoMarca : tema.borde}`,
               }}
             >
-              <BanderaPais pais={pais} url={partidos.find((x) => x.league?.country === pais)?.league?.flag} size={16} />
-              {pais}
+              {c.etiqueta}
             </button>
           ))}
         </div>
@@ -4260,6 +4316,21 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
       {!loading && !error && partidosFiltrados.length === 0 && (
         <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay partidos disponibles para hoy en este plan.</p>
       )}
+      {competicionesOrdenadas.map((clave) => (
+        <div key={clave} style={{ marginBottom: 24 }}>
+          <h4 style={{
+            fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", color: acentoMarca,
+            borderBottom: `2px solid ${acentoMarca}`, paddingBottom: 6, marginBottom: 12,
+          }}>
+            {clave}
+          </h4>
+          <div className="jmcs-partidos-grid">
+            {gruposTop[clave].partidos.map((p) => (
+              <TarjetaPartidoInicio key={p.fixture.id} p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} onAbrirPerfil={onAbrirPerfil} modoOscuro={modoOscuro} />
+            ))}
+          </div>
+        </div>
+      ))}
       {paisesOrdenados.map((pais) => (
         <div key={pais} id={`pais-${pais}`} style={{ marginBottom: 24 }}>
           <h4 style={{
