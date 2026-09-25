@@ -4185,6 +4185,8 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   // El mismo filtro rápido de siempre, pero por país — solo tiene efecto
   // cuando ordenPorImportancia === false.
   const [filtroPais, setFiltroPais] = useState(null);
+  // null (todos) | "vivo" | "finalizado" — se activa al tocar la leyenda de arriba.
+  const [filtroEstado, setFiltroEstado] = useState(null);
   // true = competencias importantes primero (por defecto). false = todo
   // agrupado por país, alfabético — el orden de siempre, elegido a mano.
   const [ordenPorImportancia, setOrdenPorImportancia] = useState(true);
@@ -4226,11 +4228,16 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
       .finally(() => setLoading(false));
   }, []);
 
-  const partidosFiltrados = !ordenPorImportancia
+  const partidosPorFiltroPrincipal = !ordenPorImportancia
     ? (filtroPais ? partidos.filter((p) => p.league?.country === filtroPais) : partidos)
     : (filtroCompeticion
         ? partidos.filter((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === filtroCompeticion)
         : partidos);
+  const partidosFiltrados = filtroEstado === "vivo"
+    ? partidosPorFiltroPrincipal.filter((p) => ESTADOS_EN_VIVO.includes(p.fixture?.status?.short))
+    : filtroEstado === "finalizado"
+      ? partidosPorFiltroPrincipal.filter((p) => ["FT", "AET", "PEN"].includes(p.fixture?.status?.short))
+      : partidosPorFiltroPrincipal;
 
   // Orden dentro de cada bloque: en vivo primero, luego por jugar, jugados al final
   function prioridadPartido(p) {
@@ -4238,6 +4245,20 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     if (ESTADOS_EN_VIVO.includes(estado)) return 0;
     if (["FT", "AET", "PEN"].includes(estado)) return 2;
     return 1;
+  }
+
+  // Entre dos partidos en vivo dentro de una misma sección, el que lleva
+  // más tiempo jugado (más cerca de terminar) va arriba.
+  function compararPartidos(a, b) {
+    const prioA = prioridadPartido(a);
+    const prioB = prioridadPartido(b);
+    if (prioA !== prioB) return prioA - prioB;
+    if (prioA === 0) {
+      const elapsedA = a.fixture?.status?.elapsed || 0;
+      const elapsedB = b.fixture?.status?.elapsed || 0;
+      return elapsedB - elapsedA;
+    }
+    return 0;
   }
 
   // Separar en "competiciones top" (Champions, Libertadores, las 5 grandes de
@@ -4256,7 +4277,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     if (!gruposTop[comp.etiqueta]) gruposTop[comp.etiqueta] = { nivel: comp.nivel, partidos: [] };
     gruposTop[comp.etiqueta].partidos.push(p);
   });
-  Object.values(gruposTop).forEach((g) => g.partidos.sort((a, b) => prioridadPartido(a) - prioridadPartido(b)));
+  Object.values(gruposTop).forEach((g) => g.partidos.sort(compararPartidos));
   // Nivel 1 primero, después nivel 2, después nivel 3 — alfabético entre las del mismo nivel.
   const competicionesOrdenadas = Object.keys(gruposTop).sort((a, b) => {
     if (gruposTop[a].nivel !== gruposTop[b].nivel) return gruposTop[a].nivel - gruposTop[b].nivel;
@@ -4270,7 +4291,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     grupos[pais].push(p);
   });
   Object.keys(grupos).forEach((pais) => {
-    grupos[pais].sort((a, b) => prioridadPartido(a) - prioridadPartido(b));
+    grupos[pais].sort(compararPartidos);
   });
 
   // El minuto más alto entre los partidos en vivo de un país (-1 si no tiene ninguno en vivo)
@@ -4304,6 +4325,23 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   return (
     <div>
       <h3 style={{ fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}><Icono tipo="balon" size={16} /> {traducir("partidosDeHoy")}</h3>
+
+      <div style={{ display: "flex", gap: 14, marginBottom: 10 }}>
+        <div
+          onClick={() => setFiltroEstado(filtroEstado === "vivo" ? null : "vivo")}
+          style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
+        >
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#e05c5c", display: "inline-block" }} />
+          <span style={{ fontSize: 10, color: filtroEstado === "vivo" ? acentoMarca : tema.textoSuave, fontWeight: filtroEstado === "vivo" ? "bold" : "normal" }}>En vivo</span>
+        </div>
+        <div
+          onClick={() => setFiltroEstado(filtroEstado === "finalizado" ? null : "finalizado")}
+          style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
+        >
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: tema.textoSuave, opacity: 0.5, display: "inline-block" }} />
+          <span style={{ fontSize: 10, color: filtroEstado === "finalizado" ? acentoMarca : tema.textoSuave, fontWeight: filtroEstado === "finalizado" ? "bold" : "normal" }}>Finalizado</span>
+        </div>
+      </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         {(ordenPorImportancia ? competicionesConPartidos.length > 0 : paisesPopularesConPartidos.length > 0) && (
