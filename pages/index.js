@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import Head from "next/head";
 import Script from "next/script";
 import { supabase } from "../lib/supabaseClient";
+import { COMPETICIONES_TOP, competicionDe } from "../lib/competiciones";
 
 const TEMAS = {
   claro: {
@@ -172,29 +173,6 @@ const PAISES_POPULARES = [
 // del filtro rápido de arriba. Se reconoce por nombre de la liga (y, cuando
 // hace falta, también por país — "Serie A" es a la vez Italia y Brasil, así
 // que ahí sí hace falta el país para no confundirlas).
-const COMPETICIONES_TOP = [
-  { etiqueta: "Mundial", nivel: 1, coincide: (n) => n.includes("world cup") && !n.includes("qualif") },
-  { etiqueta: "Champions League", nivel: 1, coincide: (n) => n.includes("champions league") },
-  { etiqueta: "Copa Libertadores", nivel: 1, coincide: (n) => n.includes("libertadores") },
-  { etiqueta: "Premier League", nivel: 2, coincide: (n, p) => n.includes("premier league") && p === "england" },
-  { etiqueta: "La Liga", nivel: 2, coincide: (n, p) => n === "la liga" && p === "spain" },
-  { etiqueta: "Serie A", nivel: 2, coincide: (n, p) => n === "serie a" && p === "italy" },
-  { etiqueta: "Bundesliga", nivel: 2, coincide: (n, p) => n.includes("bundesliga") && p === "germany" && !n.includes("2.") },
-  { etiqueta: "Ligue 1", nivel: 2, coincide: (n, p) => n === "ligue 1" && p === "france" },
-  { etiqueta: "Brasileirão", nivel: 2, coincide: (n, p) => n === "serie a" && p === "brazil" },
-  { etiqueta: "Europa League", nivel: 3, coincide: (n) => n.includes("europa league") },
-  { etiqueta: "Copa Sudamericana", nivel: 3, coincide: (n) => n.includes("sudamericana") },
-  { etiqueta: "Liga MX", nivel: 3, coincide: (n, p) => n.includes("liga mx") && p === "mexico" },
-  { etiqueta: "Primera Argentina", nivel: 3, coincide: (n, p) => (n.includes("primera división") || n.includes("liga profesional")) && p === "argentina" },
-];
-// A qué competición top pertenece este partido, o null si es de nivel 4
-// (todo lo demás, incluida la Primera A de Colombia y cualquier liga menor).
-function competicionDe(nombreLiga, pais) {
-  const n = (nombreLiga || "").trim().toLowerCase();
-  const p = (pais || "").toLowerCase();
-  return COMPETICIONES_TOP.find((c) => c.coincide(n, p)) || null;
-}
-
 // El usuario busca en español; la API guarda el país en inglés — esta tabla los conecta
 const PAISES_ES_A_EN = {
   colombia: "Colombia", argentina: "Argentina", brasil: "Brazil", brazil: "Brazil",
@@ -4206,6 +4184,29 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   // agrupado por país, alfabético — el orden de siempre, elegido a mano.
   const [ordenPorImportancia, setOrdenPorImportancia] = useState(true);
   const [menuOrdenAbierto, setMenuOrdenAbierto] = useState(false);
+  // Próximo partido de una competición sin nada hoy — se busca bajo demanda
+  // (al tocar el chip, o al marcar la casilla de abajo) y se guarda acá para
+  // no repetir la búsqueda cada vez. undefined = todavía no se buscó,
+  // null = se buscó y no hay nada en las próximas 3 semanas.
+  const [proximosPorCompeticion, setProximosPorCompeticion] = useState({});
+  const [buscandoProximo, setBuscandoProximo] = useState({});
+  // Cuando ninguna competición top tiene partido hoy, este checkbox deja
+  // ver sus próximos partidos en vez de una sección vacía.
+  const [mostrarProximasCompeticiones, setMostrarProximasCompeticiones] = useState(false);
+
+  async function buscarProximoPartido(etiqueta) {
+    if (proximosPorCompeticion[etiqueta] !== undefined || buscandoProximo[etiqueta]) return;
+    setBuscandoProximo((prev) => ({ ...prev, [etiqueta]: true }));
+    try {
+      const r = await fetch(`/api/proximo-partido-competicion?etiqueta=${encodeURIComponent(etiqueta)}&timezone=${encodeURIComponent(zonaHorariaUsuario())}`);
+      const data = await r.json();
+      setProximosPorCompeticion((prev) => ({ ...prev, [etiqueta]: data.partido || null }));
+    } catch {
+      setProximosPorCompeticion((prev) => ({ ...prev, [etiqueta]: null }));
+    } finally {
+      setBuscandoProximo((prev) => ({ ...prev, [etiqueta]: false }));
+    }
+  }
 
   useEffect(() => {
     const hoy = fechaLocalHoy();
@@ -4285,14 +4286,13 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     return a.localeCompare(b);
   });
 
-  // Solo mostramos en la fila de accesos rápidos las competiciones top que sí tienen partidos hoy,
-  // cada una con el escudo tomado del primer partido que la representa hoy.
-  const competicionesConPartidos = COMPETICIONES_TOP
-    .filter((c) => partidos.some((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === c.etiqueta))
-    .map((c) => ({
-      ...c,
-      logo: partidos.find((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === c.etiqueta)?.league?.logo,
-    }));
+  // Ahora se muestran SIEMPRE las 13 competiciones top, tengan o no partido
+  // hoy — cada una con el escudo tomado del primer partido de hoy que la
+  // representa, si hay alguno (si no hay ninguno, se queda sin escudo).
+  const competicionesConPartidos = COMPETICIONES_TOP.map((c) => ({
+    ...c,
+    logo: partidos.find((p) => competicionDe(p.league?.name, p.league?.country)?.etiqueta === c.etiqueta)?.league?.logo,
+  }));
   // Lo mismo, pero para el modo "solo por país" — los países populares que de verdad tienen partido hoy.
   const paisesPopularesConPartidos = PAISES_POPULARES.filter((pais) => partidos.some((p) => p.league?.country === pais));
 
@@ -4318,7 +4318,11 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
                 {competicionesConPartidos.map((c) => (
                   <button
                     key={c.etiqueta}
-                    onClick={() => setFiltroCompeticion(c.etiqueta === filtroCompeticion ? null : c.etiqueta)}
+                    onClick={() => {
+                      const nueva = c.etiqueta === filtroCompeticion ? null : c.etiqueta;
+                      setFiltroCompeticion(nueva);
+                      if (nueva && !gruposTop[nueva]) buscarProximoPartido(nueva);
+                    }}
                     style={{
                       flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", fontSize: 12, borderRadius: 16, whiteSpace: "nowrap", cursor: "pointer",
                       background: filtroCompeticion === c.etiqueta ? acentoMarca : "transparent", color: filtroCompeticion === c.etiqueta ? "#fff" : tema.texto,
@@ -4418,7 +4422,76 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
 
       {loading && <p style={{ color: tema.textoSuave, fontSize: 13 }}>Cargando partidos...</p>}
       {error && <p style={{ color: "#e05555", fontSize: 13 }}>{error}</p>}
-      {!loading && !error && partidosFiltrados.length === 0 && (
+
+      {/* Chip de una competición puntual, sin nada programado hoy */}
+      {!loading && !error && filtroCompeticion && !gruposTop[filtroCompeticion] && (
+        <div style={{ marginBottom: 24 }}>
+          {buscandoProximo[filtroCompeticion] && (
+            <p style={{ color: tema.textoSuave, fontSize: 13 }}>Buscando el próximo partido de {filtroCompeticion}...</p>
+          )}
+          {proximosPorCompeticion[filtroCompeticion] === null && (
+            <p style={{ color: tema.textoSuave, fontSize: 13 }}>No encontramos ningún partido de {filtroCompeticion} en las próximas 3 semanas.</p>
+          )}
+          {proximosPorCompeticion[filtroCompeticion] && (
+            <>
+              <h4 style={{
+                fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", color: acentoMarca,
+                borderBottom: `2px solid ${acentoMarca}`, paddingBottom: 6, marginBottom: 12,
+              }}>
+                {filtroCompeticion} — próximo partido
+              </h4>
+              <div className="jmcs-partidos-grid">
+                <TarjetaPartidoInicio
+                  p={proximosPorCompeticion[filtroCompeticion]}
+                  tema={tema} acentoMarca={acentoMarca}
+                  onClick={() => onTocarPartido(proximosPorCompeticion[filtroCompeticion])}
+                  onAbrirPerfil={onAbrirPerfil} modoOscuro={modoOscuro}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Modo "Todos" (importancia) sin ningún partido top hoy: casilla para ver los próximos */}
+      {!loading && !error && !filtroCompeticion && ordenPorImportancia && competicionesOrdenadas.length === 0 && (
+        <div style={{
+          marginBottom: 20, padding: 12, borderRadius: 8,
+          background: tema.panel, border: `1px solid ${tema.borde}`,
+        }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: tema.texto, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={mostrarProximasCompeticiones}
+              onChange={(e) => {
+                const marcado = e.target.checked;
+                setMostrarProximasCompeticiones(marcado);
+                if (marcado) COMPETICIONES_TOP.forEach((c) => buscarProximoPartido(c.etiqueta));
+              }}
+            />
+            Hoy no hay partidos de competiciones top — mostrar sus próximos partidos
+          </label>
+        </div>
+      )}
+      {!loading && !error && !filtroCompeticion && mostrarProximasCompeticiones && COMPETICIONES_TOP.map((c) => {
+        const p = proximosPorCompeticion[c.etiqueta];
+        if (!p) return null;
+        return (
+          <div key={c.etiqueta} style={{ marginBottom: 24 }}>
+            <h4 style={{
+              fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", color: acentoMarca,
+              borderBottom: `2px solid ${acentoMarca}`, paddingBottom: 6, marginBottom: 12,
+            }}>
+              {c.etiqueta} — próximo partido
+            </h4>
+            <div className="jmcs-partidos-grid">
+              <TarjetaPartidoInicio p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} onAbrirPerfil={onAbrirPerfil} modoOscuro={modoOscuro} />
+            </div>
+          </div>
+        );
+      })}
+
+      {!loading && !error && partidosFiltrados.length === 0 && !filtroCompeticion && (
         <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay partidos disponibles para hoy en este plan.</p>
       )}
       {competicionesOrdenadas.map((clave) => (
