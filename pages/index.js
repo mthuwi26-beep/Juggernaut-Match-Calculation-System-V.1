@@ -2607,7 +2607,12 @@ function PanelCalendario({ tema, onSeleccionarPartido, acentoMarca, onAbrirPerfi
       </button>
 
       {paisesDisponibles.length > 1 && (
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 8, marginBottom: 10, touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}>
+        <div
+          style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 8, marginBottom: 10, touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => setPaisFiltro(null)}
             style={{
@@ -4302,7 +4307,12 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         {(ordenPorImportancia ? competicionesConPartidos.length > 0 : paisesPopularesConPartidos.length > 0) && (
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, flex: 1, touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}>
+          <div
+            style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 10, flex: 1, touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
             {ordenPorImportancia ? (
               <>
                 <button
