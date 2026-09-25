@@ -7276,6 +7276,15 @@ function Home() {
     setPartidoCalendario(p);
   }
 
+  // Al volver a Inicio, se limpia el partido que estaba seleccionado en
+  // Estudio — antes quedaba dando vueltas de fondo, aunque no se viera.
+  function volverAInicio() {
+    setEquipoForzadoLocal(null);
+    setEquipoForzadoVisitante(null);
+    setPartidoCalendario(null);
+    setVistaActual("inicio");
+  }
+
   // Cuando tocas un V/E/D de "Últimos 5": en PC se abre una pestaña nueva
   // (no interrumpe el Estudio que ya tenías armado), en celular se abre una
   // ventana superpuesta encima de lo que ya estabas viendo.
@@ -8348,7 +8357,7 @@ function Home() {
                     key={item.clave}
                     onClick={
                       item.clave === "inicio"
-                        ? () => { setMenuAbierto(false); setVistaActual("inicio"); }
+                        ? () => { setMenuAbierto(false); volverAInicio(); }
                         : item.clave === "admin"
                         ? () => { setMenuAbierto(false); setVistaActual("admin"); }
                         : item.clave === "perfil"
@@ -8366,7 +8375,7 @@ function Home() {
 
           {/* Zona centro: logo + título — clic lleva a Inicio */}
           <div
-            onClick={() => setVistaActual("inicio")}
+            onClick={() => volverAInicio()}
             style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
             title="Ir a Inicio"
           >
@@ -9057,7 +9066,7 @@ function Home() {
           <button
             key={item.id}
             className="jmcs-nav-movil-item"
-            onClick={() => (item.id === "inicio" ? setVistaActual("inicio") : accederOPedirCuenta(item.id))}
+            onClick={() => (item.id === "inicio" ? volverAInicio() : accederOPedirCuenta(item.id))}
             style={{ color: vistaActual === item.id ? acentoMarca : tema.textoSuave, fontWeight: vistaActual === item.id ? "bold" : "normal" }}
           >
             <Icono tipo={item.icono} size={18} />
