@@ -6426,24 +6426,47 @@ function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
 }
 
 // Indicador lateral con el % de partidos que sí tienen datos puntuales
-// (córners, tarjetas, faltas) cargados para el estudio actual. Reemplaza
-// al botón manual de antes — ahora la carga es automática, esto solo
-// informa qué tan completa quedó.
-function IndicadorCoberturaDatos({ porcentaje, cargando }) {
+// (córners, tarjetas, faltas) cargados para el estudio actual. Colapsado
+// dice "DE" (Datos Estudio); tocarlo despliega el detalle real — qué se
+// está trayendo mientras carga, o el resumen final una vez que terminó.
+function IndicadorCoberturaDatos({ porcentaje, cargando, progreso, resumenCarga, tema }) {
+  const [abierto, setAbierto] = useState(false);
   if (porcentaje === null) return null;
   const color = porcentaje >= 70 ? "#2e9e4f" : porcentaje >= 40 ? "#c9a227" : "#e0955c";
   return (
-    <div
-      style={{
-        position: "fixed", left: 12, top: "50%", transform: "translateY(-50%)", zIndex: 45,
-        background: "#1a1a1a", border: `2px solid ${color}`, borderRadius: 20,
-        padding: "8px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
-      }}
-      title="Porcentaje de partidos con córners/tarjetas/faltas cargados para este estudio"
-    >
-      <span style={{ fontSize: 13, fontWeight: "bold", color }}>{cargando ? "…" : `${porcentaje}%`}</span>
-      <span style={{ fontSize: 8, color: "#ccc", writingMode: "vertical-rl", textOrientation: "mixed" }}>datos</span>
+    <div style={{ position: "fixed", left: 12, top: "50%", transform: "translateY(-50%)", zIndex: 45 }}>
+      <div
+        onClick={() => setAbierto((v) => !v)}
+        style={{
+          background: "#1a1a1a", border: `2px solid ${color}`, borderRadius: 20,
+          padding: "8px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.35)", cursor: "pointer",
+        }}
+        title="Ver detalle de los datos del estudio"
+      >
+        <span style={{ fontSize: 13, fontWeight: "bold", color }}>{cargando ? "…" : `${porcentaje}%`}</span>
+        <span style={{ fontSize: 9, color: "#ccc", letterSpacing: "0.05em" }}>DE</span>
+      </div>
+
+      {abierto && (
+        <div
+          style={{
+            position: "absolute", left: "100%", top: "50%", transform: "translateY(-50%)",
+            marginLeft: 8, minWidth: 220, maxWidth: 260,
+            background: tema?.panel || "#1a1a1a", border: `2px solid ${color}`, borderRadius: 10,
+            padding: 14, boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: "bold", color: tema?.texto || "#fff", marginBottom: 8 }}>
+            Datos Estudio
+          </div>
+          <div style={{ fontSize: 12, color: tema?.textoSuave || "#ccc", lineHeight: 1.4 }}>
+            {cargando
+              ? (progreso || "Cargando los datos de los últimos partidos...")
+              : (resumenCarga || "Todavía no hay datos cargados para este estudio.")}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -9188,6 +9211,9 @@ function Home() {
       {vistaActual === "estudio" && equipoLocal?.team && equipoVisitante?.team && (
         <IndicadorCoberturaDatos
           cargando={cargandoPuntuales}
+          progreso={progreso}
+          resumenCarga={resumenCarga}
+          tema={tema}
           porcentaje={
             coberturaPuntuales
               ? Math.round((coberturaPuntuales.exitos / coberturaPuntuales.total) * 100)
