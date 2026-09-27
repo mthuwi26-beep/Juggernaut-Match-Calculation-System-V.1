@@ -208,7 +208,7 @@ const TEXTOS = {
     registrarse: "Registrarse", iniciarSesion: "Iniciar sesión", cerrarSesion: "Cerrar sesión",
     buscar: "Buscar", local: "Local", visitante: "Visitante",
     menuInicio: "Inicio", menuMisEstudios: "Mis estudios", menuFavoritos: "Favoritos",
-    menuHistorial: "Historial de aciertos", menuAjustes: "Ajustes",
+    menuHistorial: "Historial", menuAjustes: "Ajustes",
     buscarEquipoPlaceholder: "Busca un equipo (ej: Barcelona)",
     // Etiquetas de estadísticas (las que más se repiten en toda la app)
     record: "Récord (V-E-D)", golesFavor: "Goles a favor (prom.)", golesContra: "Goles en contra (prom.)",
@@ -230,7 +230,7 @@ const TEXTOS = {
     calendarioPartidos: "Calendario de partidos", todos: "Todos",
     misFavoritos: "Mis favoritos", sinFavoritosTexto: "Aún no tienes equipos favoritos. Toca la estrella junto al nombre de un equipo para guardarlo aquí.",
     editarPerfil: "Editar perfil", panelAdmin: "Panel de administrador",
-    historialAciertos: "Historial de aciertos", pronosticoYSemaforo: "Pronóstico y semáforo",
+    historialAciertos: "Mis Estudios", pronosticoYSemaforo: "Pronóstico y semáforo",
     calculadoraValor: "Calculadora de valor", valorSi: "Podría tener valor", valorNo: "No parece tener valor",
     guardado: "Guardado", guardando: "Guardando...", guardarEnHistorial: "Guardar en mi Historial",
     estudioClimatico: "Estudio Climático Personalizado", conEstudioClimatico: "Con mi Estudio Climático:",
@@ -273,7 +273,7 @@ const TEXTOS = {
     registrarse: "Sign up", iniciarSesion: "Log in", cerrarSesion: "Log out",
     buscar: "Search", local: "Home", visitante: "Away",
     menuInicio: "Home", menuMisEstudios: "My studies", menuFavoritos: "Favorites",
-    menuHistorial: "Track record", menuAjustes: "Settings",
+    menuHistorial: "History", menuAjustes: "Settings",
     buscarEquipoPlaceholder: "Search a team (e.g. Barcelona)",
     record: "Record (W-D-L)", golesFavor: "Goals for (avg.)", golesContra: "Goals against (avg.)",
     over25: "% Over 2.5", btts: "% BTTS", corners: "Corners (avg.)", tarjetasAm: "Yellow cards (avg.)",
@@ -293,7 +293,7 @@ const TEXTOS = {
     calendarioPartidos: "Match calendar", todos: "All",
     misFavoritos: "My favorites", sinFavoritosTexto: "You don't have any favorite teams yet. Tap the star next to a team's name to save it here.",
     editarPerfil: "Edit profile", panelAdmin: "Admin panel",
-    historialAciertos: "Track record", pronosticoYSemaforo: "Prediction and traffic light",
+    historialAciertos: "My Studies", pronosticoYSemaforo: "Prediction and traffic light",
     calculadoraValor: "Value calculator", valorSi: "Could have value", valorNo: "Doesn't seem to have value",
     guardado: "Saved", guardando: "Saving...", guardarEnHistorial: "Save to my History",
     estudioClimatico: "Personalized Weather Study", conEstudioClimatico: "With my Weather Study:",
@@ -5771,7 +5771,69 @@ function TutorialFlotante({ id, titulo, texto, tema, acentoMarca, tutorialesOcul
   );
 }
 
-function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin, mostrarToast }) {
+// Historial automático: cada partido real que se abrió para estudiar (desde
+// Inicio o el calendario) queda anotado solo acá, sin que el usuario tenga
+// que guardar nada a mano — eso es "Mis Estudios", más abajo.
+function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
+  const [visitas, setVisitas] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    if (!sesion) return;
+    supabase
+      .from("historial_visitas")
+      .select("*")
+      .order("visto_en", { ascending: false })
+      .limit(100)
+      .then(({ data }) => {
+        setVisitas(data || []);
+        setCargando(false);
+      });
+  }, [sesion]);
+
+  if (!sesion) {
+    return (
+      <div style={{ textAlign: "center", padding: 40 }}>
+        <p style={{ color: tema.textoSuave, marginBottom: 16 }}>Inicia sesión para ver tu historial.</p>
+        <button onClick={onPedirLogin} style={{ padding: "10px 20px", fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+          Iniciar sesión
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 12px" }}>
+      <h3 style={{ fontSize: 18, marginBottom: 20, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <Icono tipo="grafico" size={18} /> Historial
+      </h3>
+
+      {cargando ? (
+        <p style={{ color: tema.textoSuave, textAlign: "center" }}>Cargando...</p>
+      ) : visitas.length === 0 ? (
+        <p style={{ color: tema.textoSuave, fontSize: 13, textAlign: "center" }}>
+          Todavía no abriste ningún partido para estudiar. Cada uno que abras desde Inicio queda anotado acá solo.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {visitas.map((v) => (
+            <div key={v.id} style={{ background: tema.panel, borderRadius: 8, padding: 14, borderTop: `3px solid ${acentoMarca}` }}>
+              <div style={{ fontWeight: "bold" }}>{v.equipo_local} vs {v.equipo_visitante}</div>
+              <div style={{ fontSize: 12, color: tema.textoSuave, marginTop: 4 }}>
+                Visto: {new Date(v.visto_en).toLocaleString("es-ES")}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Los pronósticos guardados a mano (el botón "Guardar este pronóstico" en
+// Estudio) — antes vivía bajo "Historial"; ahora "Historial" es automático
+// (ver VistaHistorial más abajo) y esto pasa a llamarse "Mis Estudios".
+function VistaMisEstudios({ sesion, tema, acentoMarca, onPedirLogin, mostrarToast }) {
   const [predicciones, setPredicciones] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -7187,6 +7249,9 @@ function Home() {
     } else if (itemMenu === "historial") {
       setMenuAbierto(false);
       setVistaActual("historial");
+    } else if (itemMenu === "misEstudios") {
+      setMenuAbierto(false);
+      setVistaActual("misEstudios");
     } else if (itemMenu === "ajustes") {
       setMenuAbierto(false);
       setVistaActual("ajustes");
@@ -7355,6 +7420,21 @@ function Home() {
       team: { id: p.teams.away.id, name: p.teams.away.name, logo: p.teams.away.logo, country: p.league.country },
     });
     setPartidoCalendario(p);
+
+    // Historial automático — no bloquea nada, y si falla no pasa nada grave.
+    if (sesion?.user?.id) {
+      supabase
+        .from("historial_visitas")
+        .insert({
+          user_id: sesion.user.id,
+          equipo_local: p.teams.home.name,
+          equipo_visitante: p.teams.away.name,
+          equipo_local_id: p.teams.home.id,
+          equipo_visitante_id: p.teams.away.id,
+        })
+        .then(() => {})
+        .catch(() => {});
+    }
   }
 
   // Al volver a Inicio, se limpia el partido que estaba seleccionado en
@@ -8728,7 +8808,13 @@ function Home() {
 
       {vistaActual === "historial" && (
         <div style={{ margin: "20px auto" }}>
-          <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} />
+          <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} />
+        </div>
+      )}
+
+      {vistaActual === "misEstudios" && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaMisEstudios sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} />
         </div>
       )}
 
