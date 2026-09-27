@@ -3059,6 +3059,16 @@ function esEstadioCubierto(nombreEstadio) {
 }
 
 const ESTADOS_EN_VIVO = ["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT", "LIVE"];
+
+// El minuto real de un partido en vivo, para ordenar y para el minuto que se
+// muestra. En "Entretiempo" (HT) la API no manda el minuto (elapsed llega
+// vacío) — sin este arreglo, se trataba como si el partido recién hubiera
+// arrancado, cuando en realidad ya lleva al menos el primer tiempo jugado.
+function minutoEfectivo(p) {
+  const elapsed = p.fixture?.status?.elapsed;
+  if (elapsed !== null && elapsed !== undefined) return elapsed;
+  return p.fixture?.status?.short === "HT" ? 45 : 0;
+}
 const ETIQUETAS_ESTADO = {
   "1H": "1er tiempo", HT: "Entretiempo", "2H": "2do tiempo", ET: "Tiempo extra",
   BT: "Descanso (extra)", P: "Penales", SUSP: "Suspendido", INT: "Interrumpido",
@@ -4254,8 +4264,8 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
     const prioB = prioridadPartido(b);
     if (prioA !== prioB) return prioA - prioB;
     if (prioA === 0) {
-      const elapsedA = a.fixture?.status?.elapsed || 0;
-      const elapsedB = b.fixture?.status?.elapsed || 0;
+      const elapsedA = minutoEfectivo(a);
+      const elapsedB = minutoEfectivo(b);
       return elapsedB - elapsedA;
     }
     return 0;
@@ -4298,7 +4308,7 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   function minutoMasAltoEnVivo(partidosPais) {
     const enVivo = partidosPais.filter((p) => ESTADOS_EN_VIVO.includes(p.fixture?.status?.short));
     if (enVivo.length === 0) return -1;
-    return Math.max(...enVivo.map((p) => p.fixture?.status?.elapsed || 0));
+    return Math.max(...enVivo.map((p) => minutoEfectivo(p)));
   }
 
   // Países con partidos en vivo van primero (el que tenga el minuto más alto, arriba de todo).
