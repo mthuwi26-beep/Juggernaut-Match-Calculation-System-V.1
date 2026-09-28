@@ -223,8 +223,8 @@ const TEXTOS = {
     ganadorPartido: "Ganador del partido", cornersTotales: "Córners totales del partido",
     amarillasTotales: "Tarjetas amarillas totales", faltasTotales: "Faltas totales del partido",
     empate: "Empate", datosGenerales: "Datos generales del encuentro", arbitro: "Árbitro",
-    sinDatosCorto: "Sin datos", guardarPronostico: "Guardar este pronóstico en mi historial",
-    pronosticoGuardado: "Pronóstico guardado en tu historial",
+    sinDatosCorto: "Sin datos", guardarPronostico: "Guardar en Mis Estudios",
+    pronosticoGuardado: "Guardado en Mis Estudios",
     // Fase 2 de traducción — pantallas más visibles
     partidosDeHoy: "Partidos de hoy", buscarPorFecha: "Buscar partidos por fecha",
     calendarioPartidos: "Calendario de partidos", todos: "Todos",
@@ -232,7 +232,7 @@ const TEXTOS = {
     editarPerfil: "Editar perfil", panelAdmin: "Panel de administrador",
     historialAciertos: "Mis Estudios", pronosticoYSemaforo: "Pronóstico y semáforo",
     calculadoraValor: "Calculadora de valor", valorSi: "Podría tener valor", valorNo: "No parece tener valor",
-    guardado: "Guardado", guardando: "Guardando...", guardarEnHistorial: "Guardar en mi Historial",
+    guardado: "Guardado", guardando: "Guardando...", guardarEnHistorial: "Guardar en Mis Estudios",
     estudioClimatico: "Estudio Climático Personalizado", conEstudioClimatico: "Con mi Estudio Climático:",
     avisarSemaforoVerde: "Avisarme cuando haya semáforo verde",
     seleccionNacionalLabel: "Selección nacional:", equiposFamosos: "Equipos más famosos:",
@@ -286,8 +286,8 @@ const TEXTOS = {
     ganadorPartido: "Match winner", cornersTotales: "Total match corners",
     amarillasTotales: "Total yellow cards", faltasTotales: "Total match fouls",
     empate: "Draw", datosGenerales: "Match general info", arbitro: "Referee",
-    sinDatosCorto: "No data", guardarPronostico: "Save this prediction to my history",
-    pronosticoGuardado: "Prediction saved to your history",
+    sinDatosCorto: "No data", guardarPronostico: "Save to My Studies",
+    pronosticoGuardado: "Saved to My Studies",
     // Phase 2 translation — most visible screens
     partidosDeHoy: "Today's matches", buscarPorFecha: "Search matches by date",
     calendarioPartidos: "Match calendar", todos: "All",
@@ -295,7 +295,7 @@ const TEXTOS = {
     editarPerfil: "Edit profile", panelAdmin: "Admin panel",
     historialAciertos: "My Studies", pronosticoYSemaforo: "Prediction and traffic light",
     calculadoraValor: "Value calculator", valorSi: "Could have value", valorNo: "Doesn't seem to have value",
-    guardado: "Saved", guardando: "Saving...", guardarEnHistorial: "Save to my History",
+    guardado: "Saved", guardando: "Saving...", guardarEnHistorial: "Save to My Studies",
     estudioClimatico: "Personalized Weather Study", conEstudioClimatico: "With my Weather Study:",
     avisarSemaforoVerde: "Notify me when it hits green light",
     seleccionNacionalLabel: "National team:", equiposFamosos: "Most famous teams:",
@@ -3772,7 +3772,7 @@ function ModalEstudioClimatico({
           </button>
         </div>
         <p style={{ fontSize: 10, color: "#9fc4ac", marginTop: 6, textAlign: "center" }}>
-          Tu ajuste ya está activo en Estudio sin necesidad de guardar — esto solo envía una copia a tu Historial de aciertos, para comparar después contra el resultado real.
+          Tu ajuste ya está activo en Estudio sin necesidad de guardar — esto solo guarda una copia en Mis Estudios, para comparar después contra el resultado real.
         </p>
 
         {confirmarGlobalAbierto && (
@@ -5412,7 +5412,7 @@ function VistaRanking({ sesion, tema, acentoMarca }) {
   );
 }
 
-function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
+function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar, esAdmin, onVerSuscripcion, onVerAjustes, onCerrarSesion }) {
   const [predicciones, setPredicciones] = useState([]);
   const [historialBusquedas, setHistorialBusquedas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -5500,7 +5500,12 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
         style={{ borderRadius: "50%", objectFit: "cover", border: `2px solid ${acentoMarca}`, marginBottom: 12 }}
       />
       <h3 style={{ marginBottom: 4 }}>{perfil?.username || sesion.user.email}</h3>
-      {perfil?.suscripcion_activa && (
+      {esAdmin && (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 20, background: acentoMarca, color: "#fff", fontSize: 11, fontWeight: "bold", marginBottom: 20 }}>
+          <Icono tipo="corona" size={11} /> Administrador
+        </span>
+      )}
+      {perfil?.suscripcion_activa && !esAdmin && (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 20, background: acentoMarca, color: "#fff", fontSize: 11, fontWeight: "bold", marginBottom: 20 }}>
           <Icono tipo="trofeo" size={11} /> Plan {perfil.plan_suscripcion === "anual" ? "Max" : "Pro"}
         </span>
@@ -5596,12 +5601,28 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar }) {
         </>
       )}
 
-      <button
-        onClick={onEditar}
-        style={{ padding: "10px 20px", background: "transparent", border: `1px solid ${acentoMarca}`, color: acentoMarca, borderRadius: 6, fontSize: 13, fontWeight: "bold", cursor: "pointer" }}
-      >
-        Editar perfil
-      </button>
+      {/* Todo lo de la cuenta en una sola página: editar perfil, suscripción y ajustes */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+        {[
+          { etiqueta: "Editar perfil", onClick: onEditar },
+          { etiqueta: "Mi suscripción", onClick: onVerSuscripcion },
+          { etiqueta: "Ajustes", onClick: onVerAjustes },
+        ].map((b) => (
+          <button
+            key={b.etiqueta}
+            onClick={b.onClick}
+            style={{ width: "100%", padding: "10px 20px", background: "transparent", border: `1px solid ${acentoMarca}`, color: acentoMarca, borderRadius: 6, fontSize: 13, fontWeight: "bold", cursor: "pointer" }}
+          >
+            {b.etiqueta}
+          </button>
+        ))}
+        <button
+          onClick={onCerrarSesion}
+          style={{ width: "100%", padding: "10px 20px", background: acentoMarca, border: "none", color: "#fff", borderRadius: 6, fontSize: 13, fontWeight: "bold", cursor: "pointer", marginTop: 6 }}
+        >
+          Cerrar sesión
+        </button>
+      </div>
     </div>
   );
 }
@@ -6180,7 +6201,9 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mos
 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: "0 12px" }}>
+      {/* En celular se vuelve con el gesto o el botón atrás; la flecha queda solo en PC */}
       <button
+        className="jmcs-oculto-movil"
         onClick={onVolver}
         style={{ background: "transparent", border: "none", color: tema.textoSuave, cursor: "pointer", fontSize: 13, marginBottom: 14 }}
       >
@@ -6974,6 +6997,7 @@ function Home() {
   const [coberturaPuntuales, setCoberturaPuntuales] = useState(null);
   const [esPartidoLiga, setEsPartidoLiga] = useState(true);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [pestanaDatos, setPestanaDatos] = useState("misEstudios");
   const menuRef = useRef(null);
   const masBtnRef = useRef(null);
 
@@ -7307,6 +7331,12 @@ function Home() {
     if (itemMenu === "ranking") {
       setMenuAbierto(false);
       setVistaActual("ranking");
+      return;
+    }
+    if (itemMenu === "datos") {
+      // El Ranking se ve sin cuenta; "Mis estudios" pide iniciar sesión por dentro.
+      setMenuAbierto(false);
+      setVistaActual("datos");
       return;
     }
     if (!sesion) {
@@ -8101,7 +8131,14 @@ function Home() {
         // al vertical (un swipe de verdad), no un scroll hacia abajo con el dedo levemente
         // de costado — eso antes cambiaba de pestaña por error.
         const esSwipeHorizontal = Math.abs(deltaX) > 90 && Math.abs(deltaX) > Math.abs(deltaY) * 2;
-        if (!hayModalAbierto && indiceActual !== -1 && esSwipeHorizontal) {
+        // En celular, deslizar de izquierda a derecha abre el menú "Más" desde
+        // cualquier pantalla. No cuenta si el dedo empieza pegado al borde
+        // izquierdo (ese es el gesto "atrás" del celular).
+        const esCelular = typeof window !== "undefined" && window.innerWidth < 768;
+        if (esCelular && !hayModalAbierto && esSwipeHorizontal && deltaX > 0 && toqueSwipeX > 24) {
+          setMenuAbierto(true);
+          if (!tutorialesOcultos.includes("menu_deslizar")) ocultarTutorialPermanente("menu_deslizar");
+        } else if (!hayModalAbierto && indiceActual !== -1 && esSwipeHorizontal && !(esCelular && deltaX > 0)) {
           if (deltaX < 0 && indiceActual < ORDEN_PESTANAS.length - 1) setVistaActual(ORDEN_PESTANAS[indiceActual + 1]);
           else if (deltaX > 0 && indiceActual > 0) setVistaActual(ORDEN_PESTANAS[indiceActual - 1]);
         }
@@ -8393,15 +8430,45 @@ function Home() {
           padding: 4px 6px;
         }
 
+        /* En celular, el menú "Más" sale desde abajo, bajito (máximo ~55% de la
+           pantalla) y semitransparente, para que se note que está encima de la
+           pantalla donde se abrió. Se abre deslizando de izquierda a derecha. */
+        .jmcs-velo-menu { display: none; }
+        .jmcs-solo-movil-bloque { display: none; }
+        .jmcs-oculto-movil { display: none; }
+        @media (min-width: 768px) {
+          .jmcs-oculto-movil { display: block; }
+        }
         @media (max-width: 767px) {
+          .jmcs-velo-menu {
+            display: block;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 119;
+          }
+          .jmcs-solo-movil-bloque { display: block; }
           .jmcs-menu-desplegable {
             position: fixed !important;
             top: auto !important;
-            bottom: 70px !important;
-            left: 12px !important;
-            right: 12px !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
             width: auto !important;
+            max-height: 55vh;
+            overflow-y: auto !important;
+            border-radius: 18px 18px 0 0 !important;
+            border-bottom: none !important;
+            background: ${tema.panel}E0 !important;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            padding-bottom: env(safe-area-inset-bottom);
+            animation: jmcsSubirMenu 0.2s ease-out;
           }
+        }
+        @keyframes jmcsSubirMenu {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
         }
 
         .jmcs-inicio-grid {
@@ -8513,7 +8580,18 @@ function Home() {
                     {perfil?.username || sesion.user.email}
                   </span>
                 </div>
-                {perfil?.suscripcion_activa && (
+                {esAdmin && (
+                  <span
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 20,
+                      background: acentoMarca, color: "#fff", fontSize: 11, fontWeight: "bold",
+                    }}
+                  >
+                    <Icono tipo="corona" size={11} />
+                    Administrador
+                  </span>
+                )}
+                {perfil?.suscripcion_activa && !esAdmin && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setModalPlanAbierto(true); }}
                     style={{
@@ -8570,6 +8648,9 @@ function Home() {
             )}
 
             {menuAbierto && (
+              <div className="jmcs-velo-menu" onClick={() => setMenuAbierto(false)} />
+            )}
+            {menuAbierto && (
               <div
                 className="jmcs-menu-desplegable"
                 style={{
@@ -8578,18 +8659,20 @@ function Home() {
                   boxShadow: "0 6px 16px rgba(0,0,0,0.25)", overflow: "hidden",
                 }}
               >
+                {/* Agarradera: solo se ve en celular, donde el menú sale desde abajo */}
+                <div className="jmcs-solo-movil-bloque" style={{ padding: "8px 0 4px" }}>
+                  <div style={{ width: 40, height: 4, borderRadius: 4, background: tema.textoSuave, opacity: 0.6, margin: "0 auto" }} />
+                </div>
                 {[
-                  { clave: "verPerfil", etiqueta: "Perfil" },
-                  { clave: "inicio", etiqueta: t("menuInicio") },
-                  { clave: "ranking", etiqueta: "Ranking" },
-                  { clave: "misEstudios", etiqueta: t("menuMisEstudios") },
-                  { clave: "favoritos", etiqueta: t("menuFavoritos") },
-                  { clave: "historial", etiqueta: t("menuHistorial") },
-                  { clave: "ajustes", etiqueta: t("menuAjustes") },
+                  { clave: "verPerfil", etiqueta: "Perfil", detalle: "Tu cuenta, suscripción y ajustes" },
+                  { clave: "datos", etiqueta: "Datos", detalle: "Mis estudios y Ranking" },
+                  // En celular, Historial ya está en la barra de abajo
+                  { clave: "historial", etiqueta: t("menuHistorial"), soloPc: true },
                   ...(esAdmin ? [{ clave: "admin", etiqueta: "Panel de administrador" }] : []),
                 ].map((item) => (
                   <div
                     key={item.clave}
+                    className={item.soloPc ? "jmcs-oculto-movil" : undefined}
                     onClick={
                       item.clave === "inicio"
                         ? () => { setMenuAbierto(false); volverAInicio(); }
@@ -8599,9 +8682,10 @@ function Home() {
                         ? () => (sesion ? (() => { setMenuAbierto(false); setVistaActual("perfil"); })() : abrirLogin())
                         : () => accederOPedirCuenta(item.clave)
                     }
-                    style={{ padding: "10px 14px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
+                    style={{ padding: "12px 16px", fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
                   >
-                    {item.etiqueta}
+                    <div style={{ fontWeight: "bold" }}>{item.etiqueta}</div>
+                    {item.detalle && <div style={{ fontSize: 11, color: tema.textoSuave, marginTop: 2 }}>{item.detalle}</div>}
                   </div>
                 ))}
               </div>
@@ -8749,6 +8833,18 @@ function Home() {
             tutorialesOcultos={tutorialesOcultos}
             onOcultarPermanente={ocultarTutorialPermanente}
           />
+          {/* Pista del gesto del menú, solo en celular. Mismo id que en la app. */}
+          <div className="jmcs-solo-movil-bloque">
+            <TutorialFlotante
+              id="menu_deslizar"
+              titulo="Menú"
+              texto="Desliza el dedo de izquierda a derecha, desde cualquier pantalla, para abrir el menú con tu perfil y tus datos."
+              tema={tema}
+              acentoMarca={acentoMarca}
+              tutorialesOcultos={tutorialesOcultos}
+              onOcultarPermanente={ocultarTutorialPermanente}
+            />
+          </div>
 
           {jalando && (
             <p style={{ textAlign: "center", fontSize: 12, color: acentoMarca, marginBottom: 8 }}>
@@ -8901,9 +8997,50 @@ function Home() {
         </div>
       )}
 
+      {/* "Datos" une Mis estudios y Ranking en un solo apartado, con dos pestañas */}
+      {vistaActual === "datos" && (
+        <div style={{ margin: "20px auto" }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 16 }}>
+            {[
+              { id: "misEstudios", etiqueta: "Mis estudios" },
+              { id: "ranking", etiqueta: "Ranking" },
+            ].map((pes) => (
+              <button
+                key={pes.id}
+                onClick={() => setPestanaDatos(pes.id)}
+                style={{
+                  padding: "8px 18px", fontSize: 13, borderRadius: 20, cursor: "pointer",
+                  background: pestanaDatos === pes.id ? acentoMarca : "transparent",
+                  color: pestanaDatos === pes.id ? "#fff" : tema.texto,
+                  border: `1px solid ${pestanaDatos === pes.id ? acentoMarca : tema.borde}`,
+                  fontWeight: pestanaDatos === pes.id ? "bold" : "normal",
+                }}
+              >
+                {pes.etiqueta}
+              </button>
+            ))}
+          </div>
+          {pestanaDatos === "misEstudios" ? (
+            <VistaMisEstudios sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} />
+          ) : (
+            <VistaRanking sesion={sesion} tema={tema} acentoMarca={acentoMarca} />
+          )}
+        </div>
+      )}
+
       {vistaActual === "verPerfil" && sesion && (
         <div style={{ margin: "20px auto" }}>
-          <VistaVerPerfil sesion={sesion} perfil={perfil} tema={tema} acentoMarca={acentoMarca} onEditar={() => setVistaActual("perfil")} />
+          <VistaVerPerfil
+            sesion={sesion}
+            perfil={perfil}
+            tema={tema}
+            acentoMarca={acentoMarca}
+            esAdmin={esAdmin}
+            onEditar={() => setVistaActual("perfil")}
+            onVerSuscripcion={() => setModalPlanAbierto(true)}
+            onVerAjustes={() => setVistaActual("ajustes")}
+            onCerrarSesion={cerrarSesion}
+          />
         </div>
       )}
 
@@ -9317,15 +9454,7 @@ function Home() {
             {item.etiqueta}
           </button>
         ))}
-        <button
-          ref={masBtnRef}
-          className="jmcs-nav-movil-item"
-          onClick={() => setMenuAbierto(!menuAbierto)}
-          style={{ color: tema.textoSuave }}
-        >
-          <Icono tipo="menu" size={18} />
-          Más
-        </button>
+        {/* "Más" ya no es un botón: en celular se abre deslizando de izquierda a derecha */}
       </div>
 
       {estudioClimaticoAbierto && ajustesClima && climaOficialNorm && equipoLocal?.team && equipoVisitante?.team && (
