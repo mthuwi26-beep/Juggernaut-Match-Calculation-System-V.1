@@ -6580,17 +6580,84 @@ Si cambiamos esta política de forma importante, te lo vamos a avisar dentro de 
 
 Contacto: jmcsystem26@gmail.com`;
 
+// Preguntas frecuentes: las usa el Profesor y el pie de página. Las marcadas
+// "soloWeb" no aplican a la app. Mismo contenido que ProfesorScreen.kt en la app.
 const PREGUNTAS_FRECUENTES = [
   { p: "¿Qué es el semáforo (verde, amarillo, rojo)?", r: "Es nuestra forma de mostrar qué tan probable es cada resultado, según el modelo estadístico. Verde: 70% o más de probabilidad. Amarillo: entre 50% y 69%. Rojo: menos de 50%. No es una garantía de resultado, es una estimación." },
-  { p: "¿JMCS es una casa de apuestas?", r: "No. No operamos apuestas, no recibimos comisión de ninguna casa de apuestas, y no te recomendamos apostar. Somos una herramienta de métricas — lo que hagas con esa información es tu decisión." },
+  { p: "¿JMCS es una casa de apuestas?", r: "No. No operamos apuestas, no recibimos comisión de ninguna casa de apuestas, y no te recomendamos apostar. Somos una herramienta de métricas: lo que hagas con esa información es tu decisión." },
   { p: "¿De dónde salen los datos?", r: "De API-Football (estadísticas de partidos) y Open-Meteo (clima). Nosotros los procesamos y los organizamos en indicadores." },
   { p: "¿Por qué a veces dice 'S/D'?", r: "Significa 'sin datos'. Preferimos mostrarte que no tenemos esa información en vez de ocultarla o inventarla." },
-  { p: "¿Necesito cuenta para usar Estudio?", r: "Puedes usar Estudio libremente sin cuenta por un tiempo limitado. Después de eso, te pedimos iniciar sesión (es gratis) para seguir usándolo sin límite." },
-  { p: "¿Qué pasa si cierro el navegador durante la prueba gratis?", r: "El tiempo de prueba se reinicia — es por sesión del navegador, no acumulado entre días." },
-  { p: "¿Cómo activo las notificaciones?", r: "Desde el menú → Ajustes → Preferencias de notificaciones. Puedes elegir avisos de gol, inicio/fin de partido, tarjetas, y semáforo en verde, por cada equipo que marques con la campana en Favoritos." },
-  { p: "¿Puedo usar JMCS en mi celular como una app?", r: "Sí — desde el navegador, busca la opción \"Agregar a pantalla de inicio\" (Android) o \"Añadir a inicio\" en Safari (iPhone, versión 16.4 o más nueva)." },
-  { p: "¿Tienen plan pago?", r: "Todavía no — por ahora todo es gratis con cuenta. Si en el futuro hay un plan pago, te lo vamos a avisar dentro de la propia app con tiempo." },
+  { p: "¿Cómo sé si mis estudios aciertan?", r: "Se verifican solos cuando termina el partido: comparamos cada mercado del semáforo con lo que pasó de verdad y te damos un porcentaje de acierto. Los mercados muy parejos (entre 45% y 55%) o sin datos no cuentan." },
+  { p: "¿Por qué un estudio dice 'Referencia'?", r: "Porque se guardó después de que empezó el partido. Igual te mostramos cómo le fue, pero no suma al ranking, para que sea justo con todos." },
+  { p: "¿Cómo entro al ranking?", r: "Necesitas al menos 3 estudios guardados antes de que empiece el partido y ya verificados. El ranking se ordena por el porcentaje de mercados acertados." },
+  { p: "¿Por qué salen primero los partidos de mi país?", r: "Tomamos tu país de tu conexión o de tu celular, sin tu ubicación exacta. Si quieres otro, cámbialo en Perfil → Ajustes → Mi país." },
+  { p: "¿Necesito cuenta para usar Estudio?", r: "Puedes usar Estudio libremente sin cuenta por un tiempo limitado. Después de eso, te pedimos iniciar sesión para seguir usándolo.", soloWeb: true },
+  { p: "¿Qué pasa si cierro el navegador durante la prueba gratis?", r: "El tiempo de prueba se reinicia: es por sesión del navegador, no acumulado entre días.", soloWeb: true },
+  { p: "¿Cómo activo las notificaciones?", r: "En Perfil → Ajustes activa las notificaciones y elige qué avisos quieres (gol, inicio y fin de partido, tarjetas, semáforo en verde). Después marca con la campana, en Favoritos, los equipos de los que quieres avisos." },
+  { p: "¿Puedo usar JMCS en mi celular como una app?", r: "Sí: tenemos app para Android. Y desde el navegador también puedes usar \"Agregar a pantalla de inicio\" (Android) o \"Añadir a inicio\" en Safari (iPhone, versión 16.4 o más nueva).", soloWeb: true },
+  { p: "¿Tienen plan pago?", r: "Sí: el plan Pro (mensual) y el plan Max (anual), en Perfil → Mi suscripción. Al crear tu cuenta tienes un periodo de prueba gratis." },
 ];
+
+// Lecciones del Profesor: cada una explica una parte de JMCS y lleva ahí mismo.
+const LECCIONES_PROFESOR = [
+  { titulo: "Inicio: los partidos del día", destino: "inicio", texto: "Aquí ves los partidos de hoy. Arriba salen los de tu país, luego las competencias importantes y después el resto, agrupado por país. Los partidos en vivo suben primero, ordenados por el minuto. Con los chips filtras por competencia o país, y con \"En vivo\" o \"Finalizado\" filtras por estado. Toca un partido para abrir su estudio." },
+  { titulo: "Estudio y semáforo", destino: "estudio", texto: "Al abrir un partido ves el análisis completo: cómo viene cada equipo, los enfrentamientos entre ellos y el semáforo con la probabilidad de cada mercado (verde 70% o más, amarillo entre 50% y 69%, rojo menos de 50%). La burbuja \"DE\" te dice cuántos partidos tienen datos de córners, tarjetas y faltas. Toca una bolita V, E o D de los últimos 5 para ver ese partido." },
+  { titulo: "Estudio Climático", destino: "estudio", texto: "Si crees que el clima va a influir, ajústalo tú: viento, lluvia, temperatura y humedad para cada equipo. El semáforo te muestra también la versión con tu ajuste, y si guardas el estudio se guarda con esa afectación. Si tus ajustes aciertan más que el cálculo normal, JMCS aprende de ti." },
+  { titulo: "Mis Estudios", destino: "datos", texto: "Guarda un estudio con el botón \"Guardar en Mis Estudios\", o quédate más de un minuto en él y se guarda solo. Cuando termina el partido se verifica solo: comparamos cada mercado con lo que pasó y te damos tu porcentaje de acierto. Toca un estudio para volver a abrir ese partido." },
+  { titulo: "Ranking", destino: "datos", texto: "Los usuarios con mejor porcentaje de acierto aparecen en el ranking de la semana, del mes y el histórico. Solo cuentan los estudios guardados antes de que empiece el partido. Si no quieres salir con tu nombre, ponte un apodo en Perfil → Editar perfil." },
+  { titulo: "Historial", destino: "historial", texto: "Cada partido que abres queda anotado aquí automáticamente, sin que hagas nada, y se borra solo a los 20 días. Es distinto de Mis Estudios, que es lo que tú guardas y nunca se borra." },
+  { titulo: "Favoritos y avisos", destino: "favoritos", texto: "Marca con la estrella los equipos que sigues. Con la campana eliges de cuáles quieres avisos de gol, inicio y fin de partido, tarjetas o semáforo en verde." },
+  { titulo: "Tu cuenta", destino: "verPerfil", texto: "En Perfil tienes todo junto: tus estadísticas, tus referidos, Editar perfil, Mi suscripción y Ajustes, donde puedes elegir tu país y las notificaciones." },
+];
+
+// ============================================================
+// PROFESOR: explica cómo usar JMCS, con enlaces directos a cada parte y
+// las preguntas frecuentes.
+// ============================================================
+function VistaProfesor({ tema, acentoMarca, onIrA }) {
+  const [abierta, setAbierta] = useState(null);
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto", padding: "0 12px" }}>
+      <h3 style={{ fontSize: 18, marginBottom: 6, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <Icono tipo="foco" size={18} color={acentoMarca} /> Profesor
+      </h3>
+      <p style={{ textAlign: "center", color: tema.textoSuave, fontSize: 13, marginTop: 0, marginBottom: 22 }}>
+        Aquí te explico cómo sacarle provecho a JMCS. Toca "Ir allí" para abrir esa parte.
+      </p>
+
+      {LECCIONES_PROFESOR.map((l, i) => (
+        <div key={i} style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 12, borderLeft: `4px solid ${acentoMarca}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <strong style={{ fontSize: 14 }}>{i + 1}. {l.titulo}</strong>
+            <button
+              onClick={() => onIrA(l.destino)}
+              style={{ fontSize: 12, padding: "5px 12px", borderRadius: 14, border: `1px solid ${acentoMarca}`, background: "transparent", color: acentoMarca, cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              Ir allí
+            </button>
+          </div>
+          <p style={{ fontSize: 13, color: tema.textoSuave, margin: 0, lineHeight: 1.6 }}>{l.texto}</p>
+        </div>
+      ))}
+
+      <h4 style={{ marginTop: 28, marginBottom: 10, fontSize: 14 }}>Preguntas frecuentes</h4>
+      {PREGUNTAS_FRECUENTES.map((item, i) => (
+        <div key={i} style={{ borderBottom: `1px solid ${tema.borde}`, padding: "10px 0" }}>
+          <div
+            onClick={() => setAbierta(abierta === i ? null : i)}
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontSize: 13, fontWeight: "bold", gap: 10 }}
+          >
+            <span>{item.p}</span>
+            <span style={{ color: acentoMarca, fontSize: 16 }}>{abierta === i ? "−" : "+"}</span>
+          </div>
+          {abierta === i && (
+            <p style={{ fontSize: 12, color: tema.textoSuave, marginTop: 8, lineHeight: 1.5 }}>{item.r}</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ModalFAQ({ tema, acentoMarca, onCerrar }) {
   const [abierta, setAbierta] = useState(null);
@@ -7533,6 +7600,12 @@ function Home() {
     if (itemMenu === "ranking") {
       setMenuAbierto(false);
       setVistaActual("ranking");
+      return;
+    }
+    if (itemMenu === "profesor") {
+      // El Profesor lo puede ver cualquiera, con o sin cuenta
+      setMenuAbierto(false);
+      setVistaActual("profesor");
       return;
     }
     if (itemMenu === "datos") {
@@ -8835,6 +8908,7 @@ function Home() {
                   { clave: "verPerfil", etiqueta: "Perfil" },
                   { clave: "inicio", etiqueta: t("menuInicio") },
                   { clave: "datos", etiqueta: "Datos" },
+                  { clave: "profesor", etiqueta: "Profesor" },
                   { clave: "favoritos", etiqueta: t("menuFavoritos") },
                   { clave: "historial", etiqueta: t("menuHistorial") },
                   ...(esAdmin ? [{ clave: "admin", etiqueta: "Panel de administrador" }] : []),
@@ -9150,6 +9224,21 @@ function Home() {
       {vistaActual === "ranking" && (
         <div style={{ margin: "20px auto" }}>
           <VistaRanking sesion={sesion} tema={tema} acentoMarca={acentoMarca} />
+        </div>
+      )}
+
+      {vistaActual === "profesor" && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaProfesor
+            tema={tema}
+            acentoMarca={acentoMarca}
+            onIrA={(destino) => {
+              window.scrollTo({ top: 0 });
+              if (destino === "inicio") volverAInicio();
+              else if (destino === "estudio") setVistaActual("estudio");
+              else accederOPedirCuenta(destino);
+            }}
+          />
         </div>
       )}
 
