@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/verificar-estudios", "schedule": "0 9 * * *" }
+  ]
+}
