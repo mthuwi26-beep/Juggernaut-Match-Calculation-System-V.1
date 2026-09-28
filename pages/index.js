@@ -2542,6 +2542,16 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
           modelo: modeloEstudio,
         }}
       />
+      <RegistroBacktesting
+        fixtureId={ignorarCompeticionExacta ? null : fixtureIdActual}
+        listo={datosPuntualesListos}
+        modelo={{
+          gl: redondear3(lambdaGolesLocal), gv: redondear3(lambdaGolesVisitante),
+          corners: redondear3(lambdaCornersTotal), amarillas: redondear3(lambdaAmarillasTotal), faltas: redondear3(lambdaFaltasTotal),
+          handicap: lineaHandicap,
+          muestraInsuficiente: !!advertenciaMuestra,
+        }}
+      />
     </div>
   );
 }
@@ -6627,10 +6637,224 @@ const LECCIONES_PROFESOR = [
   { titulo: "Estudio Climático", destino: "estudio", texto: "Si crees que el clima va a influir, ajústalo tú: viento, lluvia, temperatura y humedad para cada equipo. El semáforo te muestra también la versión con tu ajuste, y si guardas el estudio se guarda con esa afectación. Si tus ajustes aciertan más que el cálculo normal, JMCS aprende de ti." },
   { titulo: "Mis Estudios", destino: "datos", texto: "Guarda un estudio con el botón \"Guardar en Mis Estudios\", o quédate más de un minuto en él y se guarda solo. Cuando termina el partido se verifica solo: comparamos cada mercado con lo que pasó y te damos tu porcentaje de acierto. Toca un estudio para volver a abrir ese partido." },
   { titulo: "Ranking", destino: "datos", texto: "Los usuarios con mejor porcentaje de acierto aparecen en el ranking de la semana, del mes y el histórico. Solo cuentan los estudios guardados antes de que empiece el partido. Si no quieres salir con tu nombre, ponte un apodo en Perfil → Editar perfil." },
+  { titulo: "Backtesting", destino: "backtesting", texto: "Aquí ves cómo le ha ido al semáforo de verdad: lo que dijo antes de cada partido comparado con lo que pasó, por mercado y por competencia, y si sus probabilidades se cumplen. Arriba están los Destacados del día, los mercados donde el semáforo está más seguro, para los planes Pro y Max." },
   { titulo: "Historial", destino: "historial", texto: "Cada partido que abres queda anotado aquí automáticamente, sin que hagas nada, y se borra solo a los 20 días. Es distinto de Mis Estudios, que es lo que tú guardas y nunca se borra." },
   { titulo: "Favoritos y avisos", destino: "favoritos", texto: "Marca con la estrella los equipos que sigues. Con la campana eliges de cuáles quieres avisos de gol, inicio y fin de partido, tarjetas o semáforo en verde." },
   { titulo: "Tu cuenta", destino: "verPerfil", texto: "En Perfil tienes todo junto: tus estadísticas, tus referidos, Editar perfil, Mi suscripción y Ajustes, donde puedes elegir tu país y las notificaciones." },
 ];
+
+// ============================================================
+// Registro del Backtesting: manda al servidor lo que calculó el semáforo
+// (cálculo puro, sin clima) cuando se abre un partido que aún no empieza.
+// No muestra nada. Es un componente aparte para poder usar useEffect sin
+// romper el orden de los hooks de PanelSemaforo.
+// ============================================================
+const partidosRegistradosBacktesting = new Set();
+function RegistroBacktesting({ fixtureId, listo, modelo }) {
+  useEffect(() => {
+    if (!fixtureId || !listo || !modelo) return;
+    if (modelo.gl === null || modelo.gv === null) return;
+    if (partidosRegistradosBacktesting.has(fixtureId)) return;
+    partidosRegistradosBacktesting.add(fixtureId);
+    fetch("/api/registrar-modelo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fixtureId, modelo, origen: "web" }),
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixtureId, listo]);
+  return null;
+}
+
+// ============================================================
+// BACKTESTING: así le ha ido al semáforo de JMCS, partido por partido.
+// ============================================================
+function VistaBacktesting({ sesion, tema, acentoMarca, onAbrirPartido, onVerPlanes }) {
+  const [periodo, setPeriodo] = useState("mes");
+  const [datos, setDatos] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [destacados, setDestacados] = useState(null);
+
+  useEffect(() => {
+    setCargando(true);
+    fetch(`/api/backtesting?periodo=${periodo}`)
+      .then((r) => r.json())
+      .then((d) => setDatos(d))
+      .catch(() => setDatos(null))
+      .finally(() => setCargando(false));
+  }, [periodo]);
+
+  useEffect(() => {
+    fetch("/api/destacados", { headers: sesion ? { Authorization: `Bearer ${sesion.access_token}` } : {} })
+      .then((r) => r.json())
+      .then((d) => setDestacados(d))
+      .catch(() => setDestacados(null));
+  }, [sesion?.access_token]);
+
+  async function abrir(fixtureId) {
+    try {
+      const r = await fetch(`/api/partido-por-id?fixtureId=${fixtureId}`);
+      const partido = await r.json();
+      if (partido?.fixture) onAbrirPartido(partido);
+    } catch {
+      // nada
+    }
+  }
+
+  const colorPct = (x) => (x === null || x === undefined ? tema.textoSuave : x >= 60 ? "#22c55e" : x >= 40 ? "#eab308" : "#ef4444");
+  const tarjeta = { background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 14 };
+  const celda = { padding: "6px 8px", borderBottom: `1px solid ${tema.borde}`, fontSize: 12, textAlign: "left" };
+
+  return (
+    <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 12px" }}>
+      <h3 style={{ fontSize: 18, marginBottom: 4, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <Icono tipo="grafico" size={18} color={acentoMarca} /> Backtesting
+      </h3>
+      <p style={{ textAlign: "center", color: tema.textoSuave, fontSize: 13, marginTop: 0, marginBottom: 16 }}>
+        Así le ha ido al semáforo de JMCS, partido por partido.
+      </p>
+
+      {/* Destacados del día: solo Pro, Max y administradores */}
+      <div style={{ ...tarjeta, position: "relative", overflow: "hidden", borderTop: `3px solid ${acentoMarca}` }}>
+        <h4 style={{ margin: "0 0 10px", fontSize: 14 }}>Destacados del día</h4>
+        <div style={destacados?.bloqueado ? { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } : undefined}>
+          {!destacados ? (
+            <p style={{ fontSize: 12, color: tema.textoSuave }}>Cargando...</p>
+          ) : destacados.destacados?.length === 0 ? (
+            <p style={{ fontSize: 12, color: tema.textoSuave }}>Todavía no hay partidos próximos registrados con una predicción clara. Vuelve más tarde.</p>
+          ) : (
+            (destacados.destacados || []).map((d, i) => (
+              <div
+                key={i}
+                onClick={() => d.fixtureId && abrir(d.fixtureId)}
+                style={{ padding: "8px 0", borderBottom: `1px solid ${tema.borde}`, cursor: d.fixtureId ? "pointer" : "default" }}
+              >
+                <div style={{ fontSize: 13, fontWeight: "bold" }}>{d.local} vs {d.visitante}</div>
+                <div style={{ fontSize: 12, color: acentoMarca }}>{d.texto}</div>
+                <div style={{ fontSize: 11, color: tema.textoSuave }}>
+                  {d.liga}{d.fecha ? ` · ${new Date(d.fecha).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        {destacados?.bloqueado && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, background: "rgba(0,0,0,0.25)" }}>
+            <strong style={{ fontSize: 15, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>Disponible en planes de pago</strong>
+            <button onClick={onVerPlanes} style={{ padding: "8px 16px", fontSize: 12, fontWeight: "bold", background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+              Ver planes
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 14 }}>
+        {[
+          { id: "semana", etiqueta: "Semana" },
+          { id: "mes", etiqueta: "Mes" },
+          { id: "historico", etiqueta: "Histórico" },
+        ].map((op) => (
+          <button
+            key={op.id}
+            onClick={() => setPeriodo(op.id)}
+            style={{
+              padding: "6px 16px", fontSize: 12, borderRadius: 20, cursor: "pointer",
+              background: periodo === op.id ? acentoMarca : "transparent",
+              color: periodo === op.id ? "#fff" : tema.texto,
+              border: `1px solid ${periodo === op.id ? acentoMarca : tema.borde}`,
+            }}
+          >
+            {op.etiqueta}
+          </button>
+        ))}
+      </div>
+
+      {cargando ? (
+        <p style={{ textAlign: "center", color: tema.textoSuave }}>Cargando...</p>
+      ) : !datos || datos.partidos === 0 ? (
+        <div style={tarjeta}>
+          <p style={{ fontSize: 13, color: tema.textoSuave, margin: 0, lineHeight: 1.6 }}>
+            Todavía estamos juntando partidos para este período. Cada vez que alguien abre el estudio de un partido que aún no empieza,
+            queda registrado lo que dijo el semáforo, y al terminar el partido se verifica solo.
+            {datos?.pendientes ? ` Hay ${datos.pendientes} partidos registrados esperando resultado.` : ""}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={{ ...tarjeta, textAlign: "center" }}>
+            <div style={{ fontSize: 32, fontWeight: "bold", color: colorPct(datos.porcentaje) }}>{datos.porcentaje}%</div>
+            <div style={{ fontSize: 13 }}>de acierto en {datos.mercadosEvaluados} mercados de {datos.partidos} partidos</div>
+            <div style={{ fontSize: 11, color: tema.textoSuave, marginTop: 6 }}>
+              {datos.pendientes} partidos registrados esperando resultado
+              {datos.brier !== null && ` · Precisión de las probabilidades (Brier): ${datos.brier} — mientras más cerca de 0, mejor`}
+            </div>
+          </div>
+
+          <div style={tarjeta}>
+            <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>¿Las probabilidades dicen la verdad?</h4>
+            <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 8px" }}>
+              Si el semáforo está bien calibrado, cuando dice 75% debería pasar cerca del 75% de las veces.
+            </p>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={celda}>Cuando dijimos</th><th style={celda}>Promedio</th><th style={celda}>Pasó</th><th style={celda}>Mercados</th></tr></thead>
+                <tbody>
+                  {datos.calibracion.map((c) => (
+                    <tr key={c.rango}>
+                      <td style={celda}>{c.rango}</td>
+                      <td style={celda}>{c.dijimos !== null ? `${c.dijimos}%` : "—"}</td>
+                      <td style={{ ...celda, fontWeight: "bold", color: colorPct(c.paso) }}>{c.paso !== null ? `${c.paso}%` : "—"}</td>
+                      <td style={celda}>{c.n}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style={tarjeta}>
+            <h4 style={{ margin: "0 0 8px", fontSize: 14 }}>Por mercado</h4>
+            {datos.porMercado.map((m) => (
+              <div key={m.mercado} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: `1px solid ${tema.borde}` }}>
+                <span>{m.mercado} <span style={{ color: tema.textoSuave }}>({m.n})</span></span>
+                <strong style={{ color: colorPct(m.porcentaje) }}>{m.porcentaje}%</strong>
+              </div>
+            ))}
+          </div>
+
+          <div style={tarjeta}>
+            <h4 style={{ margin: "0 0 8px", fontSize: 14 }}>Por competencia</h4>
+            {datos.porCompeticion.map((c) => (
+              <div key={c.competicion} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: `1px solid ${tema.borde}` }}>
+                <span>{c.competicion} <span style={{ color: tema.textoSuave }}>({c.partidos} partidos)</span></span>
+                <strong style={{ color: colorPct(c.porcentaje) }}>{c.porcentaje}%</strong>
+              </div>
+            ))}
+          </div>
+
+          <div style={tarjeta}>
+            <h4 style={{ margin: "0 0 8px", fontSize: 14 }}>Últimos partidos verificados</h4>
+            {datos.recientes.map((r) => (
+              <div key={r.fixtureId} onClick={() => abrir(r.fixtureId)} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, padding: "6px 0", borderBottom: `1px solid ${tema.borde}`, cursor: "pointer" }}>
+                <span>
+                  {r.local} {r.marcador} {r.visitante}
+                  <span style={{ color: tema.textoSuave }}> · {r.liga}</span>
+                </span>
+                <strong style={{ color: colorPct(r.porcentaje), whiteSpace: "nowrap" }}>{r.porcentaje}% ({r.acertados}/{r.evaluados})</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <p style={{ fontSize: 11, color: tema.textoSuave, textAlign: "center", lineHeight: 1.6 }}>
+        Solo cuenta lo que el semáforo calculó antes de que empezara cada partido, sin el Estudio Climático.
+        Los mercados muy parejos (entre 45% y 55%) y los que no tienen datos no cuentan. Esto mide acierto, no ganancias:
+        JMCS no es una casa de apuestas.
+      </p>
+    </div>
+  );
+}
 
 // ============================================================
 // PROFESOR: explica cómo usar JMCS, con enlaces directos a cada parte y
@@ -7622,6 +7846,12 @@ function Home() {
     if (itemMenu === "ranking") {
       setMenuAbierto(false);
       setVistaActual("ranking");
+      return;
+    }
+    if (itemMenu === "backtesting") {
+      // Backtesting es público (los Destacados se bloquean solos si no hay plan de pago)
+      setMenuAbierto(false);
+      setVistaActual("backtesting");
       return;
     }
     if (itemMenu === "profesor") {
@@ -8930,6 +9160,7 @@ function Home() {
                   { clave: "verPerfil", etiqueta: "Perfil" },
                   { clave: "inicio", etiqueta: t("menuInicio") },
                   { clave: "datos", etiqueta: "Datos" },
+                  { clave: "backtesting", etiqueta: "Backtesting" },
                   { clave: "profesor", etiqueta: "Profesor" },
                   { clave: "favoritos", etiqueta: t("menuFavoritos") },
                   { clave: "historial", etiqueta: t("menuHistorial") },
@@ -9246,6 +9477,18 @@ function Home() {
       {vistaActual === "ranking" && (
         <div style={{ margin: "20px auto" }}>
           <VistaRanking sesion={sesion} tema={tema} acentoMarca={acentoMarca} />
+        </div>
+      )}
+
+      {vistaActual === "backtesting" && (
+        <div style={{ margin: "20px auto" }}>
+          <VistaBacktesting
+            sesion={sesion}
+            tema={tema}
+            acentoMarca={acentoMarca}
+            onAbrirPartido={(p) => { seleccionarPartidoDelCalendario(p); setVistaActual("estudio"); }}
+            onVerPlanes={() => (sesion ? setModalPlanAbierto(true) : abrirLogin())}
+          />
         </div>
       )}
 
