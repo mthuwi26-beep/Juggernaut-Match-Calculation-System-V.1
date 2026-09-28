@@ -3951,17 +3951,36 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
     setCargando(false);
   }
 
+  // Si falla (casi siempre por internet), se reintenta una vez sola. Si vuelve
+  // a fallar, sale un aviso suave (no rojo) que se quita solo.
+  const [avisoGoogle, setAvisoGoogle] = useState("");
+  useEffect(() => {
+    if (!avisoGoogle) return;
+    const t = setTimeout(() => setAvisoGoogle(""), 4000);
+    return () => clearTimeout(t);
+  }, [avisoGoogle]);
+
   async function entrarConGoogle() {
     setError("");
+    setAvisoGoogle("");
     setCargandoGoogle(true);
-    try {
+    const intentar = async () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
       });
       if (error) throw error;
+    };
+    try {
+      try {
+        await intentar();
+      } catch {
+        await new Promise((r) => setTimeout(r, 1500));
+        await intentar();
+      }
     } catch (err) {
-      setError(err.message || "No se pudo iniciar sesión con Google");
+      console.warn("Inicio con Google fallido:", err);
+      setAvisoGoogle("No se pudo conectar con Google. Intenta de nuevo.");
       setCargandoGoogle(false);
     }
   }
@@ -4092,6 +4111,7 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
           )}
 
           {error && <p style={{ color: "#e05555", fontSize: 12, marginBottom: 10 }}>{error}</p>}
+          {avisoGoogle && <p style={{ color: tema.textoSuave, fontSize: 12, marginBottom: 10 }}>{avisoGoogle}</p>}
           {mensaje && <p style={{ color: "#2e9e4f", fontSize: 12, marginBottom: 10, lineHeight: 1.4 }}>{mensaje}</p>}
 
           <button
@@ -6587,6 +6607,8 @@ const PREGUNTAS_FRECUENTES = [
   { p: "¿JMCS es una casa de apuestas?", r: "No. No operamos apuestas, no recibimos comisión de ninguna casa de apuestas, y no te recomendamos apostar. Somos una herramienta de métricas: lo que hagas con esa información es tu decisión." },
   { p: "¿De dónde salen los datos?", r: "De API-Football (estadísticas de partidos) y Open-Meteo (clima). Nosotros los procesamos y los organizamos en indicadores." },
   { p: "¿Por qué a veces dice 'S/D'?", r: "Significa 'sin datos'. Preferimos mostrarte que no tenemos esa información en vez de ocultarla o inventarla." },
+  { p: "¿Dónde está el Estudio Climático y cómo se usa?", r: "Abre un partido. Casi arriba del todo está la tarjeta con los datos del encuentro (estadio, árbitro y clima), y justo debajo de la temperatura, la lluvia, el viento y la humedad está el botón «Estudio Climático Personalizado». Necesitas haber iniciado sesión, y no aparece si el estadio es cerrado o si todavía no hay pronóstico del clima para ese partido. Al abrirlo ves, para cada equipo, el viento, la lluvia, la temperatura y la humedad en una escala de 0 a 10: el punto fijo es el clima real según JMCS y el otro es tu ajuste, que mueves según tu criterio. Abajo verás cómo cambian Over 2.5 y Ambos anotan, y en el semáforo aparece la línea «Con mi Estudio Climático». Si quieres conservarlo, toca «Guardar en Mis Estudios»." },
+  { p: "¿Dónde está la Calculadora de Valor y cómo se usa?", r: "Abre un partido y baja hasta el final del semáforo: la Calculadora de Valor está debajo de todos los mercados. Si no la ves, revisa en Perfil → Editar perfil que esté marcada entre los mercados que quieres ver. Para usarla: 1) elige en la lista el mercado que te interesa, 2) escribe la cuota que te da tu casa de apuestas, por ejemplo 2.10, y 3) la calculadora te muestra la probabilidad que implica esa cuota y la compara con la del semáforo. Si la nuestra es mayor, dice «Podría tener valor»; si no, «No parece tener valor». Es una comparación con nuestro modelo, no una garantía." },
   { p: "¿Cómo sé si mis estudios aciertan?", r: "Se verifican solos cuando termina el partido: comparamos cada mercado del semáforo con lo que pasó de verdad y te damos un porcentaje de acierto. Los mercados muy parejos (entre 45% y 55%) o sin datos no cuentan." },
   { p: "¿Por qué un estudio dice 'Referencia'?", r: "Porque se guardó después de que empezó el partido. Igual te mostramos cómo le fue, pero no suma al ranking, para que sea justo con todos." },
   { p: "¿Cómo entro al ranking?", r: "Necesitas al menos 3 estudios guardados antes de que empiece el partido y ya verificados. El ranking se ordena por el porcentaje de mercados acertados." },
