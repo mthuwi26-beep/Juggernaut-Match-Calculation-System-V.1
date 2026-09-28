@@ -119,6 +119,16 @@ async function verificarUno(p) {
   const nombres = { local: p.equipo_local, visitante: p.equipo_visitante };
   const detalle = p.modelo ? evaluarModelo(p.modelo, real, nombres) : evaluarLegado(p, real, nombres);
   const acertados = detalle.filter((d) => d.acierto).length;
+
+  // Para el aprendizaje del clima: el mismo estudio calificado SIN el clima.
+  // Si el ajuste del usuario sube el porcentaje, su ajuste ayudó.
+  let porcentajeSinClima = null;
+  if (p.modelo?.clima && p.modelo?.puro) {
+    const detallePuro = evaluarModelo({ ...p.modelo, ...p.modelo.puro }, real, nombres);
+    if (detallePuro.length > 0) {
+      porcentajeSinClima = Math.round((detallePuro.filter((d) => d.acierto).length / detallePuro.length) * 1000) / 10;
+    }
+  }
   const antes = new Date(p.created_at).getTime() < new Date(partido.fixture.date).getTime();
 
   return {
@@ -130,6 +140,7 @@ async function verificarUno(p) {
     porcentaje_acierto: detalle.length > 0 ? Math.round((acertados / detalle.length) * 1000) / 10 : null,
     detalle_verificacion: detalle,
     marcador_final: `${real.golesLocal}-${real.golesVisitante}`,
+    porcentaje_sin_clima: porcentajeSinClima,
     verificado_en: new Date().toISOString(),
   };
 }
