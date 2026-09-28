@@ -2031,7 +2031,7 @@ function PanelAlineaciones({ fixtureIdActual, equipoLocal, equipoVisitante, tema
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual, ignorarCompeticionExacta, setIgnorarCompeticionExacta, fixtureIdActual }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual, ignorarCompeticionExacta, setIgnorarCompeticionExacta, fixtureIdActual, modeloRef }) {
   const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
   const [lineaHandicap, setLineaHandicap] = useState(0);
   const [permisoNotificaciones, setPermisoNotificaciones] = useState(
@@ -2154,6 +2154,24 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       advertenciaMuestra = `Muestra insuficiente (${coberturaPuntuales.exitos}/${coberturaPuntuales.total} partidos con dato real) — tómalo con cautela.`;
     }
   }
+
+  // "Modelo" del estudio: lo que se guarda en Mis Estudios para verificarlo solo
+  // cuando termine el partido. Si el Estudio Climático está activo, se guarda
+  // ya con esa afectación. El servidor recalcula con esto todos los mercados.
+  const climaActivo = !!climaAjuste?.activo;
+  const redondear3 = (x) => (x === null || x === undefined ? null : Math.round(x * 1000) / 1000);
+  const modeloEstudio = {
+    gl: redondear3(climaActivo && lambdaGolesLocalAjustado !== null ? lambdaGolesLocalAjustado : lambdaGolesLocal),
+    gv: redondear3(climaActivo && lambdaGolesVisitanteAjustado !== null ? lambdaGolesVisitanteAjustado : lambdaGolesVisitante),
+    corners: redondear3(climaActivo && lambdaCornersTotalAjustado !== null ? lambdaCornersTotalAjustado : lambdaCornersTotal),
+    amarillas: redondear3(climaActivo && lambdaAmarillasTotalAjustado !== null ? lambdaAmarillasTotalAjustado : lambdaAmarillasTotal),
+    faltas: redondear3(climaActivo && lambdaFaltasTotalAjustado !== null ? lambdaFaltasTotalAjustado : lambdaFaltasTotal),
+    handicap: lineaHandicap,
+    clima: climaActivo,
+    // Córners, tarjetas y faltas no cuentan si la muestra no alcanza o aún no cargan
+    muestraInsuficiente: !!advertenciaMuestra || !datosPuntualesListos,
+  };
+  if (modeloRef) modeloRef.current = modeloEstudio;
 
   // Opciones disponibles para la calculadora de valor (solo mercados con datos reales)
   const opcionesValor = [];
@@ -2489,6 +2507,8 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
                 ? traducir("empate")
                 : equipoVisitante.team.name)
             : null,
+          fixture_id: fixtureIdActual || null,
+          modelo: modeloEstudio,
         }}
       />
     </div>
@@ -2521,6 +2541,8 @@ function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos, mos
         prob_over25: d.prob_over25,
         prob_btts: d.prob_btts,
         pick_1x2: d.pick_1x2,
+        fixture_id: d.fixture_id || null,
+        modelo: d.modelo || null,
       });
       if (!error) {
         guardadoRef.current = true;
@@ -2546,6 +2568,8 @@ function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos, mos
       prob_over25: datos.prob_over25,
       prob_btts: datos.prob_btts,
       pick_1x2: datos.pick_1x2,
+      fixture_id: datos.fixture_id || null,
+      modelo: datos.modelo || null,
     });
     if (!error) {
       guardadoRef.current = true;
@@ -5353,7 +5377,7 @@ function VistaRanking({ sesion, tema, acentoMarca }) {
         <Icono tipo="corona" size={18} color={acentoMarca} /> Top pronosticadores
       </h3>
       <p style={{ fontSize: 11, color: tema.textoSuave, textAlign: "center", marginBottom: 18 }}>
-        Necesitas al menos 3 pronósticos guardados y verificados para aparecer aquí.
+        Necesitas al menos 3 estudios guardados antes del partido y ya verificados para aparecer aquí. El porcentaje es de mercados acertados.
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 18, justifyContent: "center" }}>
@@ -5375,7 +5399,7 @@ function VistaRanking({ sesion, tema, acentoMarca }) {
       {cargando ? (
         <p style={{ textAlign: "center", color: tema.textoSuave, fontSize: 13 }}>Cargando...</p>
       ) : datos.length === 0 ? (
-        <p style={{ textAlign: "center", color: tema.textoSuave, fontSize: 13 }}>Todavía no hay suficientes pronósticos verificados en este período.</p>
+        <p style={{ textAlign: "center", color: tema.textoSuave, fontSize: 13 }}>Todavía no hay suficientes estudios verificados en este período.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {datos.map((d, i) => {
@@ -5395,7 +5419,7 @@ function VistaRanking({ sesion, tema, acentoMarca }) {
                 <span style={{ flex: 1, fontSize: 13, fontWeight: soyYo ? "bold" : "normal" }}>
                   {d.nombre_mostrado}{soyYo ? " (tú)" : ""}
                 </span>
-                <span style={{ fontSize: 11, color: tema.textoSuave }}>{d.aciertos}/{d.total}</span>
+                <span style={{ fontSize: 11, color: tema.textoSuave }}>{d.aciertos}/{d.total} mercados</span>
                 <strong style={{ fontSize: 14, color: acentoMarca, minWidth: 46, textAlign: "right" }}>{d.porcentaje}%</strong>
               </div>
             );
@@ -5405,7 +5429,7 @@ function VistaRanking({ sesion, tema, acentoMarca }) {
 
       {sesion && miPosicion === -1 && datos.length > 0 && (
         <p style={{ fontSize: 11, color: tema.textoSuave, textAlign: "center", marginTop: 16 }}>
-          Todavía no apareces en este ranking — sigue guardando y verificando pronósticos en Estudio.
+          Todavía no apareces en este ranking — sigue guardando estudios antes de que empiecen los partidos.
         </p>
       )}
     </div>
@@ -5422,7 +5446,7 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar, esAdmin, 
   useEffect(() => {
     if (!sesion) return;
     Promise.all([
-      supabase.from("predicciones").select("resultado"),
+      supabase.from("predicciones").select("resultado, mercados_evaluados, mercados_acertados").eq("user_id", sesion.user.id),
       supabase.from("historial_busquedas_estudio").select("team_name, team_country").eq("user_id", sesion.user.id).limit(500),
       supabase.from("referidos").select("recompensa_referidor_dada").eq("referidor_id", sesion.user.id),
     ]).then(([resPred, resHist, resReferidos]) => {
@@ -5471,9 +5495,11 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar, esAdmin, 
     document.body.removeChild(areaTexto);
   }
 
-  const resueltas = predicciones.filter((p) => p.resultado !== "pendiente");
-  const aciertos = resueltas.filter((p) => p.resultado === "acierto").length;
-  const porcentaje = resueltas.length > 0 ? Math.round((aciertos / resueltas.length) * 100) : null;
+  // Solo cuentan los estudios guardados antes del partido y ya verificados
+  const resueltas = predicciones.filter((p) => p.resultado === "verificado" && p.mercados_evaluados > 0);
+  const totalMercados = resueltas.reduce((a, p) => a + p.mercados_evaluados, 0);
+  const aciertos = resueltas.reduce((a, p) => a + (p.mercados_acertados || 0), 0);
+  const porcentaje = totalMercados > 0 ? Math.round((aciertos / totalMercados) * 100) : null;
 
   function contarTop(lista, campo, cantidad = 5) {
     const conteo = {};
@@ -5521,10 +5547,10 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar, esAdmin, 
             </h4>
             {porcentaje !== null ? (
               <p style={{ fontSize: 13, margin: 0 }}>
-                <strong style={{ color: acentoMarca }}>{porcentaje}%</strong> de aciertos — {aciertos}/{resueltas.length} pronósticos verificados
+                <strong style={{ color: acentoMarca }}>{porcentaje}%</strong> de aciertos — {aciertos}/{totalMercados} mercados en {resueltas.length} estudios verificados
               </p>
             ) : (
-              <p style={{ fontSize: 12, color: tema.textoSuave, margin: 0 }}>Todavía no verificaste ningún pronóstico guardado.</p>
+              <p style={{ fontSize: 12, color: tema.textoSuave, margin: 0 }}>Todavía no tienes estudios verificados.</p>
             )}
           </div>
 
@@ -5923,35 +5949,76 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin, onAbrirPartid
 // Los pronósticos guardados a mano (el botón "Guardar este pronóstico" en
 // Estudio) — antes vivía bajo "Historial"; ahora "Historial" es automático
 // (ver VistaHistorial más abajo) y esto pasa a llamarse "Mis Estudios".
-function VistaMisEstudios({ sesion, tema, acentoMarca, onPedirLogin, mostrarToast }) {
+function VistaMisEstudios({ sesion, tema, acentoMarca, onPedirLogin, mostrarToast, onAbrirPartido }) {
   const [predicciones, setPredicciones] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [verificando, setVerificando] = useState(false);
+  const [abriendoId, setAbriendoId] = useState(null);
+  const [detalleAbierto, setDetalleAbierto] = useState(null);
 
-  useEffect(() => {
-    if (!sesion) return;
-    supabase
+  async function cargar() {
+    const { data } = await supabase
       .from("predicciones")
       .select("*")
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        setPredicciones(data || []);
-        setCargando(false);
-      });
-  }, [sesion]);
+      .eq("user_id", sesion.user.id)
+      .order("created_at", { ascending: false });
+    setPredicciones(data || []);
+    setCargando(false);
+    return data || [];
+  }
 
-  async function marcarResultado(id, resultado) {
-    const { error } = await supabase.from("predicciones").update({ resultado }).eq("id", id);
-    if (error) {
-      mostrarToast && mostrarToast("No se pudo guardar. Intenta de nuevo.");
+  // Al abrir Mis Estudios se piden verificar los pendientes cuyo partido ya terminó.
+  useEffect(() => {
+    if (!sesion) return;
+    let cancelado = false;
+    cargar().then(async (lista) => {
+      if (cancelado || !lista.some((p) => p.resultado === "pendiente")) return;
+      setVerificando(true);
+      try {
+        const r = await fetch("/api/verificar-estudios", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${sesion.access_token}` },
+        });
+        const json = await r.json();
+        if (!cancelado && json?.verificados > 0) await cargar();
+      } catch {
+        // si falla, se intenta la próxima vez que se abra
+      }
+      if (!cancelado) setVerificando(false);
+    });
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion?.user?.id]);
+
+  async function abrir(p) {
+    if (!onAbrirPartido || abriendoId) return;
+    if (!p.fixture_id && !(p.equipo_local_id && p.equipo_visitante_id)) {
+      mostrarToast && mostrarToast("Este estudio es muy viejo y no tiene el partido guardado.");
       return;
     }
-    setPredicciones((prev) => prev.map((p) => (p.id === id ? { ...p, resultado } : p)));
+    setAbriendoId(p.id);
+    try {
+      if (p.fixture_id) {
+        const r = await fetch(`/api/partido-por-id?fixtureId=${p.fixture_id}`);
+        const partido = await r.json();
+        if (partido?.fixture) onAbrirPartido(partido);
+        else mostrarToast && mostrarToast("No se pudo abrir ese partido.");
+      } else {
+        const r = await fetch(`/api/enfrentamiento-cercano?team1=${p.equipo_local_id}&team2=${p.equipo_visitante_id}`);
+        const json = await r.json();
+        if (json?.partido) onAbrirPartido(json.partido);
+        else mostrarToast && mostrarToast("No se encontró el partido de este estudio.");
+      }
+    } catch {
+      mostrarToast && mostrarToast("No se pudo abrir ese partido.");
+    }
+    setAbriendoId(null);
   }
 
   if (!sesion) {
     return (
       <div style={{ textAlign: "center", padding: 40 }}>
-        <p style={{ color: tema.textoSuave, marginBottom: 16 }}>Inicia sesión para ver tu historial de aciertos.</p>
+        <p style={{ color: tema.textoSuave, marginBottom: 16 }}>Inicia sesión para ver tus estudios.</p>
         <button onClick={onPedirLogin} style={{ padding: "10px 20px", fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
           Iniciar sesión
         </button>
@@ -5959,65 +6026,102 @@ function VistaMisEstudios({ sesion, tema, acentoMarca, onPedirLogin, mostrarToas
     );
   }
 
-  const resueltas = predicciones.filter((p) => p.resultado !== "pendiente");
-  const aciertos = resueltas.filter((p) => p.resultado === "acierto").length;
-  const porcentaje = resueltas.length > 0 ? Math.round((aciertos / resueltas.length) * 100) : null;
+  // Resumen: porcentaje de mercados acertados en los estudios que cuentan (antes del partido)
+  const cuentan = predicciones.filter((p) => p.resultado === "verificado" && p.mercados_evaluados > 0);
+  const totalMercados = cuentan.reduce((a, p) => a + p.mercados_evaluados, 0);
+  const totalAciertos = cuentan.reduce((a, p) => a + (p.mercados_acertados || 0), 0);
+  const porcentajeGeneral = totalMercados > 0 ? Math.round((totalAciertos / totalMercados) * 100) : null;
+
+  function colorPorcentaje(x) {
+    if (x >= 60) return "#22c55e";
+    if (x >= 40) return "#eab308";
+    return "#ef4444";
+  }
+
+  function estadoDe(p) {
+    switch (p.resultado) {
+      case "verificado":
+        return { texto: `Acierto ${Math.round(p.porcentaje_acierto)}%`, color: colorPorcentaje(p.porcentaje_acierto), nota: `${p.mercados_acertados} de ${p.mercados_evaluados} mercados` };
+      case "referencia":
+        return { texto: p.porcentaje_acierto !== null ? `Referencia ${Math.round(p.porcentaje_acierto)}%` : "Referencia", color: tema.textoSuave, nota: "Guardado después de empezar el partido: no suma al ranking" };
+      case "sin_pronostico":
+        return { texto: "Sin pronóstico", color: tema.textoSuave, nota: "Ningún mercado tenía una inclinación clara (o no había datos)" };
+      case "sin_partido":
+        return { texto: "Sin partido", color: tema.textoSuave, nota: "No encontramos el partido de este estudio" };
+      case "anulado":
+        return { texto: "Partido anulado", color: tema.textoSuave, nota: "El partido se canceló o se suspendió" };
+      default:
+        return { texto: "Pendiente", color: tema.textoSuave, nota: "El partido aún no termina" };
+    }
+  }
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 12px" }}>
       <h3 style={{ fontSize: 18, marginBottom: 6, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Icono tipo="grafico" size={18} /> {traducir("historialAciertos")}</h3>
-      {porcentaje !== null && (
-        <p style={{ textAlign: "center", color: acentoMarca, fontWeight: "bold", marginBottom: 20 }}>
-          {aciertos}/{resueltas.length} aciertos verificados — {porcentaje}%
+      {porcentajeGeneral !== null && (
+        <p style={{ textAlign: "center", color: acentoMarca, fontWeight: "bold", marginBottom: 4 }}>
+          {porcentajeGeneral}% de acierto — {totalAciertos}/{totalMercados} mercados en {cuentan.length} estudios
         </p>
       )}
+      <p style={{ textAlign: "center", color: tema.textoSuave, fontSize: 11, marginTop: 0, marginBottom: 20 }}>
+        Se verifican solos cuando termina el partido. Toca un estudio para abrir ese partido.
+        {verificando && " Verificando..."}
+      </p>
 
       {cargando ? (
         <p style={{ color: tema.textoSuave, textAlign: "center" }}>Cargando...</p>
       ) : predicciones.length === 0 ? (
         <p style={{ color: tema.textoSuave, fontSize: 13, textAlign: "center" }}>
-          Aún no has guardado ningún pronóstico. Ve a "Estudio", arma un análisis, y toca "Guardar este pronóstico".
+          Aún no has guardado ningún estudio. Abre un partido y toca "Guardar en Mis Estudios", o quédate más de un minuto en él y se guarda solo.
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {predicciones.map((p) => (
-            <div key={p.id} style={{ background: tema.panel, borderRadius: 8, padding: 14, borderTop: `3px solid ${acentoMarca}` }}>
-              <div style={{ fontWeight: "bold", marginBottom: 6 }}>{p.equipo_local} vs {p.equipo_visitante}</div>
-              <div style={{ fontSize: 12, color: tema.textoSuave, marginBottom: 8, lineHeight: 1.6 }}>
-                Ganador estimado: <strong>{p.pick_1x2 || "—"}</strong> · Goles esperados: <strong>{p.goles_esperados ?? "—"}</strong> · Over 2.5: <strong>{p.prob_over25 ?? "—"}%</strong> · BTTS: <strong>{p.prob_btts ?? "—"}%</strong>
-                <br />
-                Guardado: {new Date(p.created_at).toLocaleDateString("es-ES")}
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: tema.textoSuave }}>Resultado real:</span>
-                {["pendiente", "acierto", "fallo"].map((r) => (
+          {predicciones.map((p) => {
+            const est = estadoDe(p);
+            const detalle = Array.isArray(p.detalle_verificacion) ? p.detalle_verificacion : [];
+            return (
+              <div
+                key={p.id}
+                onClick={() => abrir(p)}
+                style={{ background: tema.panel, borderRadius: 8, padding: 14, borderTop: `3px solid ${acentoMarca}`, cursor: "pointer", opacity: abriendoId === p.id ? 0.6 : 1 }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ fontWeight: "bold" }}>
+                    {p.equipo_local} vs {p.equipo_visitante}
+                    {p.marcador_final && <span style={{ color: tema.textoSuave, fontWeight: "normal" }}> ({p.marcador_final})</span>}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: "bold", color: est.color, whiteSpace: "nowrap" }}>{est.texto}</span>
+                </div>
+                <div style={{ fontSize: 11, color: tema.textoSuave, marginTop: 4 }}>
+                  {est.nota} · Guardado: {new Date(p.created_at).toLocaleDateString("es-ES")}
+                  {p.ajuste_climatico || p.modelo?.clima ? " · Con Estudio Climático" : ""}
+                </div>
+                {detalle.length > 0 && (
                   <button
-                    key={r}
-                    onClick={() => marcarResultado(p.id, r)}
-                    style={{
-                      fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
-                      border: `1px solid ${p.resultado === r ? acentoMarca : tema.borde}`,
-                      background: p.resultado === r ? acentoMarca : "transparent",
-                      color: p.resultado === r ? "#fff" : tema.texto,
-                    }}
+                    onClick={(e) => { e.stopPropagation(); setDetalleAbierto(detalleAbierto === p.id ? null : p.id); }}
+                    style={{ marginTop: 8, fontSize: 11, padding: "4px 10px", borderRadius: 12, border: `1px solid ${tema.borde}`, background: "transparent", color: tema.texto, cursor: "pointer" }}
                   >
-                    {r === "pendiente" ? "Pendiente" : r === "acierto" ? <><Icono tipo="check" size={12} color="#2e9e4f" /> Acertó</> : <><Icono tipo="cerrar" size={12} color="#e05555" /> Falló</>}
+                    {detalleAbierto === p.id ? "Ocultar mercados" : "Ver mercados"}
                   </button>
-                ))}
+                )}
+                {detalleAbierto === p.id && (
+                  <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.7 }}>
+                    {detalle.map((d, i) => (
+                      <div key={i} style={{ color: d.acierto ? "#22c55e" : "#ef4444" }}>
+                        {d.acierto ? "✓" : "✗"} <span style={{ color: tema.texto }}>{d.texto}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-// Muestra todo lo relacionado a UN partido puntual ya jugado (estadísticas de
-// ambos equipos, enfrentamientos directos, datos generales) SIN semáforo ni
-// pronósticos — no tiene sentido "predecir" un resultado que ya pasó.
-// Se usa como ventana superpuesta en celular, y como contenido de la pestaña
-// nueva que se abre en PC.
 function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
   const [climaData, setClimaData] = useState(null);
   const [statsPartido, setStatsPartido] = useState(null);
@@ -7908,6 +8012,7 @@ function Home() {
   const [confirmarGlobalAbierto, setConfirmarGlobalAbierto] = useState(false);
   const [indicadorClimaAbierto, setIndicadorClimaAbierto] = useState(false);
   const [guardandoClima, setGuardandoClima] = useState(false);
+  const modeloSemaforoRef = useRef(null);
   const [guardadoClima, setGuardadoClima] = useState(false);
 
   async function guardarEstudioClimatico() {
@@ -7919,6 +8024,9 @@ function Home() {
       equipo_visitante: equipoVisitante?.team?.name || "",
       equipo_local_id: equipoLocal?.team?.id || null,
       equipo_visitante_id: equipoVisitante?.team?.id || null,
+      // Con esto se verifica igual que cualquier estudio, ya con el clima aplicado
+      fixture_id: partidoCalendario?.fixture?.id || null,
+      modelo: modeloSemaforoRef.current || null,
       ajuste_climatico: {
         activo: climaAjuste.activo,
         equipos: ajustesClima,
@@ -8131,14 +8239,7 @@ function Home() {
         // al vertical (un swipe de verdad), no un scroll hacia abajo con el dedo levemente
         // de costado — eso antes cambiaba de pestaña por error.
         const esSwipeHorizontal = Math.abs(deltaX) > 90 && Math.abs(deltaX) > Math.abs(deltaY) * 2;
-        // En celular, deslizar de izquierda a derecha abre el menú "Más" desde
-        // cualquier pantalla. No cuenta si el dedo empieza pegado al borde
-        // izquierdo (ese es el gesto "atrás" del celular).
-        const esCelular = typeof window !== "undefined" && window.innerWidth < 768;
-        if (esCelular && !hayModalAbierto && esSwipeHorizontal && deltaX > 0 && toqueSwipeX > 24) {
-          setMenuAbierto(true);
-          if (!tutorialesOcultos.includes("menu_deslizar")) ocultarTutorialPermanente("menu_deslizar");
-        } else if (!hayModalAbierto && indiceActual !== -1 && esSwipeHorizontal && !(esCelular && deltaX > 0)) {
+        if (!hayModalAbierto && indiceActual !== -1 && esSwipeHorizontal) {
           if (deltaX < 0 && indiceActual < ORDEN_PESTANAS.length - 1) setVistaActual(ORDEN_PESTANAS[indiceActual + 1]);
           else if (deltaX > 0 && indiceActual > 0) setVistaActual(ORDEN_PESTANAS[indiceActual - 1]);
         }
@@ -8430,45 +8531,21 @@ function Home() {
           padding: 4px 6px;
         }
 
-        /* En celular, el menú "Más" sale desde abajo, bajito (máximo ~55% de la
-           pantalla) y semitransparente, para que se note que está encima de la
-           pantalla donde se abrió. Se abre deslizando de izquierda a derecha. */
-        .jmcs-velo-menu { display: none; }
-        .jmcs-solo-movil-bloque { display: none; }
-        .jmcs-oculto-movil { display: none; }
-        @media (min-width: 768px) {
-          .jmcs-oculto-movil { display: block; }
-        }
         @media (max-width: 767px) {
-          .jmcs-velo-menu {
-            display: block;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.35);
-            z-index: 119;
-          }
-          .jmcs-solo-movil-bloque { display: block; }
           .jmcs-menu-desplegable {
             position: fixed !important;
             top: auto !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
+            bottom: 70px !important;
+            left: 12px !important;
+            right: 12px !important;
             width: auto !important;
-            max-height: 55vh;
-            overflow-y: auto !important;
-            border-radius: 18px 18px 0 0 !important;
-            border-bottom: none !important;
-            background: ${tema.panel}E0 !important;
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            padding-bottom: env(safe-area-inset-bottom);
-            animation: jmcsSubirMenu 0.2s ease-out;
           }
         }
-        @keyframes jmcsSubirMenu {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
+
+        /* La flecha "Volver" del perfil de equipo solo se ve en PC */
+        .jmcs-oculto-movil { display: none; }
+        @media (min-width: 768px) {
+          .jmcs-oculto-movil { display: block; }
         }
 
         .jmcs-inicio-grid {
@@ -8648,9 +8725,6 @@ function Home() {
             )}
 
             {menuAbierto && (
-              <div className="jmcs-velo-menu" onClick={() => setMenuAbierto(false)} />
-            )}
-            {menuAbierto && (
               <div
                 className="jmcs-menu-desplegable"
                 style={{
@@ -8659,20 +8733,16 @@ function Home() {
                   boxShadow: "0 6px 16px rgba(0,0,0,0.25)", overflow: "hidden",
                 }}
               >
-                {/* Agarradera: solo se ve en celular, donde el menú sale desde abajo */}
-                <div className="jmcs-solo-movil-bloque" style={{ padding: "8px 0 4px" }}>
-                  <div style={{ width: 40, height: 4, borderRadius: 4, background: tema.textoSuave, opacity: 0.6, margin: "0 auto" }} />
-                </div>
                 {[
-                  { clave: "verPerfil", etiqueta: "Perfil", detalle: "Tu cuenta, suscripción y ajustes" },
-                  { clave: "datos", etiqueta: "Datos", detalle: "Mis estudios y Ranking" },
-                  // En celular, Historial ya está en la barra de abajo
-                  { clave: "historial", etiqueta: t("menuHistorial"), soloPc: true },
+                  { clave: "verPerfil", etiqueta: "Perfil" },
+                  { clave: "inicio", etiqueta: t("menuInicio") },
+                  { clave: "datos", etiqueta: "Datos" },
+                  { clave: "favoritos", etiqueta: t("menuFavoritos") },
+                  { clave: "historial", etiqueta: t("menuHistorial") },
                   ...(esAdmin ? [{ clave: "admin", etiqueta: "Panel de administrador" }] : []),
                 ].map((item) => (
                   <div
                     key={item.clave}
-                    className={item.soloPc ? "jmcs-oculto-movil" : undefined}
                     onClick={
                       item.clave === "inicio"
                         ? () => { setMenuAbierto(false); volverAInicio(); }
@@ -8682,10 +8752,9 @@ function Home() {
                         ? () => (sesion ? (() => { setMenuAbierto(false); setVistaActual("perfil"); })() : abrirLogin())
                         : () => accederOPedirCuenta(item.clave)
                     }
-                    style={{ padding: "12px 16px", fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
+                    style={{ padding: "10px 14px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${tema.borde}` }}
                   >
-                    <div style={{ fontWeight: "bold" }}>{item.etiqueta}</div>
-                    {item.detalle && <div style={{ fontSize: 11, color: tema.textoSuave, marginTop: 2 }}>{item.detalle}</div>}
+                    {item.etiqueta}
                   </div>
                 ))}
               </div>
@@ -8833,18 +8902,6 @@ function Home() {
             tutorialesOcultos={tutorialesOcultos}
             onOcultarPermanente={ocultarTutorialPermanente}
           />
-          {/* Pista del gesto del menú, solo en celular. Mismo id que en la app. */}
-          <div className="jmcs-solo-movil-bloque">
-            <TutorialFlotante
-              id="menu_deslizar"
-              titulo="Menú"
-              texto="Desliza el dedo de izquierda a derecha, desde cualquier pantalla, para abrir el menú con tu perfil y tus datos."
-              tema={tema}
-              acentoMarca={acentoMarca}
-              tutorialesOcultos={tutorialesOcultos}
-              onOcultarPermanente={ocultarTutorialPermanente}
-            />
-          </div>
 
           {jalando && (
             <p style={{ textAlign: "center", fontSize: 12, color: acentoMarca, marginBottom: 8 }}>
@@ -8987,7 +9044,7 @@ function Home() {
 
       {vistaActual === "misEstudios" && (
         <div style={{ margin: "20px auto" }}>
-          <VistaMisEstudios sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} />
+          <VistaMisEstudios sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} onAbrirPartido={(p) => { seleccionarPartidoDelCalendario(p); setVistaActual("estudio"); }} />
         </div>
       )}
 
@@ -9021,7 +9078,7 @@ function Home() {
             ))}
           </div>
           {pestanaDatos === "misEstudios" ? (
-            <VistaMisEstudios sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} />
+            <VistaMisEstudios sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} mostrarToast={mostrarToast} onAbrirPartido={(p) => { seleccionarPartidoDelCalendario(p); setVistaActual("estudio"); }} />
           ) : (
             <VistaRanking sesion={sesion} tema={tema} acentoMarca={acentoMarca} />
           )}
@@ -9339,6 +9396,7 @@ function Home() {
               ignorarCompeticionExacta={ignorarCompeticionExacta}
               setIgnorarCompeticionExacta={setIgnorarCompeticionExacta}
               fixtureIdActual={partidoCalendario?.fixture?.id}
+              modeloRef={modeloSemaforoRef}
             />
           )}
           {modoSoloResultado && (
@@ -9454,7 +9512,15 @@ function Home() {
             {item.etiqueta}
           </button>
         ))}
-        {/* "Más" ya no es un botón: en celular se abre deslizando de izquierda a derecha */}
+        <button
+          ref={masBtnRef}
+          className="jmcs-nav-movil-item"
+          onClick={() => setMenuAbierto(!menuAbierto)}
+          style={{ color: tema.textoSuave }}
+        >
+          <Icono tipo="menu" size={18} />
+          Más
+        </button>
       </div>
 
       {estudioClimaticoAbierto && ajustesClima && climaOficialNorm && equipoLocal?.team && equipoVisitante?.team && (
