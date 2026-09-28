@@ -7494,7 +7494,8 @@ function Home() {
     if (sesion?.user?.id) {
       supabase
         .from("historial_visitas")
-        .insert({
+        // Un solo registro por partido: si ya estaba, solo se actualiza la fecha.
+        .upsert({
           user_id: sesion.user.id,
           equipo_local: p.teams.home.name,
           equipo_visitante: p.teams.away.name,
@@ -7503,7 +7504,8 @@ function Home() {
           equipo_local_logo: p.teams.home.logo || null,
           equipo_visitante_logo: p.teams.away.logo || null,
           fixture_id: p.fixture?.id || null,
-        })
+          visto_en: new Date().toISOString(),
+        }, { onConflict: "user_id,fixture_id" })
         .then(() => {})
         .catch(() => {});
     }
