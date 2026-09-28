@@ -45,6 +45,30 @@ const CODIGOS_ISO_PAISES = {
   India: "in", Australia: "au",
 };
 
+// Nombres en español para el selector "Mi país" (la clave es el nombre que usa la API).
+const NOMBRES_PAIS_ES = {
+  Argentina: "Argentina", Brazil: "Brasil", Spain: "España", England: "Inglaterra", Italy: "Italia",
+  Germany: "Alemania", France: "Francia", Portugal: "Portugal", Mexico: "México", Colombia: "Colombia",
+  Chile: "Chile", Uruguay: "Uruguay", Peru: "Perú", Ecuador: "Ecuador", "United-States": "Estados Unidos",
+  Netherlands: "Países Bajos", Belgium: "Bélgica", Turkey: "Turquía", Japan: "Japón", "South-Korea": "Corea del Sur",
+  Paraguay: "Paraguay", Bolivia: "Bolivia", Venezuela: "Venezuela", "Costa-Rica": "Costa Rica", Honduras: "Honduras",
+  Panama: "Panamá", Guatemala: "Guatemala", Russia: "Rusia", Ukraine: "Ucrania", Poland: "Polonia",
+  Croatia: "Croacia", Serbia: "Serbia", Switzerland: "Suiza", Austria: "Austria", Scotland: "Escocia",
+  Wales: "Gales", Ireland: "Irlanda", Denmark: "Dinamarca", Sweden: "Suecia", Norway: "Noruega",
+  Greece: "Grecia", Egypt: "Egipto", Morocco: "Marruecos", Nigeria: "Nigeria", Senegal: "Senegal",
+  "Saudi-Arabia": "Arabia Saudita", Qatar: "Catar", "United-Arab-Emirates": "Emiratos Árabes Unidos", China: "China",
+  India: "India", Australia: "Australia",
+};
+
+// Código ISO de 2 letras (el que da la conexión, ej. "CO") -> nombre del país en la API.
+function paisDesdeCodigoIso(codigo) {
+  if (!codigo) return null;
+  const c = String(codigo).toLowerCase();
+  if (c === "gb" || c === "uk") return "England";
+  const encontrado = Object.entries(CODIGOS_ISO_PAISES).find(([, iso]) => iso === c);
+  return encontrado ? encontrado[0] : null;
+}
+
 // Bandera como imagen real (reemplaza los emoji 🇦🇷 que en PC/Windows a veces se ven como texto "AR").
 // Prioridad: 1) la URL que ya nos manda la API en el partido (league.flag), 2) nuestro propio mapa por
 // código ISO vía flagcdn.com, 3) no muestra nada (mejor vacío que un ícono roto o equivocado).
@@ -2031,7 +2055,7 @@ function PanelAlineaciones({ fixtureIdActual, equipoLocal, equipoVisitante, tema
   );
 }
 
-function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual, ignorarCompeticionExacta, setIgnorarCompeticionExacta, fixtureIdActual, modeloRef }) {
+function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVisitante, h2h, statsMap, datosPuntualesListos, esPartidoLiga, setEsPartidoLiga, tema, acento, climaAjuste, coberturaPuntuales, sesion, onPedirLogin, mercadosPreferidos, mostrarToast, competicionActual, ignorarCompeticionExacta, setIgnorarCompeticionExacta, fixtureIdActual, modeloRef, climaDetalle }) {
   const mostrarMercado = (id) => !mercadosPreferidos || mercadosPreferidos.length === 0 || mercadosPreferidos.includes(id);
   const [lineaHandicap, setLineaHandicap] = useState(0);
   const [permisoNotificaciones, setPermisoNotificaciones] = useState(
@@ -2170,6 +2194,13 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
     clima: climaActivo,
     // Córners, tarjetas y faltas no cuentan si la muestra no alcanza o aún no cargan
     muestraInsuficiente: !!advertenciaMuestra || !datosPuntualesListos,
+    // Para el aprendizaje: el cálculo SIN clima y los valores del clima (oficial
+    // y del usuario). Así se puede saber si el ajuste del usuario ayudó o no.
+    puro: climaActivo ? {
+      gl: redondear3(lambdaGolesLocal), gv: redondear3(lambdaGolesVisitante),
+      corners: redondear3(lambdaCornersTotal), amarillas: redondear3(lambdaAmarillasTotal), faltas: redondear3(lambdaFaltasTotal),
+    } : null,
+    climaDatos: climaActivo ? (climaDetalle || null) : null,
   };
   if (modeloRef) modeloRef.current = modeloEstudio;
 
@@ -4240,7 +4271,7 @@ function TarjetaPartidoInicio({ p, tema, acentoMarca, onClick, onAbrirPerfil, mo
   );
 }
 
-function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil, mostrarToast, modoOscuro }) {
+function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil, mostrarToast, modoOscuro, paisUsuario }) {
   const [partidos, setPartidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -4330,12 +4361,18 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
   // Separar en "competiciones top" (Champions, Libertadores, las 5 grandes de
   // Europa, Brasileirão, Europa League, Sudamericana, Liga MX, Argentina) y
   // "el resto" — este segundo grupo sigue agrupado por país, como antes.
+  // El país del usuario va arriba del todo (solo en "Todos", sin un chip
+  // elegido). Sus partidos no se repiten más abajo.
+  const usarPaisUsuario = !!paisUsuario && (ordenPorImportancia ? !filtroCompeticion : !filtroPais);
+  const propios = [];
   const top = [];
   const resto = [];
   partidosFiltrados.forEach((p) => {
-    if (ordenPorImportancia && competicionDe(p.league?.name, p.league?.country)) top.push(p);
+    if (usarPaisUsuario && p.league?.country === paisUsuario) propios.push(p);
+    else if (ordenPorImportancia && competicionDe(p.league?.name, p.league?.country)) top.push(p);
     else resto.push(p);
   });
+  propios.sort(compararPartidos);
 
   const gruposTop = {};
   top.forEach((p) => {
@@ -4608,6 +4645,21 @@ function ListaPartidosInicio({ tema, acentoMarca, onTocarPartido, onAbrirPerfil,
       {!loading && !error && partidosFiltrados.length === 0 && !filtroCompeticion && (
         <p style={{ color: tema.textoSuave, fontSize: 13 }}>No hay partidos disponibles para hoy en este plan.</p>
       )}
+      {propios.length > 0 && (
+        <div id={`pais-${paisUsuario}`} style={{ marginBottom: 24 }}>
+          <h4 style={{
+            fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", color: acentoMarca,
+            borderBottom: `2px solid ${acentoMarca}`, paddingBottom: 6, marginBottom: 12,
+          }}>
+            <BanderaPais pais={paisUsuario} url={propios[0]?.league?.flag} size={18} /> {paisUsuario} · Tu país
+          </h4>
+          <div className="jmcs-partidos-grid">
+            {propios.map((p) => (
+              <TarjetaPartidoInicio key={p.fixture.id} p={p} tema={tema} acentoMarca={acentoMarca} onClick={() => onTocarPartido(p)} onAbrirPerfil={onAbrirPerfil} modoOscuro={modoOscuro} />
+            ))}
+          </div>
+        </div>
+      )}
       {competicionesOrdenadas.map((clave) => (
         <div key={clave} style={{ marginBottom: 24 }}>
           <h4 style={{
@@ -4688,7 +4740,7 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarca, mostrarToast }) {
+function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarca, mostrarToast, paisPorConexion }) {
   const [procesando, setProcesando] = useState(false);
   const activadas = !!perfil?.notif_activadas;
   const soportado = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
@@ -4779,11 +4831,45 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
     { campo: "notif_semaforo", icono: "semaforo", etiqueta: traducir("notifSemaforoEtiqueta") },
   ];
 
+  async function cambiarPais(valor) {
+    const { data } = await supabase
+      .from("perfiles")
+      .update({ pais_preferido: valor || null })
+      .eq("user_id", sesion.user.id)
+      .select()
+      .maybeSingle();
+    if (data) onPerfilActualizado(data);
+    else mostrarToast && mostrarToast("No se pudo guardar tu país.");
+  }
+
   return (
     <div style={{ maxWidth: 480, margin: "0 auto" }}>
       <h3 style={{ fontSize: 18, marginBottom: 18, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
         <Icono tipo="menu" size={16} /> {traducir("ajustesTitulo")}
       </h3>
+
+      <div style={{ background: tema.panel, border: `1px solid ${tema.borde}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <h4 style={{ margin: "0 0 6px", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="estadio" size={15} /> Mi país
+        </h4>
+        <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 10px" }}>
+          Los partidos de tu país salen primero en Inicio. En automático lo tomamos de tu conexión, sin tu ubicación exacta.
+        </p>
+        <select
+          value={perfil?.pais_preferido || ""}
+          onChange={(e) => cambiarPais(e.target.value)}
+          style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 6, border: `1px solid ${tema.borde}`, background: tema.fondo, color: tema.texto }}
+        >
+          <option value="">
+            Automático{paisPorConexion ? ` (${NOMBRES_PAIS_ES[paisPorConexion] || paisPorConexion})` : ""}
+          </option>
+          {Object.keys(NOMBRES_PAIS_ES)
+            .sort((a, b) => NOMBRES_PAIS_ES[a].localeCompare(NOMBRES_PAIS_ES[b], "es"))
+            .map((clave) => (
+              <option key={clave} value={clave}>{NOMBRES_PAIS_ES[clave]}</option>
+            ))}
+        </select>
+      </div>
 
       <div style={{ background: tema.panel, border: `1px solid ${tema.borde}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
         <h4 style={{ margin: "0 0 6px", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
@@ -6346,7 +6432,7 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mos
   );
 }
 
-function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey, paisDetectado, onBuscarEquipoPorNombre, mostrarToast, modoOscuro }) {
+function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipoInicio, fixturesInicio, colorMarcaInicio, onSeleccionarPartido, partidoTocado, onAbrirPerfil, refrescarKey, paisDetectado, onBuscarEquipoPorNombre, mostrarToast, modoOscuro, paisUsuario }) {
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   return (
     <div className="jmcs-inicio-grid">
@@ -6423,7 +6509,7 @@ function VistaInicio({ tema, acentoMarca, sesion, onPedirLogin, statsMap, equipo
         </div>
       )}
 
-      <ListaPartidosInicio key={refrescarKey} tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} modoOscuro={modoOscuro} />
+      <ListaPartidosInicio key={refrescarKey} tema={tema} acentoMarca={acentoMarca} onTocarPartido={onSeleccionarPartido} onAbrirPerfil={onAbrirPerfil} mostrarToast={mostrarToast} modoOscuro={modoOscuro} paisUsuario={paisUsuario} />
       </div>
 
       <div className="jmcs-inicio-calendario-col">
@@ -7229,6 +7315,18 @@ function Home() {
   const [esAdminPrincipal, setEsAdminPrincipal] = useState(false);
   const [cargandoChequeoAdmin, setCargandoChequeoAdmin] = useState(true);
   const [perfil, setPerfil] = useState(null);
+
+  // País del usuario para poner sus partidos primero en Inicio. Se toma de
+  // la conexión (sin pedir la ubicación exacta); si eligió uno en Ajustes,
+  // manda ese.
+  const [paisPorConexion, setPaisPorConexion] = useState(null);
+  useEffect(() => {
+    fetch("/api/mi-pais")
+      .then((r) => r.json())
+      .then((d) => setPaisPorConexion(paisDesdeCodigoIso(d?.codigo)))
+      .catch(() => {});
+  }, []);
+  const paisUsuario = perfil?.pais_preferido || paisPorConexion;
 
   // Al cargar el perfil de un usuario con cuenta, aplicamos su tema guardado
   // una sola vez (si después lo cambia a mano, no lo pisamos de nuevo solos)
@@ -8988,6 +9086,7 @@ function Home() {
             onBuscarEquipoPorNombre={buscarEquipoPorNombre}
             mostrarToast={mostrarToast}
             modoOscuro={modoOscuro}
+            paisUsuario={paisUsuario}
           />
         </div>
       )}
@@ -9109,7 +9208,7 @@ function Home() {
 
       {vistaActual === "ajustes" && sesion && (
         <div style={{ margin: "20px auto" }}>
-          <PantallaAjustes sesion={sesion} perfil={perfil} onPerfilActualizado={setPerfil} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
+          <PantallaAjustes sesion={sesion} perfil={perfil} onPerfilActualizado={setPerfil} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} paisPorConexion={paisPorConexion} />
         </div>
       )}
 
@@ -9397,6 +9496,7 @@ function Home() {
               setIgnorarCompeticionExacta={setIgnorarCompeticionExacta}
               fixtureIdActual={partidoCalendario?.fixture?.id}
               modeloRef={modeloSemaforoRef}
+              climaDetalle={climaOficialNorm && ajustesClima ? { oficial: climaOficialNorm, ajustes: ajustesClima } : null}
             />
           )}
           {modoSoloResultado && (
