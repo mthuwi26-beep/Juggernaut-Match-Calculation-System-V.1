@@ -2498,6 +2498,37 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos, mostrarToast }) {
   const [guardado, setGuardado] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const guardadoRef = useRef(false);
+  const datosRef = useRef(datos);
+  datosRef.current = datos;
+
+  // Si el usuario se queda más de un minuto viendo este Estudio sin guardar
+  // nada a mano, se guarda solo en "Mis Estudios". Si sale antes, el
+  // temporizador se cancela solo. Si no hay sesión, no pasa nada (no tiene
+  // sentido pedirle login por algo que ni pidió).
+  useEffect(() => {
+    if (!sesion?.user?.id) return;
+    const temporizador = setTimeout(async () => {
+      if (guardadoRef.current) return;
+      const d = datosRef.current;
+      const { error } = await supabase.from("predicciones").insert({
+        user_id: sesion.user.id,
+        equipo_local: d.equipo_local,
+        equipo_visitante: d.equipo_visitante,
+        equipo_local_id: d.equipo_local_id,
+        equipo_visitante_id: d.equipo_visitante_id,
+        goles_esperados: d.goles_esperados,
+        prob_over25: d.prob_over25,
+        prob_btts: d.prob_btts,
+        pick_1x2: d.pick_1x2,
+      });
+      if (!error) {
+        guardadoRef.current = true;
+        setGuardado(true);
+      }
+    }, 60000);
+    return () => clearTimeout(temporizador);
+  }, [sesion?.user?.id, datos?.equipo_local_id, datos?.equipo_visitante_id]);
 
   async function guardar() {
     if (!sesion) {
@@ -2517,6 +2548,7 @@ function BotonGuardarPronostico({ sesion, onPedirLogin, tema, acento, datos, mos
       pick_1x2: datos.pick_1x2,
     });
     if (!error) {
+      guardadoRef.current = true;
       setGuardado(true);
     } else {
       mostrarToast && mostrarToast("No se pudo guardar el pronóstico. Intenta de nuevo.");
@@ -5774,9 +5806,10 @@ function TutorialFlotante({ id, titulo, texto, tema, acentoMarca, tutorialesOcul
 // Historial automático: cada partido real que se abrió para estudiar (desde
 // Inicio o el calendario) queda anotado solo acá, sin que el usuario tenga
 // que guardar nada a mano — eso es "Mis Estudios", más abajo.
-function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
+function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin, onAbrirPartido }) {
   const [visitas, setVisitas] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [buscandoId, setBuscandoId] = useState(null);
 
   useEffect(() => {
     if (!sesion) return;
@@ -5790,6 +5823,31 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
         setCargando(false);
       });
   }, [sesion]);
+
+  // Tocar una visita abre en Estudio el mismo partido que se estudió
+  // (por su ID), igual que tocarlo desde Inicio.
+  async function abrir(v) {
+    if (buscandoId) return;
+    // Sin ID de partido (visitas de antes de que se guardara) ni equipos, no hay qué abrir.
+    if (!v.fixture_id && (!v.equipo_local_id || !v.equipo_visitante_id)) return;
+    setBuscandoId(v.id);
+    try {
+      if (v.fixture_id) {
+        // El partido exacto que se estudió ese día.
+        const r = await fetch(`/api/partido-por-id?fixtureId=${v.fixture_id}`);
+        const partido = await r.json();
+        if (partido?.fixture) onAbrirPartido(partido);
+      } else {
+        // Visitas viejas: lo mejor posible es el partido más cercano entre los dos equipos.
+        const r = await fetch(`/api/enfrentamiento-cercano?team1=${v.equipo_local_id}&team2=${v.equipo_visitante_id}`);
+        const json = await r.json();
+        if (json?.partido) onAbrirPartido(json.partido);
+      }
+    } catch (e) {
+      // Silencioso: si falla la búsqueda, simplemente no pasa nada al tocar.
+    }
+    setBuscandoId(null);
+  }
 
   if (!sesion) {
     return (
@@ -5817,9 +5875,20 @@ function VistaHistorial({ sesion, tema, acentoMarca, onPedirLogin }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {visitas.map((v) => (
-            <div key={v.id} style={{ background: tema.panel, borderRadius: 8, padding: 14, borderTop: `3px solid ${acentoMarca}` }}>
-              <div style={{ fontWeight: "bold" }}>{v.equipo_local} vs {v.equipo_visitante}</div>
-              <div style={{ fontSize: 12, color: tema.textoSuave, marginTop: 4 }}>
+            <div
+              key={v.id}
+              onClick={() => abrir(v)}
+              style={{
+                background: tema.panel, borderRadius: 8, padding: 14, borderTop: `3px solid ${acentoMarca}`,
+                cursor: "pointer", opacity: buscandoId === v.id ? 0.6 : 1,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {v.equipo_local_logo && <img src={v.equipo_local_logo} alt="" style={{ width: 24, height: 24, objectFit: "contain" }} />}
+                <div style={{ fontWeight: "bold", flex: 1 }}>{v.equipo_local} vs {v.equipo_visitante}</div>
+                {v.equipo_visitante_logo && <img src={v.equipo_visitante_logo} alt="" style={{ width: 24, height: 24, objectFit: "contain" }} />}
+              </div>
+              <div style={{ fontSize: 12, color: tema.textoSuave, marginTop: 6 }}>
                 Visto: {new Date(v.visto_en).toLocaleString("es-ES")}
               </div>
             </div>
@@ -7431,6 +7500,9 @@ function Home() {
           equipo_visitante: p.teams.away.name,
           equipo_local_id: p.teams.home.id,
           equipo_visitante_id: p.teams.away.id,
+          equipo_local_logo: p.teams.home.logo || null,
+          equipo_visitante_logo: p.teams.away.logo || null,
+          fixture_id: p.fixture?.id || null,
         })
         .then(() => {})
         .catch(() => {});
@@ -8808,7 +8880,10 @@ function Home() {
 
       {vistaActual === "historial" && (
         <div style={{ margin: "20px auto" }}>
-          <VistaHistorial sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin} />
+          <VistaHistorial
+            sesion={sesion} tema={tema} acentoMarca={acentoMarca} onPedirLogin={abrirLogin}
+            onAbrirPartido={(p) => { seleccionarPartidoDelCalendario(p); setVistaActual("estudio"); }}
+          />
         </div>
       )}
 
