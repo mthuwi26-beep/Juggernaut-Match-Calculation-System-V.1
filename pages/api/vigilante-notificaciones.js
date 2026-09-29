@@ -20,7 +20,7 @@ import { enviarPush, enviarPushFcm } from "../../lib/push";
 const motor = require("../../lib/motor");
 
 const ESTADOS_FINALIZADOS = ["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"];
-// Si tu dominio cambia, agregá NEXT_PUBLIC_SITE_URL en Vercel con la URL nueva.
+// Si tu dominio cambia, agrega NEXT_PUBLIC_SITE_URL en Vercel con la URL nueva.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://juggernaut-match-calculation-system-nine.vercel.app";
 
 // Calcula el semáforo de los 4 mercados (goles, córners, amarillas, faltas) para un
