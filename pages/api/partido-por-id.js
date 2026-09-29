@@ -1,6 +1,6 @@
 // Trae el partido completo (equipos, liga, fecha, venue, árbitro) por su ID —
 // se usa para abrir el resultado de un partido puntual en una pestaña nueva
-// (cuando tocás un V/E/D de "Últimos 5"), sin depender de tener los dos
+// (cuando se toca un V/E/D de "Últimos 5"), sin depender de tener los dos
 // equipos ya cargados en la pantalla principal.
 import { obtenerCache, guardarCache, CACHE_3_MINUTOS, CACHE_PARA_SIEMPRE } from "../../lib/cacheApi";
 
