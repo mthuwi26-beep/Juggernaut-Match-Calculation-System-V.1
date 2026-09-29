@@ -324,7 +324,7 @@ const TEXTOS = {
     chatPensando: "Pensando...", chatPlaceholder: "Escribe tu pregunta sobre el partido...",
     chatEnviar: "Enviar", chatErrorConexion: "No se pudo conectar con la IA",
     panelAdminCargando: "Cargando panel...", panelAdminUsuarios: "Usuarios registrados",
-    panelAdminEstudios: "Estudios guardados", panelAdminAciertos: "% de aciertos (verificados)",
+    panelAdminEstudios: "Estudios guardados", panelAdminAciertos: "% de mercados acertados",
     panelAdminFavoritos: "Equipos en favoritos", panelAdminSinDatos: "Sin datos aún",
     comoLocalVisitante: "Como Local / Como Visitante",
     tutClimaTitulo: "¿Cuánto pesa cada punto?",
@@ -387,7 +387,7 @@ const TEXTOS = {
     chatPensando: "Thinking...", chatPlaceholder: "Type your question about the match...",
     chatEnviar: "Send", chatErrorConexion: "Could not connect to the AI",
     panelAdminCargando: "Loading panel...", panelAdminUsuarios: "Registered users",
-    panelAdminEstudios: "Saved studies", panelAdminAciertos: "% correct (verified)",
+    panelAdminEstudios: "Saved studies", panelAdminAciertos: "% of markets correct",
     panelAdminFavoritos: "Teams in favorites", panelAdminSinDatos: "No data yet",
     comoLocalVisitante: "As Home / As Away",
     tutClimaTitulo: "How much does each point weigh?",
@@ -5138,9 +5138,14 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
   const [resultadosSuscripcion, setResultadosSuscripcion] = useState([]);
   const [buscandoSuscripcion, setBuscandoSuscripcion] = useState(false);
   const [planGratisElegido, setPlanGratisElegido] = useState({});
+  // Precisión verificada (porcentaje de mercados acertados). "sin-sql" si falta la función.
+  const [precision, setPrecision] = useState(null);
 
   function cargarTodo() {
     setCargando(true);
+    supabase.rpc("admin_precision_stats").then(({ data, error }) => {
+      setPrecision(error ? "sin-sql" : data);
+    });
     supabase.rpc("admin_dashboard_stats").then(({ data, error }) => {
       if (error) setError(error.message);
       else setStats(data);
@@ -5270,8 +5275,9 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
   if (error) return <p style={{ textAlign: "center", color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><Icono tipo="exclamacion" size={13} /> {error}</p>;
   if (!stats) return null;
 
-  const resueltas = stats.aciertos + stats.fallos;
-  const porcentajeAciertos = resueltas > 0 ? Math.round((stats.aciertos / resueltas) * 100) : null;
+  // % de mercados acertados en los estudios que cuentan (guardados antes del partido)
+  const pctDe = (g) => (g && g.mercados > 0 ? Math.round((g.acertados / g.mercados) * 100) : null);
+  const porcentajeAciertos = precision && precision !== "sin-sql" ? pctDe(precision.estudios) : null;
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 12px" }}>
@@ -5317,18 +5323,40 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
         </div>
 
         <div style={{ flex: "1 1 220px", background: tema.panel, borderRadius: 8, padding: 16 }}>
-          <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="grafico" size={14} /> Aciertos vs fallos verificados</h4>
-          {resueltas === 0 ? (
-            <p style={{ fontSize: 12, color: tema.textoSuave }}>Todavía no hay pronósticos verificados.</p>
+          <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="grafico" size={14} /> Precisión verificada</h4>
+          {precision === null ? (
+            <p style={{ fontSize: 12, color: tema.textoSuave }}>Cargando...</p>
+          ) : precision === "sin-sql" ? (
+            <p style={{ fontSize: 12, color: tema.textoSuave }}>Falta correr el SQL de la Tanda 9 en Supabase.</p>
           ) : (
             <>
-              <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", height: 18, marginBottom: 8 }}>
-                <div style={{ width: `${(stats.aciertos / resueltas) * 100}%`, background: "#2e9e4f" }} />
-                <div style={{ width: `${(stats.fallos / resueltas) * 100}%`, background: "#e05555" }} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: tema.textoSuave }}>
-                <span><span style={{ color: "#2e9e4f", fontWeight: "bold" }}>●</span> Aciertos: {stats.aciertos}</span>
-                <span><span style={{ color: "#e05555", fontWeight: "bold" }}>●</span> Fallos: {stats.fallos}</span>
+              {[
+                { titulo: "Estudios de los usuarios", total: precision.estudios, mes: precision.estudios30, unidad: "estudios" },
+                { titulo: "Semáforo del sistema (Backtesting)", total: precision.sistema, mes: precision.sistema30, unidad: "partidos" },
+              ].map((fila) => {
+                const pct = pctDe(fila.total);
+                const pctMes = pctDe(fila.mes);
+                return (
+                  <div key={fila.titulo} style={{ marginBottom: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                      <strong>{fila.titulo}</strong>
+                      <strong style={{ color: acentoMarca }}>{pct !== null ? `${pct}%` : "Sin datos"}</strong>
+                    </div>
+                    {pct !== null && (
+                      <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", height: 12, marginBottom: 4 }}>
+                        <div style={{ width: `${pct}%`, background: "#2e9e4f" }} />
+                        <div style={{ width: `${100 - pct}%`, background: "#e05555" }} />
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: tema.textoSuave }}>
+                      {fila.total?.verificados || 0} {fila.unidad} · {fila.total?.acertados || 0} de {fila.total?.mercados || 0} mercados acertados
+                      {pctMes !== null && ` · últimos 30 días: ${pctMes}%`}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ fontSize: 11, color: tema.textoSuave }}>
+                Pendientes de verificar: {precision.pendientes || 0} · De referencia (guardados ya iniciado el partido, no cuentan): {precision.referencia || 0}
               </div>
             </>
           )}
