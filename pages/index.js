@@ -3952,8 +3952,71 @@ function ContenedorToasts({ toasts }) {
   );
 }
 
+// ============================================================
+// Contraseña nueva: se abre al entrar por el enlace del correo de
+// "¿Olvidaste tu contraseña?" (web o app). Sirve para las dos, porque la
+// cuenta es la misma.
+// ============================================================
+function ModalNuevaContrasena({ tema, acentoMarca, mostrarToast, onCerrar }) {
+  const [nueva, setNueva] = useState("");
+  const [repetida, setRepetida] = useState("");
+  const [mostrar, setMostrar] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  async function guardar(e) {
+    e.preventDefault();
+    setError("");
+    if (nueva.length < 6) return setError("La contraseña debe tener al menos 6 caracteres.");
+    if (nueva !== repetida) return setError("Las contraseñas no coinciden.");
+    setGuardando(true);
+    const { error: errorGuardar } = await supabase.auth.updateUser({ password: nueva });
+    setGuardando(false);
+    if (errorGuardar) {
+      setError(
+        errorGuardar.message?.toLowerCase().includes("different")
+          ? "La contraseña nueva debe ser distinta a la anterior."
+          : "No se pudo cambiar la contraseña. Pide otro enlace e intenta de nuevo."
+      );
+      return;
+    }
+    mostrarToast && mostrarToast("Contraseña actualizada. Ya puedes usarla en la web y en la app.");
+    onCerrar();
+  }
+
+  const campo = { width: "100%", padding: 10, marginBottom: 10, fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120, padding: 16 }}>
+      <div style={{ background: tema.panel, borderRadius: 12, padding: 28, width: 380, maxWidth: "100%", borderTop: `3px solid ${acentoMarca}` }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 18 }}>
+          <img src="/logo.png" alt="JMCS" width={48} height={48} style={{ marginBottom: 8 }} />
+          <h3 style={{ margin: 0, fontSize: 17 }}>Crea tu contraseña nueva</h3>
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: tema.textoSuave, textAlign: "center" }}>
+            Te servirá para entrar tanto en la web como en la app.
+          </p>
+        </div>
+        <form onSubmit={guardar}>
+          <input type={mostrar ? "text" : "password"} placeholder="Contraseña nueva" value={nueva} onChange={(e) => setNueva(e.target.value)} required minLength={6} style={campo} />
+          <input type={mostrar ? "text" : "password"} placeholder="Repetir contraseña nueva" value={repetida} onChange={(e) => setRepetida(e.target.value)} required minLength={6} style={campo} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: tema.textoSuave, marginBottom: 12, cursor: "pointer" }}>
+            <input type="checkbox" checked={mostrar} onChange={(e) => setMostrar(e.target.checked)} /> Mostrar contraseñas
+          </label>
+          {error && <p style={{ color: "#e05555", fontSize: 12, marginBottom: 10 }}>{error}</p>}
+          <button type="submit" disabled={guardando} style={{ width: "100%", padding: 10, fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: "bold" }}>
+            {guardando ? "Guardando..." : "Guardar contraseña"}
+          </button>
+        </form>
+        <div style={{ marginTop: 12, textAlign: "center" }}>
+          <span onClick={onCerrar} style={{ fontSize: 12, color: tema.textoSuave, cursor: "pointer" }}>Ahora no</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
-  const [modo, setModo] = useState(modoInicial || "login"); // "login" | "registro" | "magico"
+  const [modo, setModo] = useState(modoInicial || "login"); // "login" | "registro" | "magico" | "recuperar"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -4022,6 +4085,15 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
         const { error } = await supabase.auth.signInWithOtp({ email });
         if (error) throw error;
         setMensaje("Te enviamos un enlace mágico a tu correo. Ábrelo desde este mismo dispositivo.");
+      } else if (modo === "recuperar") {
+        // El enlace del correo vuelve a la web con ?recuperar=1 y ahí se pide
+        // la contraseña nueva (ModalNuevaContrasena).
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: typeof window !== "undefined" ? `${window.location.origin}/?recuperar=1` : undefined,
+        });
+        if (error) throw error;
+        // Mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados
+        setMensaje("Si ese correo tiene una cuenta en JMCS, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.");
       }
     } catch (err) {
       setError(err.message || "Ocurrió un error");
@@ -4085,13 +4157,15 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 18 }}>
           <img src="/logo.png" alt="JMCS" width={48} height={48} style={{ marginBottom: 8 }} />
           <h3 style={{ margin: 0, fontSize: 17 }}>
-            {modo === "registro" ? "Crea tu cuenta en JMCS" : modo === "magico" ? "Enlace mágico" : "Bienvenido de nuevo a JMCS"}
+            {modo === "registro" ? "Crea tu cuenta en JMCS" : modo === "magico" ? "Enlace mágico" : modo === "recuperar" ? "Recuperar contraseña" : "Bienvenido de nuevo a JMCS"}
           </h3>
           <p style={{ margin: "4px 0 0", fontSize: 11, color: tema.textoSuave, textAlign: "center" }}>
             {modo === "registro"
               ? "Guarda tus estudios, favoritos y tu historial de aciertos."
               : modo === "magico"
               ? "Te mandamos un enlace, sin necesidad de contraseña."
+              : modo === "recuperar"
+              ? "Escribe tu correo y te enviamos un enlace para crear una contraseña nueva."
               : "Accede a tus estudios, favoritos e historial."}
           </p>
         </div>
@@ -4152,7 +4226,7 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
             style={{ width: "100%", padding: 10, marginBottom: 10, fontSize: 14, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 }}
           />
 
-          {modo !== "magico" && (
+          {modo !== "magico" && modo !== "recuperar" && (
             <div style={{ position: "relative", marginBottom: 10 }}>
               <input
                 type={mostrarPassword ? "text" : "password"}
@@ -4197,13 +4271,18 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
             disabled={cargando}
             style={{ width: "100%", padding: 10, fontSize: 14, background: acentoMarca, color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: "bold" }}
           >
-            {cargando ? "Cargando..." : modo === "registro" ? "Crear cuenta" : modo === "magico" ? "Enviar enlace" : "Entrar"}
+            {cargando ? "Cargando..." : modo === "registro" ? "Crear cuenta" : modo === "magico" ? "Enviar enlace" : modo === "recuperar" ? "Enviar enlace de recuperación" : "Entrar"}
           </button>
         </form>
 
         <div style={{ marginTop: 14, fontSize: 12, textAlign: "center", color: tema.textoSuave }}>
           {modo === "login" && (
             <>
+              <div style={{ marginBottom: 10 }}>
+                <span onClick={() => { setModo("recuperar"); setError(""); setMensaje(""); }} style={{ color: acentoMarca, cursor: "pointer" }}>
+                  ¿Olvidaste tu contraseña?
+                </span>
+              </div>
               <div style={{ marginBottom: 6 }}>
                 ¿No tienes cuenta?{" "}
                 <span onClick={() => { setModo("registro"); setError(""); setMensaje(""); }} style={{ color: acentoMarca, cursor: "pointer", fontWeight: "bold" }}>
@@ -4225,6 +4304,11 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
           {modo === "magico" && (
             <span onClick={() => { setModo("login"); setError(""); setMensaje(""); }} style={{ color: acentoMarca, cursor: "pointer" }}>
               Volver a entrar con contraseña
+            </span>
+          )}
+          {modo === "recuperar" && (
+            <span onClick={() => { setModo("login"); setError(""); setMensaje(""); }} style={{ color: acentoMarca, cursor: "pointer" }}>
+              Volver a iniciar sesión
             </span>
           )}
         </div>
@@ -7793,6 +7877,16 @@ function Home() {
   }, []);
 
   const [sesion, setSesion] = useState(null);
+  // Pantalla para escribir la contraseña nueva (enlace de "Recuperar contraseña")
+  const [recuperandoContrasena, setRecuperandoContrasena] = useState(false);
+  // Respaldo: si el aviso de Supabase llega antes de tiempo, la dirección del
+  // enlace (?recuperar=1 o #...type=recovery) también abre la pantalla.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.search.includes("recuperar=1") || window.location.hash.includes("type=recovery")) {
+      setRecuperandoContrasena(true);
+    }
+  }, []);
 
   // Registro de cada equipo que se estudia de verdad (no cada tecla que se
   // escribe al buscar, solo cuando ya se cargó un equipo concreto) — para
@@ -7904,8 +7998,10 @@ function Home() {
       setCargandoSesion(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nuevaSesion) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((evento, nuevaSesion) => {
       setSesion(nuevaSesion);
+      // Llegó desde el correo de "Recuperar contraseña": se pide la nueva
+      if (evento === "PASSWORD_RECOVERY") setRecuperandoContrasena(true);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -10269,6 +10365,20 @@ function Home() {
           <Icono tipo="candado" size={13} color="#fff" />
           Estás sin conexión — viendo los últimos datos guardados, puede no estar actualizado
         </div>
+      )}
+
+      {recuperandoContrasena && sesion && (
+        <ModalNuevaContrasena
+          tema={tema}
+          acentoMarca={acentoMarca}
+          mostrarToast={mostrarToast}
+          onCerrar={() => {
+            setRecuperandoContrasena(false);
+            if (typeof window !== "undefined" && window.location.search.includes("recuperar=1")) {
+              window.history.replaceState(null, "", window.location.pathname);
+            }
+          }}
+        />
       )}
 
       {modalPlanAbierto && (
