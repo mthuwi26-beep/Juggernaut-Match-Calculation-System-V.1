@@ -5199,6 +5199,106 @@ function TarjetaAprendizajeAdmin({ sesion, tema, acentoMarca, mostrarToast }) {
   );
 }
 
+// ============================================================
+// Panel de administrador: Backtesting automático (el servidor calcula solo
+// el semáforo de los partidos importantes y de los equipos favoritos).
+// ============================================================
+function TarjetaBacktestingAutoAdmin({ sesion, tema, acentoMarca, mostrarToast }) {
+  const [datos, setDatos] = useState(null);
+  const [tope, setTope] = useState("");
+  const [reserva, setReserva] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const cabeceras = { Authorization: `Bearer ${sesion?.access_token}`, "Content-Type": "application/json" };
+
+  function aplicar(d) {
+    if (!d || d.error) return;
+    setDatos(d);
+    setTope(String(d.tope ?? ""));
+    setReserva(String(d.reserva ?? ""));
+  }
+
+  useEffect(() => {
+    fetch("/api/backtesting-auto?detalle=1", { headers: cabeceras })
+      .then((r) => r.json())
+      .then(aplicar)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function enviar(cuerpo, mensajeOk) {
+    setOcupado(true);
+    try {
+      const r = await fetch("/api/backtesting-auto", { method: "POST", headers: cabeceras, body: JSON.stringify(cuerpo) });
+      const d = await r.json();
+      if (d?.error) throw new Error(d.error);
+      aplicar(d);
+      const extra = d?.ultimoTurno ? ` (${d.ultimoTurno.hechos} calculados${d.ultimoTurno.motivo ? " — " + d.ultimoTurno.motivo : ""})` : "";
+      mostrarToast && mostrarToast(mensajeOk + extra);
+    } catch (e) {
+      mostrarToast && mostrarToast(e.message || "No se pudo completar. Intenta de nuevo.");
+    }
+    setOcupado(false);
+  }
+
+  const campo = { width: 90, padding: 6, fontSize: 13, background: tema.fondo, color: tema.texto, border: `1px solid ${tema.borde}`, borderRadius: 4 };
+
+  return (
+    <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+      <h4 style={{ margin: "0 0 6px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="objetivo" size={14} /> Backtesting automático</h4>
+      <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
+        El servidor calcula solo el semáforo de los partidos que aún no empiezan: primero los de equipos favoritos de los usuarios,
+        luego copas y competencias importantes, y luego las ligas top. Se detiene solo al llegar al tope del día o si a la API le
+        quedan menos consultas que la reserva.
+      </p>
+      {!datos ? (
+        <p style={{ fontSize: 12, color: tema.textoSuave }}>Cargando...</p>
+      ) : datos.sinSql ? (
+        <p style={{ fontSize: 12, color: tema.textoSuave }}>Falta correr el SQL de la Tanda 3 en Supabase.</p>
+      ) : (
+        <>
+          <div style={{ fontSize: 12, marginBottom: 10, lineHeight: 1.6 }}>
+            Hoy: <strong>{datos.hoy} de {datos.tope}</strong> partidos calculados<br />
+            API de fútbol: {datos.api ? <><strong>{datos.api.restantes}</strong> consultas disponibles hoy (de {datos.api.limite})</> : "no se pudo consultar"}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <button
+              disabled={ocupado}
+              onClick={() => enviar({ accion: "guardar", activo: !datos.activo }, datos.activo ? "Backtesting automático apagado" : "Backtesting automático encendido")}
+              style={{ padding: "7px 14px", fontSize: 12, fontWeight: "bold", borderRadius: 6, cursor: "pointer", border: "none", background: datos.activo ? "#2e9e4f" : "#e05555", color: "#fff" }}
+            >
+              {datos.activo ? "Encendido (tocar para apagar)" : "Apagado (tocar para encender)"}
+            </button>
+            <button
+              disabled={ocupado}
+              onClick={() => enviar({ accion: "correr" }, "Turno terminado")}
+              style={{ padding: "7px 14px", fontSize: 12, borderRadius: 6, cursor: "pointer", border: `1px solid ${acentoMarca}`, background: "transparent", color: acentoMarca }}
+            >
+              {ocupado ? "Procesando..." : "Calcular ahora"}
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label style={{ fontSize: 11, color: tema.textoSuave }}>
+              Tope diario (partidos)<br />
+              <input type="number" min={0} max={500} value={tope} onChange={(e) => setTope(e.target.value)} style={campo} />
+            </label>
+            <label style={{ fontSize: 11, color: tema.textoSuave }}>
+              Reserva mínima de la API<br />
+              <input type="number" min={0} value={reserva} onChange={(e) => setReserva(e.target.value)} style={campo} />
+            </label>
+            <button
+              disabled={ocupado}
+              onClick={() => enviar({ accion: "guardar", tope: Number(tope), reserva: Number(reserva) }, "Ajustes guardados")}
+              style={{ padding: "7px 14px", fontSize: 12, borderRadius: 6, cursor: "pointer", border: "none", background: acentoMarca, color: "#fff" }}
+            >
+              Guardar
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast }) {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
@@ -5578,6 +5678,8 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
       </div>
 
       <TarjetaAprendizajeAdmin sesion={sesion} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
+
+      <TarjetaBacktestingAutoAdmin sesion={sesion} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
 
       <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
         <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={14} /> Plan de API-Football</h4>
@@ -7056,8 +7158,9 @@ function VistaBacktesting({ sesion, tema, acentoMarca, onAbrirPartido, onVerPlan
       ) : !datos || datos.partidos === 0 ? (
         <div style={tarjeta}>
           <p style={{ fontSize: 13, color: tema.textoSuave, margin: 0, lineHeight: 1.6 }}>
-            Todavía estamos juntando partidos para este período. Cada vez que alguien abre el estudio de un partido que aún no empieza,
-            queda registrado lo que dijo el semáforo, y al terminar el partido se verifica solo.
+            Todavía estamos juntando partidos para este período. Antes de cada partido queda registrado lo que dijo el semáforo
+            (lo calcula el servidor solo para las competencias importantes y los equipos favoritos, y también cuando alguien abre el estudio),
+            y al terminar el partido se verifica solo.
             {datos?.pendientes ? ` Hay ${datos.pendientes} partidos registrados esperando resultado.` : ""}
           </p>
         </div>
@@ -7925,6 +8028,23 @@ function Home() {
   // la conexión (sin pedir la ubicación exacta); si eligió uno en Ajustes,
   // manda ese.
   const [paisPorConexion, setPaisPorConexion] = useState(null);
+
+  // Backtesting automático: al abrir la web se le pide al servidor un turno
+  // corto de cálculo (el servidor decide si toca: uno cada 10 minutos para
+  // todos, con tope diario). Una vez por sesión del navegador.
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined" || sessionStorage.getItem("jmcs_bt_turno")) return;
+      sessionStorage.setItem("jmcs_bt_turno", "1");
+    } catch {
+      return;
+    }
+    fetch("/api/backtesting-auto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accion: "turno" }),
+    }).catch(() => {});
+  }, []);
 
   // Aprendizaje automático: se carga una vez y se vuelve a pintar todo.
   const [, setVersionAprendizaje] = useState(0);
