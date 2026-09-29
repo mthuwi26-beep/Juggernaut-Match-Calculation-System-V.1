@@ -8,6 +8,11 @@ import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { evaluarModelo } from "../../lib/verificacion";
 
 const CONFIANZA_MINIMA = 0.7;
+// Lo casi seguro (ej. "mas de 0.5 goles" al 99%) no se destaca: no aporta nada
+const CONFIANZA_MAXIMA = 0.93;
+// Mercados con mas valor van primero; las lineas de goles y la doble
+// oportunidad solo salen si el partido no tiene nada de lo anterior
+const MERCADOS_PREFERIDOS = ["ganador", "btts", "handicap", "corners", "amarillas", "faltas"];
 
 const RELLENO = [
   { local: "Equipo local", visitante: "Equipo visitante", liga: "Competencia", texto: "Mercado destacado: Sí (80%)", prob: 0.8 },
@@ -53,10 +58,18 @@ export default async function handler(req, res) {
 
   const candidatos = [];
   for (const f of filas || []) {
-    const predichos = evaluarModelo(f.modelo, null, { local: f.equipo_local, visitante: f.equipo_visitante })
-      .filter((d) => typeof d.prob === "number" && d.prob >= CONFIANZA_MINIMA && d.mercado !== "marcador")
-      .sort((a, b) => b.prob - a.prob)
-      .slice(0, 2); // maximo 2 mercados por partido, para que haya variedad
+    const validos = evaluarModelo(f.modelo, null, { local: f.equipo_local, visitante: f.equipo_visitante })
+      .filter((d) => typeof d.prob === "number" && d.prob >= CONFIANZA_MINIMA && d.prob <= CONFIANZA_MAXIMA && d.mercado !== "marcador")
+      .sort((a, b) => b.prob - a.prob);
+    // El primer mercado de la lista de preferidos que tenga algo valido
+    // (ganador antes que ambos anotan, antes que handicap...), con su mejor opcion
+    let preferido = null;
+    for (const m of MERCADOS_PREFERIDOS) {
+      preferido = validos.find((d) => d.mercado === m);
+      if (preferido) break;
+    }
+    // Un solo destacado por partido, para que haya variedad
+    const predichos = preferido ? [preferido] : validos.slice(0, 1);
     for (const d of predichos) {
       candidatos.push({
         fixtureId: f.fixture_id,
