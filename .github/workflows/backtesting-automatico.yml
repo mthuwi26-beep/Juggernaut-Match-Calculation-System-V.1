@@ -1,0 +1,37 @@
+# ============================================================
+# JMCS - Backtesting automatico cada hora
+# Vercel (plan gratis) solo corre su proceso automatico una vez al dia, y
+# cada llamada alcanza para unos 7 partidos. Este proceso de GitHub le pide
+# al servidor un turno de calculo cada hora, asi se llega al tope diario
+# (60 por defecto, se cambia en el Panel de administrador) sin depender de
+# que alguien entre a la web. Si ya se llego al tope, el servidor responde
+# de una sin gastar consultas de la API.
+#
+# Necesita el secreto CRON_SECRET en GitHub (Settings -> Secrets and
+# variables -> Actions), con el MISMO valor que CRON_SECRET en Vercel.
+# ============================================================
+name: Backtesting automatico
+
+on:
+  schedule:
+    - cron: "15 * * * *"   # cada hora, al minuto 15 (hora UTC)
+  workflow_dispatch:        # boton para correrlo a mano desde Actions
+
+jobs:
+  turno:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Pedir un turno de calculo al servidor
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Falta el secreto CRON_SECRET en GitHub (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          respuesta=$(curl -sS --max-time 90 -w "\nCodigo HTTP: %{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://juggernaut-match-calculation-system-nine.vercel.app/api/backtesting-auto")
+          echo "$respuesta"
+          echo "$respuesta" | grep -q "Codigo HTTP: 200"
