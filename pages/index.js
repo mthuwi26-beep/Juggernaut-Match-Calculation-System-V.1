@@ -7161,7 +7161,7 @@ function VistaBacktesting({ sesion, tema, acentoMarca, onAbrirPartido, onVerPlan
             Todavía estamos juntando partidos para este período. Antes de cada partido queda registrado lo que dijo el semáforo
             (lo calcula el servidor solo para las competencias importantes y los equipos favoritos, y también cuando alguien abre el estudio),
             y al terminar el partido se verifica solo.
-            {datos?.pendientes ? ` Hay ${datos.pendientes} partidos registrados esperando resultado.` : ""}
+            {datos?.pendientes ? (datos.pendientes === 1 ? " Hay 1 partido registrado esperando resultado." : ` Hay ${datos.pendientes} partidos registrados esperando resultado.`) : ""}
           </p>
         </div>
       ) : (
@@ -7170,7 +7170,7 @@ function VistaBacktesting({ sesion, tema, acentoMarca, onAbrirPartido, onVerPlan
             <div style={{ fontSize: 32, fontWeight: "bold", color: colorPct(datos.porcentaje) }}>{datos.porcentaje}%</div>
             <div style={{ fontSize: 13 }}>de acierto en {datos.mercadosEvaluados} mercados de {datos.partidos} partidos</div>
             <div style={{ fontSize: 11, color: tema.textoSuave, marginTop: 6 }}>
-              {datos.pendientes} partidos registrados esperando resultado
+              {datos.pendientes === 1 ? "1 partido registrado esperando resultado" : `${datos.pendientes} partidos registrados esperando resultado`}
               {datos.brier !== null && ` · Precisión de las probabilidades (Brier): ${datos.brier} — mientras más cerca de 0, mejor`}
             </div>
           </div>
