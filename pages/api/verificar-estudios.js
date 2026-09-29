@@ -9,6 +9,7 @@
 // ============================================================
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { verificarEstudio, verificarRegistroPendiente } from "../../lib/verificarServidor";
+import { recalcularAprendizaje } from "../../lib/aprendizaje";
 
 const TIEMPO_MAXIMO_MS = 8000; // margen para el limite de tiempo de Vercel
 
@@ -55,6 +56,12 @@ export default async function handler(req, res) {
   let registroVerificado = 0;
   if (esCron) {
     registroVerificado = await verificarRegistroPendiente({ maximo: 60, hastaMs: inicio + TIEMPO_MAXIMO_MS });
+    // Y recalcula lo aprendido con todo lo verificado hasta hoy
+    try {
+      await recalcularAprendizaje();
+    } catch {
+      // si falla, se intenta en el proximo cron
+    }
   }
 
   res.status(200).json({ revisados, verificados, pendientes: (pendientes || []).length - verificados, registroVerificado });
