@@ -69,6 +69,60 @@ function paisDesdeCodigoIso(codigo) {
   return encontrado ? encontrado[0] : null;
 }
 
+// ============================================================
+// APRENDIZAJE AUTOMÁTICO: lo que aprendió JMCS con el Backtesting. Lo carga
+// Home al abrir la página (/api/aprendizaje). Si el administrador lo apaga,
+// llega todo neutro y el semáforo se muestra con el cálculo puro.
+// Mismas reglas que CalibracionJmcs.kt en la app.
+// ============================================================
+const APRENDIZAJE_JMCS = { activo: false, calibracion: {}, climaK: 1 };
+
+function ajusteAprendido(mercado, prob) {
+  const grupos = APRENDIZAJE_JMCS.calibracion?.[mercado];
+  if (!grupos) return 0;
+  const g = grupos.find((x) => prob >= x.desde && prob < x.hasta);
+  return g ? g.ajuste : 0;
+}
+
+// Para mercados de sí/no. Corrige la opción que el semáforo favorece
+// (55% o más); entre 45% y 55% no se toca.
+function calibrarProb(mercado, p) {
+  if (p === null || p === undefined || !APRENDIZAJE_JMCS.activo) return p;
+  if (p >= 0.55) return Math.max(0.01, Math.min(0.99, p + ajusteAprendido(mercado, p)));
+  if (p <= 0.45) {
+    const q = 1 - p;
+    return 1 - Math.max(0.01, Math.min(0.99, q + ajusteAprendido(mercado, q)));
+  }
+  return p;
+}
+
+// Ganador: se corrige el favorito y los otros dos se reparten el resto.
+function calibrar1X2(p) {
+  if (!p || !APRENDIZAJE_JMCS.activo) return p;
+  const lista = [["pLocal", p.pLocal], ["pEmpate", p.pEmpate], ["pVisitante", p.pVisitante]].sort((a, b) => b[1] - a[1]);
+  const [claveFav, fav] = lista[0];
+  if (fav - lista[1][1] < 0.1) return p;
+  const nuevoFav = Math.max(0.01, Math.min(0.99, fav + ajusteAprendido("ganador", fav)));
+  const escala = fav < 1 ? (1 - nuevoFav) / (1 - fav) : 1;
+  const salida = { ...p };
+  ["pLocal", "pEmpate", "pVisitante"].forEach((k) => { salida[k] = k === claveFav ? nuevoFav : p[k] * escala; });
+  return salida;
+}
+
+function calibrarHandicap(h) {
+  if (!h || !APRENDIZAJE_JMCS.activo) return h;
+  const push = h.probPush || 0;
+  if (h.probCubre >= 0.55) {
+    const c = Math.max(0.01, Math.min(0.99 - push, h.probCubre + ajusteAprendido("handicap", h.probCubre)));
+    return { ...h, probCubre: c, probNoCubre: Math.max(0, 1 - push - c) };
+  }
+  if (h.probNoCubre >= 0.55) {
+    const n = Math.max(0.01, Math.min(0.99 - push, h.probNoCubre + ajusteAprendido("handicap", h.probNoCubre)));
+    return { ...h, probNoCubre: n, probCubre: Math.max(0, 1 - push - n) };
+  }
+  return h;
+}
+
 // Bandera como imagen real (reemplaza los emoji 🇦🇷 que en PC/Windows a veces se ven como texto "AR").
 // Prioridad: 1) la URL que ya nos manda la API en el partido (league.flag), 2) nuestro propio mapa por
 // código ISO vía flagcdn.com, 3) no muestra nada (mejor vacío que un ícono roto o equivocado).
@@ -1544,7 +1598,7 @@ function calcularGolesNumerico(fixtures, teamId) {
   return { valor: suma / fixtures.length, n: fixtures.length };
 }
 
-function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertenciaMuestra }) {
+function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertenciaMuestra, mercado }) {
   const sinDatos = lambda === null || lambda === undefined;
 
   return (
@@ -1575,7 +1629,7 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertencia
               </div>
             );
           }
-          const p = probabilidadOver(lambda, linea);
+          const p = calibrarProb(mercado, probabilidadOver(lambda, linea));
           const { color } = colorSemaforo(p);
           return (
             <div
@@ -1598,7 +1652,7 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertencia
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {lineas.map((linea) => {
-              const p = probabilidadOver(lambdaAjustado, linea);
+              const p = calibrarProb(mercado, probabilidadOver(lambdaAjustado, linea));
               const { color } = colorSemaforo(p);
               return (
                 <div
@@ -2168,8 +2222,17 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
   const lambdaGolesLocalAjustado = climaAjuste?.activo && lambdaGolesLocal !== null ? lambdaGolesLocal * climaAjuste.factorLocal : null;
   const lambdaGolesVisitanteAjustado = climaAjuste?.activo && lambdaGolesVisitante !== null ? lambdaGolesVisitante * climaAjuste.factorVisitante : null;
-  const probBTTSAjustado = climaAjuste?.activo ? probabilidadBTTS(lambdaGolesLocalAjustado, lambdaGolesVisitanteAjustado) : null;
-  const prob1X2Ajustado = climaAjuste?.activo ? probabilidad1X2(lambdaGolesLocalAjustado, lambdaGolesVisitanteAjustado) : null;
+  const probBTTSAjustado = climaAjuste?.activo ? calibrarProb("btts", probabilidadBTTS(lambdaGolesLocalAjustado, lambdaGolesVisitanteAjustado)) : null;
+  const prob1X2Ajustado = climaAjuste?.activo ? calibrar1X2(probabilidad1X2(lambdaGolesLocalAjustado, lambdaGolesVisitanteAjustado)) : null;
+
+  // Lo que se MUESTRA lleva lo aprendido (si está activo). Lo que se guarda
+  // (modelo, Backtesting) sigue siendo el cálculo puro.
+  const probBTTSMostrar = calibrarProb("btts", probBTTS);
+  const prob1X2Mostrar = calibrar1X2(prob1X2);
+  const probDobleMostrar = probDobleOportunidad
+    ? { ...probDobleOportunidad, p1X: calibrarProb("doble", probDobleOportunidad.p1X), p12: calibrarProb("doble", probDobleOportunidad.p12), pX2: calibrarProb("doble", probDobleOportunidad.pX2) }
+    : null;
+  const probHandicapMostrar = calibrarHandicap(probHandicap);
 
   let advertenciaMuestra = null;
   if (coberturaPuntuales && coberturaPuntuales.total > 0) {
@@ -2206,23 +2269,23 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
 
   // Opciones disponibles para la calculadora de valor (solo mercados con datos reales)
   const opcionesValor = [];
-  if (prob1X2) {
-    opcionesValor.push({ etiqueta: `Gana ${equipoLocal.team.name}`, prob: prob1X2.pLocal });
-    opcionesValor.push({ etiqueta: traducir("empate"), prob: prob1X2.pEmpate });
-    opcionesValor.push({ etiqueta: `Gana ${equipoVisitante.team.name}`, prob: prob1X2.pVisitante });
+  if (prob1X2Mostrar) {
+    opcionesValor.push({ etiqueta: `Gana ${equipoLocal.team.name}`, prob: prob1X2Mostrar.pLocal });
+    opcionesValor.push({ etiqueta: traducir("empate"), prob: prob1X2Mostrar.pEmpate });
+    opcionesValor.push({ etiqueta: `Gana ${equipoVisitante.team.name}`, prob: prob1X2Mostrar.pVisitante });
   }
-  if (probBTTS !== null) opcionesValor.push({ etiqueta: "Ambos anotan (BTTS)", prob: probBTTS });
+  if (probBTTSMostrar !== null) opcionesValor.push({ etiqueta: "Ambos anotan (BTTS)", prob: probBTTSMostrar });
   if (lambdaGolesTotal !== null) {
-    LINEAS_MERCADOS.goles.forEach((l) => opcionesValor.push({ etiqueta: `Goles Over ${l}`, prob: probabilidadOver(lambdaGolesTotal, l) }));
+    LINEAS_MERCADOS.goles.forEach((l) => opcionesValor.push({ etiqueta: `Goles Over ${l}`, prob: calibrarProb("goles", probabilidadOver(lambdaGolesTotal, l)) }));
   }
   if (lambdaCornersTotal !== null) {
-    LINEAS_MERCADOS.corners.forEach((l) => opcionesValor.push({ etiqueta: `Córners Over ${l}`, prob: probabilidadOver(lambdaCornersTotal, l) }));
+    LINEAS_MERCADOS.corners.forEach((l) => opcionesValor.push({ etiqueta: `Córners Over ${l}`, prob: calibrarProb("corners", probabilidadOver(lambdaCornersTotal, l)) }));
   }
   if (lambdaAmarillasTotal !== null) {
-    LINEAS_MERCADOS.amarillas.forEach((l) => opcionesValor.push({ etiqueta: `Tarjetas Over ${l}`, prob: probabilidadOver(lambdaAmarillasTotal, l) }));
+    LINEAS_MERCADOS.amarillas.forEach((l) => opcionesValor.push({ etiqueta: `Tarjetas Over ${l}`, prob: calibrarProb("amarillas", probabilidadOver(lambdaAmarillasTotal, l)) }));
   }
   if (lambdaFaltasTotal !== null) {
-    LINEAS_MERCADOS.faltas.forEach((l) => opcionesValor.push({ etiqueta: `Faltas Over ${l}`, prob: probabilidadOver(lambdaFaltasTotal, l) }));
+    LINEAS_MERCADOS.faltas.forEach((l) => opcionesValor.push({ etiqueta: `Faltas Over ${l}`, prob: calibrarProb("faltas", probabilidadOver(lambdaFaltasTotal, l)) }));
   }
 
   // Guardamos esto en referencias (no en hooks) para que el useEffect de arriba
@@ -2238,6 +2301,11 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   return (
     <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
       <h3 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 7 }}><Icono tipo="semaforo" size={16} /> {traducir("pronosticoYSemaforo")}</h3>
+      {APRENDIZAJE_JMCS.activo && Object.keys(APRENDIZAJE_JMCS.calibracion || {}).length > 0 && (
+        <p style={{ fontSize: 11, color: tema.textoSuave, marginTop: -6, marginBottom: 12 }}>
+          Ajustado según el historial de aciertos de JMCS (ver Backtesting).
+        </p>
+      )}
 
       {permisoNotificaciones !== "unsupported" && (
         <div style={{ marginBottom: 16 }}>
@@ -2318,7 +2386,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </div>
       )}
 
-      {prob1X2 && mostrarMercado("ganador") && (
+      {prob1X2Mostrar && mostrarMercado("ganador") && (
         <div style={{ marginBottom: 18 }}>
           <h4 style={{ marginBottom: 8, fontSize: 14 }}>{traducir("ganadorPartido")}</h4>
           <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
@@ -2326,9 +2394,9 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {[
-              { etiqueta: equipoLocal.team.name, prob: prob1X2.pLocal },
-              { etiqueta: traducir("empate"), prob: prob1X2.pEmpate },
-              { etiqueta: equipoVisitante.team.name, prob: prob1X2.pVisitante },
+              { etiqueta: equipoLocal.team.name, prob: prob1X2Mostrar.pLocal },
+              { etiqueta: traducir("empate"), prob: prob1X2Mostrar.pEmpate },
+              { etiqueta: equipoVisitante.team.name, prob: prob1X2Mostrar.pVisitante },
             ].map((item) => {
               const { color } = colorSemaforo(item.prob);
               return (
@@ -2373,7 +2441,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </div>
       )}
 
-      {probDobleOportunidad && mostrarMercado("dobleOportunidad") && (
+      {probDobleMostrar && mostrarMercado("dobleOportunidad") && (
         <div style={{ marginBottom: 18 }}>
           <h4 style={{ marginBottom: 8, fontSize: 14 }}>Doble oportunidad</h4>
           <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
@@ -2381,9 +2449,9 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {[
-              { etiqueta: `${equipoLocal.team.name} o Empate`, prob: probDobleOportunidad.p1X },
-              { etiqueta: `${equipoLocal.team.name} o ${equipoVisitante.team.name}`, prob: probDobleOportunidad.p12 },
-              { etiqueta: `Empate o ${equipoVisitante.team.name}`, prob: probDobleOportunidad.pX2 },
+              { etiqueta: `${equipoLocal.team.name} o Empate`, prob: probDobleMostrar.p1X },
+              { etiqueta: `${equipoLocal.team.name} o ${equipoVisitante.team.name}`, prob: probDobleMostrar.p12 },
+              { etiqueta: `Empate o ${equipoVisitante.team.name}`, prob: probDobleMostrar.pX2 },
             ].map((item) => {
               const { color } = colorSemaforo(item.prob);
               return (
@@ -2426,12 +2494,12 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         </div>
       )}
 
-      {probHandicap && mostrarMercado("handicapAsiatico") && (
+      {probHandicapMostrar && mostrarMercado("handicapAsiatico") && (
         <div style={{ marginBottom: 18 }}>
           <h4 style={{ marginBottom: 8, fontSize: 14 }}>Hándicap asiático (Local)</h4>
           <p style={{ fontSize: 10, color: tema.textoSuave, margin: "0 0 8px" }}>
             Negativo = {equipoLocal.team.name} tiene que ganar por esa diferencia. Positivo = arranca con esa ventaja.
-            {probHandicap.esLineaCuarto && " Esta línea es de cuarto: se reparte entre las dos líneas vecinas, así que mostramos el promedio de cubrir ambas."}
+            {probHandicapMostrar.esLineaCuarto && " Esta línea es de cuarto: se reparte entre las dos líneas vecinas, así que mostramos el promedio de cubrir ambas."}
           </p>
           <select
             value={lineaHandicap}
@@ -2447,16 +2515,16 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
           </select>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {(() => {
-              const { color } = colorSemaforo(probHandicap.probCubre);
+              const { color } = colorSemaforo(probHandicapMostrar.probCubre);
               return (
                 <div style={{ padding: "8px 14px", borderRadius: 6, background: color, color: "#fff", fontSize: 13, fontWeight: "bold", minWidth: 130, textAlign: "center" }}>
-                  Cubre {equipoLocal.team.name}<br />{Math.round(probHandicap.probCubre * 100)}%
+                  Cubre {equipoLocal.team.name}<br />{Math.round(probHandicapMostrar.probCubre * 100)}%
                 </div>
               );
             })()}
-            {!probHandicap.esLineaCuarto && probHandicap.probPush > 0.005 && (
+            {!probHandicapMostrar.esLineaCuarto && probHandicapMostrar.probPush > 0.005 && (
               <div style={{ padding: "8px 14px", borderRadius: 6, background: tema.panel, border: `1px solid ${tema.borde}`, color: tema.texto, fontSize: 13, fontWeight: "bold", minWidth: 100, textAlign: "center" }}>
-                Push<br />{Math.round(probHandicap.probPush * 100)}%
+                Push<br />{Math.round(probHandicapMostrar.probPush * 100)}%
               </div>
             )}
           </div>
@@ -2464,17 +2532,17 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       )}
 
       {mostrarMercado("goles") && (
-        <FilaMercado nombre={traducir("golesTotales")} lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
+        <FilaMercado mercado="goles" nombre={traducir("golesTotales")} lineas={LINEAS_MERCADOS.goles} lambda={lambdaGolesTotal} lambdaAjustado={lambdaGolesTotalAjustado} tema={tema} />
       )}
 
-      {probBTTS !== null && mostrarMercado("btts") && (
+      {probBTTSMostrar !== null && mostrarMercado("btts") && (
         <div style={{ marginBottom: 18 }}>
           <h4 style={{ marginBottom: 8, fontSize: 14 }}>{traducir("ambosAnotan")}</h4>
           {(() => {
-            const { color } = colorSemaforo(probBTTS);
+            const { color } = colorSemaforo(probBTTSMostrar);
             return (
               <div style={{ display: "inline-block", padding: "8px 16px", borderRadius: 6, background: color, color: "#fff", fontWeight: "bold", fontSize: 13 }}>
-                {Math.round(probBTTS * 100)}%
+                {Math.round(probBTTSMostrar * 100)}%
               </div>
             );
           })()}
@@ -2496,13 +2564,13 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
       )}
 
       {mostrarMercado("corners") && (
-        <FilaMercado nombre={traducir("cornersTotales")} lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} lambdaAjustado={lambdaCornersTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado mercado="corners" nombre={traducir("cornersTotales")} lineas={LINEAS_MERCADOS.corners} lambda={lambdaCornersTotal} lambdaAjustado={lambdaCornersTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
       {mostrarMercado("amarillas") && (
-        <FilaMercado nombre={traducir("amarillasTotales")} lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} lambdaAjustado={lambdaAmarillasTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado mercado="amarillas" nombre={traducir("amarillasTotales")} lineas={LINEAS_MERCADOS.amarillas} lambda={lambdaAmarillasTotal} lambdaAjustado={lambdaAmarillasTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
       {mostrarMercado("faltas") && (
-        <FilaMercado nombre={traducir("faltasTotales")} lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} lambdaAjustado={lambdaFaltasTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
+        <FilaMercado mercado="faltas" nombre={traducir("faltasTotales")} lineas={LINEAS_MERCADOS.faltas} lambda={lambdaFaltasTotal} lambdaAjustado={lambdaFaltasTotalAjustado} tema={tema} advertenciaMuestra={advertenciaMuestra} />
       )}
 
       {!datosPuntualesListos && (
@@ -4947,6 +5015,106 @@ function PantallaAjustes({ sesion, perfil, onPerfilActualizado, tema, acentoMarc
   );
 }
 
+// ============================================================
+// Panel de administrador: qué aprendió JMCS y el interruptor para apagarlo.
+// ============================================================
+const NOMBRES_MERCADO_APRENDIZAJE = {
+  ganador: "Ganador", doble: "Doble oportunidad", goles: "Goles", btts: "Ambos anotan",
+  handicap: "Hándicap", corners: "Córners", amarillas: "Amarillas", faltas: "Faltas",
+};
+
+function TarjetaAprendizajeAdmin({ sesion, tema, acentoMarca, mostrarToast }) {
+  const [datos, setDatos] = useState(null);
+  const [ocupado, setOcupado] = useState(false);
+  const cabeceras = { Authorization: `Bearer ${sesion?.access_token}`, "Content-Type": "application/json" };
+
+  useEffect(() => {
+    fetch("/api/aprendizaje?detalle=1", { headers: cabeceras })
+      .then((r) => r.json())
+      .then((d) => setDatos(d?.error ? null : d))
+      .catch(() => setDatos(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function enviar(cuerpo, mensajeOk) {
+    setOcupado(true);
+    try {
+      const r = await fetch("/api/aprendizaje", { method: "POST", headers: cabeceras, body: JSON.stringify(cuerpo) });
+      const d = await r.json();
+      if (d?.error) throw new Error(d.error);
+      setDatos((prev) => ({ ...(prev || {}), ...d }));
+      mostrarToast && mostrarToast(mensajeOk);
+    } catch {
+      mostrarToast && mostrarToast("No se pudo completar. Intenta de nuevo.");
+    }
+    setOcupado(false);
+  }
+
+  const celda = { padding: "4px 6px", borderBottom: `1px solid ${tema.borde}`, fontSize: 11, textAlign: "left" };
+  const grupos = datos?.calibracion ? Object.entries(datos.calibracion).flatMap(([m, lista]) => lista.filter((g) => g.n > 0).map((g) => ({ m, ...g }))) : [];
+
+  return (
+    <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+      <h4 style={{ margin: "0 0 6px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="foco" size={14} /> Aprendizaje automático</h4>
+      <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 12px" }}>
+        El semáforo se corrige solo con lo verificado en Backtesting (mínimo {datos?.minimoPorGrupo || 50} mercados por grupo, máximo 8 puntos),
+        y el peso del clima se ajusta según si los Estudios Climáticos de los usuarios aciertan más que el cálculo sin clima (mínimo {datos?.minimoPartidosClima || 30} partidos).
+        Se recalcula solo una vez al día.
+      </p>
+      {!datos ? (
+        <p style={{ fontSize: 12, color: tema.textoSuave }}>Cargando...</p>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <button
+              disabled={ocupado}
+              onClick={() => enviar({ accion: "activar", activo: !datos.activo }, datos.activo ? "Aprendizaje apagado" : "Aprendizaje encendido")}
+              style={{ padding: "7px 14px", fontSize: 12, fontWeight: "bold", borderRadius: 6, cursor: "pointer", border: "none", background: datos.activo ? "#2e9e4f" : "#e05555", color: "#fff" }}
+            >
+              {datos.activo ? "Encendido (tocar para apagar)" : "Apagado (tocar para encender)"}
+            </button>
+            <button
+              disabled={ocupado}
+              onClick={() => enviar({ accion: "recalcular" }, "Aprendizaje recalculado")}
+              style={{ padding: "7px 14px", fontSize: 12, borderRadius: 6, cursor: "pointer", border: `1px solid ${acentoMarca}`, background: "transparent", color: acentoMarca }}
+            >
+              {ocupado ? "Procesando..." : "Recalcular ahora"}
+            </button>
+          </div>
+          <div style={{ fontSize: 12, marginBottom: 10 }}>
+            <strong>Clima:</strong> peso {datos.clima?.k ?? 1} (1 = como fue diseñado) · {datos.clima?.partidos ?? 0} partidos de {datos.clima?.usuarios ?? 0} usuarios
+            {datos.clima?.mejoraPromedio !== null && datos.clima?.mejoraPromedio !== undefined && ` · el clima mejora en promedio ${datos.clima.mejoraPromedio} puntos`}
+          </div>
+          <div style={{ fontSize: 11, color: tema.textoSuave, marginBottom: 6 }}>
+            Última actualización: {datos.actualizado_en ? new Date(datos.actualizado_en).toLocaleString("es-ES") : "todavía no"}
+          </div>
+          {grupos.length === 0 ? (
+            <p style={{ fontSize: 12, color: tema.textoSuave }}>Todavía no hay mercados verificados en Backtesting.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={celda}>Mercado</th><th style={celda}>Franja</th><th style={celda}>N</th><th style={celda}>Dijimos</th><th style={celda}>Pasó</th><th style={celda}>Corrección</th></tr></thead>
+                <tbody>
+                  {grupos.map((g) => (
+                    <tr key={`${g.m}-${g.desde}`}>
+                      <td style={celda}>{NOMBRES_MERCADO_APRENDIZAJE[g.m] || g.m}</td>
+                      <td style={celda}>{Math.round(g.desde * 100)}–{Math.min(100, Math.round(g.hasta * 100))}%</td>
+                      <td style={celda}>{g.n}</td>
+                      <td style={celda}>{g.dijimos !== null ? `${Math.round(g.dijimos * 100)}%` : "—"}</td>
+                      <td style={celda}>{g.paso !== null ? `${Math.round(g.paso * 100)}%` : "—"}</td>
+                      <td style={{ ...celda, fontWeight: "bold" }}>{g.ajuste ? `${g.ajuste > 0 ? "+" : ""}${Math.round(g.ajuste * 1000) / 10} pts` : "sin cambio"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast }) {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
@@ -5296,6 +5464,8 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
           </div>
         ))}
       </div>
+
+      <TarjetaAprendizajeAdmin sesion={sesion} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
 
       <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24 }}>
         <h4 style={{ margin: "0 0 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={14} /> Plan de API-Football</h4>
@@ -7633,6 +7803,21 @@ function Home() {
   // la conexión (sin pedir la ubicación exacta); si eligió uno en Ajustes,
   // manda ese.
   const [paisPorConexion, setPaisPorConexion] = useState(null);
+
+  // Aprendizaje automático: se carga una vez y se vuelve a pintar todo.
+  const [, setVersionAprendizaje] = useState(0);
+  useEffect(() => {
+    fetch("/api/aprendizaje")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d || d.error) return;
+        APRENDIZAJE_JMCS.activo = !!d.activo;
+        APRENDIZAJE_JMCS.calibracion = d.calibracion || {};
+        APRENDIZAJE_JMCS.climaK = typeof d.climaK === "number" ? d.climaK : 1;
+        setVersionAprendizaje((v) => v + 1);
+      })
+      .catch(() => {});
+  }, []);
   useEffect(() => {
     fetch("/api/mi-pais")
       .then((r) => r.json())
@@ -8527,7 +8712,8 @@ function Home() {
       const a = ajustesClima[rol]?.[v];
       if (a?.activo) sumaDeltas += (a.valorUsuario - climaOficialNorm[v]) * sensibilidad[v];
     });
-    return Math.max(0.7, Math.min(1.3, 1 + sumaDeltas * 0.015));
+    // climaK: cuánto pesa el clima según lo aprendido (1 = como fue diseñado)
+    return Math.max(0.7, Math.min(1.3, 1 + sumaDeltas * 0.015 * (APRENDIZAJE_JMCS.climaK || 1)));
   }
 
   const hayAjusteClimaActivo =
@@ -9160,7 +9346,6 @@ function Home() {
                   { clave: "verPerfil", etiqueta: "Perfil" },
                   { clave: "inicio", etiqueta: t("menuInicio") },
                   { clave: "datos", etiqueta: "Datos" },
-                  { clave: "backtesting", etiqueta: "Backtesting" },
                   { clave: "profesor", etiqueta: "Profesor" },
                   { clave: "favoritos", etiqueta: t("menuFavoritos") },
                   { clave: "historial", etiqueta: t("menuHistorial") },
@@ -9257,6 +9442,7 @@ function Home() {
             { id: "inicio", icono: "hogar", etiqueta: t("inicio") },
             { id: "estudio", icono: "barras", etiqueta: t("estudio") },
             { id: "favoritos", icono: "estrella", etiqueta: t("favoritos") },
+            { id: "backtesting", icono: "objetivo", etiqueta: "Backtesting" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -9955,6 +10141,7 @@ function Home() {
           { id: "estudio", icono: "barras", etiqueta: t("estudio") },
           { id: "favoritos", icono: "estrella", etiqueta: t("favoritos") },
           { id: "historial", icono: "grafico", etiqueta: "Historial" },
+          { id: "backtesting", icono: "objetivo", etiqueta: "Backtesting" },
         ].map((item) => (
           <button
             key={item.id}
