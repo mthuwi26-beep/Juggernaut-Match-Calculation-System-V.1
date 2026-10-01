@@ -29,10 +29,18 @@ async function tienePlanDePago(token) {
   const id = data.user.id;
   const [{ data: admin }, { data: perfil }] = await Promise.all([
     supabaseAdmin.from("admins").select("user_id").eq("user_id", id).maybeSingle(),
-    supabaseAdmin.from("perfiles").select("suscripcion_activa").eq("user_id", id).maybeSingle(),
+    supabaseAdmin.from("perfiles").select("suscripcion_activa, dias_prueba_extra").eq("user_id", id).maybeSingle(),
   ]);
-  return !!admin || !!perfil?.suscripcion_activa;
+  if (admin || perfil?.suscripcion_activa) return true;
+  // La prueba gratis (10 dias + dias de referidos) incluye todo, igual que en
+  // la web y la app (modelo gratis / Pro).
+  const creado = Date.parse(data.user.created_at || "");
+  if (isNaN(creado)) return false;
+  const dias = (Date.now() - creado) / 86400000;
+  return dias <= DIAS_PRUEBA_GRATIS + (perfil?.dias_prueba_extra || 0);
 }
+
+const DIAS_PRUEBA_GRATIS = 10;
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "private, no-store");
