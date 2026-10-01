@@ -735,6 +735,43 @@ function probabilidadBTTS(lambdaLocal, lambdaVisitante) {
   return pLocalAnota * pVisitanteAnota;
 }
 
+// ============================================================
+// MODELO GRATIS / PRO (Tanda 1)
+// Todos pueden usar Estudio; lo de pago se ve bloqueado para quien no tiene
+// plan (ni prueba gratis activa). Home actualiza esto en cada render.
+// ============================================================
+const PLAN_JMCS = { premium: true, sesion: false, abrirPlanes: () => {}, abrirRegistro: () => {} };
+
+// Una casilla verde (70% o mas) se ve bloqueada para los usuarios gratis:
+// el verde se mantiene, el texto se difumina y encima va un candado.
+function verdeBloqueado(probabilidad) {
+  return !PLAN_JMCS.premium && probabilidad !== null && probabilidad !== undefined && probabilidad >= 0.7;
+}
+
+// Recuadro para lo que solo tienen Pro y Max (Calculadora, Estudio Climatico...)
+function BloqueoPremium({ titulo, texto, tema }) {
+  return (
+    <div style={{ background: tema.panel, border: `1px dashed ${DORADO}`, borderRadius: 8, padding: 16, marginBottom: 18, textAlign: "center" }}>
+      <div style={{ fontSize: 22, marginBottom: 6 }}>🔒</div>
+      <div style={{ fontWeight: "bold", fontSize: 14, marginBottom: 4 }}>{titulo}</div>
+      <p style={{ fontSize: 12, color: tema.textoSuave, margin: "0 0 12px" }}>{texto}</p>
+      <BotonDesbloquear />
+    </div>
+  );
+}
+
+function BotonDesbloquear() {
+  return PLAN_JMCS.sesion ? (
+    <button onClick={() => PLAN_JMCS.abrirPlanes()} style={{ padding: "8px 18px", background: DORADO, color: "#000", border: "none", borderRadius: 6, fontWeight: "bold", fontSize: 12, cursor: "pointer" }}>
+      Ver planes Pro y Max
+    </button>
+  ) : (
+    <button onClick={() => PLAN_JMCS.abrirRegistro()} style={{ padding: "8px 18px", background: DORADO, color: "#000", border: "none", borderRadius: 6, fontWeight: "bold", fontSize: 12, cursor: "pointer" }}>
+      Crea tu cuenta: 10 días gratis
+    </button>
+  );
+}
+
 function colorSemaforo(probabilidad) {
   if (probabilidad === null) return { color: "#999", etiqueta: "Sin datos" };
   if (probabilidad >= 0.7) return { color: "#22c55e", etiqueta: "Verde" };
@@ -1632,7 +1669,7 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertencia
           const p = calibrarProb(mercado, probabilidadOver(lambda, linea));
           const { color } = colorSemaforo(p);
           return (
-            <div
+            <div className={verdeBloqueado(p) ? "jmcs-verde-bloqueado" : undefined}
               key={linea}
               style={{
                 padding: "8px 14px", borderRadius: 6, background: color, color: "#fff",
@@ -1655,7 +1692,7 @@ function FilaMercado({ nombre, lineas, lambda, lambdaAjustado, tema, advertencia
               const p = calibrarProb(mercado, probabilidadOver(lambdaAjustado, linea));
               const { color } = colorSemaforo(p);
               return (
-                <div
+                <div className={verdeBloqueado(p) ? "jmcs-verde-bloqueado" : undefined}
                   key={linea}
                   style={{
                     padding: "6px 12px", borderRadius: 6, background: color, color: "#fff",
@@ -2301,6 +2338,32 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
   return (
     <div style={{ marginTop: 30, padding: 16, background: tema.panel, borderRadius: 6 }}>
       <h3 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 7 }}><Icono tipo="semaforo" size={16} /> {traducir("pronosticoYSemaforo")}</h3>
+      {!PLAN_JMCS.premium && (() => {
+        // Cuantos pronosticos en verde tiene este partido (lo que se desbloquea con Pro)
+        const probs = [];
+        const overs = (mercado, lambda, lineas) => {
+          if (lambda === null || lambda === undefined || !mostrarMercado(mercado)) return;
+          lineas.forEach((l) => probs.push(calibrarProb(mercado, probabilidadOver(lambda, l))));
+        };
+        overs("goles", lambdaGolesTotal, LINEAS_MERCADOS.goles);
+        overs("corners", lambdaCornersTotal, LINEAS_MERCADOS.corners);
+        overs("amarillas", lambdaAmarillasTotal, LINEAS_MERCADOS.amarillas);
+        overs("faltas", lambdaFaltasTotal, LINEAS_MERCADOS.faltas);
+        if (prob1X2Mostrar && mostrarMercado("ganador")) probs.push(prob1X2Mostrar.pLocal, prob1X2Mostrar.pEmpate, prob1X2Mostrar.pVisitante);
+        if (probDobleMostrar && mostrarMercado("dobleOportunidad")) probs.push(probDobleMostrar.p1X, probDobleMostrar.p12, probDobleMostrar.pX2);
+        if (probBTTSMostrar !== null && mostrarMercado("btts")) probs.push(probBTTSMostrar);
+        if (probHandicapMostrar && mostrarMercado("handicapAsiatico")) probs.push(probHandicapMostrar.probCubre);
+        const verdes = probs.filter((p) => p !== null && p !== undefined && p >= 0.7).length;
+        if (verdes === 0) return null;
+        return (
+          <div style={{ background: colorTenue(DORADO, 0.14), border: `1px solid ${DORADO}`, borderRadius: 8, padding: 12, marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, flex: 1, minWidth: 200 }}>
+              🔒 Este partido tiene <strong>{verdes} pronóstico{verdes === 1 ? "" : "s"} en verde</strong> (70% o más). Desbloquéalos con Pro o Max.
+            </span>
+            <BotonDesbloquear />
+          </div>
+        );
+      })()}
       {APRENDIZAJE_JMCS.activo && Object.keys(APRENDIZAJE_JMCS.calibracion || {}).length > 0 && (
         <p style={{ fontSize: 11, color: tema.textoSuave, marginTop: -6, marginBottom: 12 }}>
           Ajustado según el historial de aciertos de JMCS (ver Backtesting).
@@ -2400,7 +2463,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
             ].map((item) => {
               const { color } = colorSemaforo(item.prob);
               return (
-                <div
+                <div className={verdeBloqueado(item.prob) ? "jmcs-verde-bloqueado" : undefined}
                   key={item.etiqueta}
                   style={{
                     padding: "8px 14px", borderRadius: 6, background: color, color: "#fff",
@@ -2424,7 +2487,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
                 ].map((item) => {
                   const { color } = colorSemaforo(item.prob);
                   return (
-                    <div
+                    <div className={verdeBloqueado(item.prob) ? "jmcs-verde-bloqueado" : undefined}
                       key={item.etiqueta}
                       style={{
                         padding: "8px 14px", borderRadius: 6, background: color, color: "#fff", opacity: 0.85,
@@ -2455,7 +2518,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
             ].map((item) => {
               const { color } = colorSemaforo(item.prob);
               return (
-                <div
+                <div className={verdeBloqueado(item.prob) ? "jmcs-verde-bloqueado" : undefined}
                   key={item.etiqueta}
                   style={{
                     padding: "8px 14px", borderRadius: 6, background: color, color: "#fff",
@@ -2517,7 +2580,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
             {(() => {
               const { color } = colorSemaforo(probHandicapMostrar.probCubre);
               return (
-                <div style={{ padding: "8px 14px", borderRadius: 6, background: color, color: "#fff", fontSize: 13, fontWeight: "bold", minWidth: 130, textAlign: "center" }}>
+                <div className={verdeBloqueado(probHandicapMostrar.probCubre) ? "jmcs-verde-bloqueado" : undefined} style={{ padding: "8px 14px", borderRadius: 6, background: color, color: "#fff", fontSize: 13, fontWeight: "bold", minWidth: 130, textAlign: "center" }}>
                   Cubre {equipoLocal.team.name}<br />{Math.round(probHandicapMostrar.probCubre * 100)}%
                 </div>
               );
@@ -2541,7 +2604,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
           {(() => {
             const { color } = colorSemaforo(probBTTSMostrar);
             return (
-              <div style={{ display: "inline-block", padding: "8px 16px", borderRadius: 6, background: color, color: "#fff", fontWeight: "bold", fontSize: 13 }}>
+              <div className={verdeBloqueado(probBTTSMostrar) ? "jmcs-verde-bloqueado" : undefined} style={{ display: "inline-block", padding: "8px 16px", borderRadius: 6, background: color, color: "#fff", fontWeight: "bold", fontSize: 13 }}>
                 {Math.round(probBTTSMostrar * 100)}%
               </div>
             );
@@ -2553,7 +2616,7 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
               {(() => {
                 const { color } = colorSemaforo(probBTTSAjustado);
                 return (
-                  <div style={{ display: "inline-block", padding: "8px 16px", borderRadius: 6, background: color, color: "#fff", opacity: 0.85, fontWeight: "bold", fontSize: 13 }}>
+                  <div className={verdeBloqueado(probBTTSAjustado) ? "jmcs-verde-bloqueado" : undefined} style={{ display: "inline-block", padding: "8px 16px", borderRadius: 6, background: color, color: "#fff", opacity: 0.85, fontWeight: "bold", fontSize: 13 }}>
                     {Math.round(probBTTSAjustado * 100)}%
                   </div>
                 );
@@ -2583,7 +2646,9 @@ function PanelSemaforo({ equipoLocal, equipoVisitante, fixturesLocal, fixturesVi
         Esto es un modelo estadístico de tendencias, no una certeza. No contempla lesiones, sanciones, clima ni decisiones arbitrales puntuales.
       </p>
 
-      {mostrarMercado("valor") && opcionesValor.length > 0 && <CalculadoraValor opciones={opcionesValor} tema={tema} acento={acento} />}
+      {mostrarMercado("valor") && opcionesValor.length > 0 && (PLAN_JMCS.premium
+        ? <CalculadoraValor opciones={opcionesValor} tema={tema} acento={acento} />
+        : <BloqueoPremium tema={tema} titulo="Calculadora de valor" texto="Compara nuestras probabilidades con la cuota de la casa y descubre si una apuesta tiene valor. Disponible en Pro y Max." />)}
 
       <BotonGuardarPronostico
         sesion={sesion}
@@ -7460,8 +7525,14 @@ function VistaBacktesting({ sesion, tema, acentoMarca, onAbrirPartido, onVerPlan
 
           <div style={tarjeta}>
             <h4 style={{ margin: "0 0 8px", fontSize: 14 }}>Últimos partidos verificados</h4>
-            {datos.recientes.map((r) => (
-              <div key={r.fixtureId} onClick={() => abrir(r.fixtureId)} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, padding: "6px 0", borderBottom: `1px solid ${tema.borde}`, cursor: "pointer" }}>
+            {!PLAN_JMCS.premium && (
+              <p style={{ fontSize: 11, color: tema.textoSuave, margin: "0 0 8px" }}>
+                Mostramos 1 de cada 2 resultados en orden, aciertos y fallos por igual. Con Pro o Max ves el historial completo.
+                Los porcentajes de arriba incluyen todos los partidos.
+              </p>
+            )}
+            {datos.recientes.map((r, i) => (
+              <div key={r.fixtureId} onClick={() => (!PLAN_JMCS.premium && i % 2 === 1 ? (PLAN_JMCS.sesion ? PLAN_JMCS.abrirPlanes() : PLAN_JMCS.abrirRegistro()) : abrir(r.fixtureId))} style={{ ...(!PLAN_JMCS.premium && i % 2 === 1 ? { filter: "blur(5px)", userSelect: "none" } : {}), display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, padding: "6px 0", borderBottom: `1px solid ${tema.borde}`, cursor: "pointer" }}>
                 <span>
                   {r.local} {r.marcador} {r.visitante}
                   <span style={{ color: tema.textoSuave }}> · {r.liga}</span>
@@ -7844,6 +7915,65 @@ function ModalMiPlan({ perfil, tema, acentoMarca, diasRestantesPrueba, onCerrar,
   );
 }
 
+// Que tiene cada plan, arriba de la pantalla de pago (antes de los datos del comprador)
+const FILAS_COMPARACION = [
+  { texto: "Semáforo amarillo y rojo", gratis: true, pro: true, max: true },
+  { texto: "Semáforo verde (70% o más)", gratis: false, pro: true, max: true },
+  { texto: "Destacados del día", gratis: false, pro: true, max: true },
+  { texto: "Calculadora de valor", gratis: false, pro: true, max: true },
+  { texto: "Estudio Climático", gratis: false, pro: true, max: true },
+  { texto: "Historial de aciertos completo", gratis: false, pro: true, max: true },
+  { texto: "Tablas, estadísticas y marcador en vivo", gratis: true, pro: true, max: true },
+  { texto: "Acceso anticipado a funciones nuevas", gratis: false, pro: false, max: true },
+];
+
+function ComparacionPlanes({ tema }) {
+  const [acierto, setAcierto] = useState(null);
+  useEffect(() => {
+    fetch("/api/backtesting?periodo=mes")
+      .then((r) => r.json())
+      .then((d) => { if (d && d.porcentaje !== null && d.mercadosEvaluados >= 30) setAcierto(d); })
+      .catch(() => {});
+  }, []);
+  const celda = { padding: "7px 4px", fontSize: 12, textAlign: "center", borderTop: `1px solid ${tema.borde}` };
+  const marca = (si) => (si ? <span style={{ color: "#2e9e4f", fontWeight: "bold" }}>✓</span> : <span style={{ opacity: 0.7 }}>🔒</span>);
+  return (
+    <div style={{ background: tema.panel, borderRadius: 10, padding: 14, marginBottom: 22, textAlign: "left", border: `1px solid ${tema.borde}` }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ ...celda, borderTop: "none", textAlign: "left", fontSize: 11, color: tema.textoSuave }}></th>
+            <th style={{ ...celda, borderTop: "none", fontSize: 11, color: tema.textoSuave }}>Gratis</th>
+            <th style={{ ...celda, borderTop: "none", fontSize: 12, color: DORADO }}>Pro</th>
+            <th style={{ ...celda, borderTop: "none", fontSize: 12, color: DORADO }}>Max</th>
+          </tr>
+        </thead>
+        <tbody>
+          {FILAS_COMPARACION.map((f) => (
+            <tr key={f.texto}>
+              <td style={{ ...celda, textAlign: "left" }}>{f.texto}</td>
+              <td style={celda}>{marca(f.gratis)}</td>
+              <td style={celda}>{marca(f.pro)}</td>
+              <td style={celda}>{marca(f.max)}</td>
+            </tr>
+          ))}
+          <tr>
+            <td style={{ ...celda, textAlign: "left", fontWeight: "bold" }}>Precio</td>
+            <td style={celda}>$0</td>
+            <td style={{ ...celda, fontWeight: "bold" }}>$70.000<br /><span style={{ fontSize: 10, color: tema.textoSuave, fontWeight: "normal" }}>al mes</span></td>
+            <td style={{ ...celda, fontWeight: "bold" }}>$714.000<br /><span style={{ fontSize: 10, color: "#2e9e4f", fontWeight: "normal" }}>al año · ahorra 15%</span></td>
+          </tr>
+        </tbody>
+      </table>
+      {acierto && (
+        <p style={{ fontSize: 12, margin: "12px 0 0", textAlign: "center" }}>
+          📊 En el último mes, JMCS acertó el <strong style={{ color: DORADO }}>{acierto.porcentaje}%</strong> de {acierto.mercadosEvaluados.toLocaleString("es-CO")} mercados verificados.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancelar }) {
   const [planElegido, setPlanElegido] = useState("mensual");
   const [procesando, setProcesando] = useState(false);
@@ -7982,10 +8112,11 @@ function PantallaSuscripcion({ sesion, tema, acentoMarca, mostrarToast, onCancel
   return (
     <div style={{ maxWidth: 460, margin: "40px auto", textAlign: "center", padding: "0 20px" }}>
       <Icono tipo="trofeo" size={40} color={acentoMarca} />
-      <h3 style={{ marginTop: 16, marginBottom: 8 }}>Tu prueba gratis de 7 días terminó</h3>
-      <p style={{ fontSize: 13, color: tema.textoSuave, marginBottom: 24 }}>
-        Suscríbete para seguir disfrutando de nuestros pronósticos, con acceso completo a Estudio.
+      <h3 style={{ marginTop: 16, marginBottom: 8 }}>Desbloquea todo el poder de JMCS</h3>
+      <p style={{ fontSize: 13, color: tema.textoSuave, marginBottom: 18 }}>
+        Probabilidades calculadas con matemática, no con corazonadas.
       </p>
+      <ComparacionPlanes tema={tema} />
 
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         <div
@@ -8851,17 +8982,24 @@ function Home() {
     if (sesion) setTiempoEstudioAgotado(false);
   }, [sesion]);
 
-  // 7 días de prueba gratis desde que se registró (lo sabemos por la fecha de
+  // 10 días de prueba gratis desde que se registró (lo sabemos por la fecha de
   // creación de su cuenta, ya la trae la sesión de Supabase) — pasado ese
   // tiempo, necesita una suscripción activa para seguir usando Estudio. Si
   // se registró con un código de referido válido, suma los días extra
   // (perfil.dias_prueba_extra) que le dio ese bono.
-  const DIAS_PRUEBA_SUSCRIPCION = 7 + (perfil?.dias_prueba_extra || 0);
+  const DIAS_PRUEBA_SUSCRIPCION = 10 + (perfil?.dias_prueba_extra || 0);
   const diasDesdeRegistro = sesion?.user?.created_at
     ? (Date.now() - new Date(sesion.user.created_at).getTime()) / (1000 * 60 * 60 * 24)
     : 0;
   const enPeriodoPrueba = diasDesdeRegistro <= DIAS_PRUEBA_SUSCRIPCION;
-  const puedeUsarEstudio = !sesion || esAdmin || enPeriodoPrueba || !!perfil?.suscripcion_activa;
+  // Modelo gratis / Pro: todos entran a Estudio; lo de pago se ve bloqueado
+  // para quien no tiene plan ni prueba gratis activa (ni cuenta).
+  const esPremium = !!sesion && (esAdmin || enPeriodoPrueba || !!perfil?.suscripcion_activa);
+  const puedeUsarEstudio = true;
+  PLAN_JMCS.premium = esPremium;
+  PLAN_JMCS.sesion = !!sesion;
+  PLAN_JMCS.abrirPlanes = () => { setVistaActual("estudio"); setSuscripcionManualAbierta(true); };
+  PLAN_JMCS.abrirRegistro = () => abrirRegistro();
   const diasRestantesPrueba = Math.max(0, Math.ceil(DIAS_PRUEBA_SUSCRIPCION - diasDesdeRegistro));
   const [suscripcionManualAbierta, setSuscripcionManualAbierta] = useState(false);
   const [modalPlanAbierto, setModalPlanAbierto] = useState(false);
@@ -9498,6 +9636,25 @@ function Home() {
           width: 100%;
           height: auto;
           display: block;
+        }
+
+        .jmcs-verde-bloqueado {
+          position: relative;
+          color: transparent !important;
+          text-shadow: 0 0 9px rgba(255, 255, 255, 0.95);
+          user-select: none;
+          -webkit-user-select: none;
+        }
+        .jmcs-verde-bloqueado::after {
+          content: "🔒";
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 17px;
+          text-shadow: none;
+          color: #fff;
         }
 
         .jmcs-burbuja-prueba {
@@ -10357,7 +10514,15 @@ function Home() {
               cargandoClima={cargandoClima}
               tema={tema}
               acentoMarca={acentoMarca}
-              onAbrirEstudioClimatico={() => (sesion ? setEstudioClimaticoAbierto(true) : abrirRegistro())}
+              onAbrirEstudioClimatico={() => {
+                if (!sesion) return abrirRegistro();
+                // El Estudio Climatico es de Pro y Max
+                if (!esPremium) {
+                  mostrarToast("El Estudio Climático es para Pro y Max.");
+                  return PLAN_JMCS.abrirPlanes();
+                }
+                setEstudioClimaticoAbierto(true);
+              }}
             />
           </div>
 
