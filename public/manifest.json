@@ -1,7 +1,7 @@
 {
   "name": "JMCS — Juggernaut Match Calculation System",
   "short_name": "JMCS",
-  "description": "Análisis y pronósticos de fútbol con estadísticas reales",
+  "description": "Probabilidades, no corazonadas. Pronósticos de fútbol calculados con modelos matemáticos y un historial de aciertos público.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1f14",
