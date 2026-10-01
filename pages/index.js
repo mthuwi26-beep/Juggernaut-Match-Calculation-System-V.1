@@ -6773,6 +6773,239 @@ function ModalResultadoPartido({ fixture, tema, acentoMarca, onCerrar }) {
   );
 }
 
+// ============================================================
+// TABLAS DE POSICIONES (Tanda 3)
+// - Pagina del equipo: las tablas de todos los torneos que juega, con su
+//   fila en dorado.
+// - Detalle del partido: la tabla del torneo, con los dos equipos
+//   resaltados con su propio color (el mismo de sus tarjetas de datos).
+// - Un torneo con varias tablas (grupos, reclasificacion...) se ve en un
+//   deslizable con puntos abajo y el titulo de la tabla que se esta viendo.
+// Los datos vienen de /api/posiciones (mismo formato para la app).
+// ============================================================
+const COLORES_ZONA_TABLA = {
+  maxima: "#3b82f6", segunda: "#f59e0b", tercera: "#22c55e", playoffs: "#a855f7",
+  siguiente: "#14b8a6", descenso: "#ef4444", otra: "#9ca3af",
+};
+
+// Acepta "#rrggbb" o "rgb(r, g, b)" (asi llega el color sacado del escudo)
+function hexARgb(color) {
+  if (!color) return null;
+  if (color.startsWith("rgb")) {
+    const n = color.match(/\d+/g);
+    return n && n.length >= 3 ? [Number(n[0]), Number(n[1]), Number(n[2])] : null;
+  }
+  const h = color.replace("#", "");
+  if (h.length !== 6) return null;
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+// Si los dos equipos tienen colores casi iguales, el visitante pasa a un tono
+// claramente mas claro u oscuro del mismo color, para que se distingan.
+function colorDistinto(colorBase, colorOtro) {
+  const a = hexARgb(colorBase), b = hexARgb(colorOtro);
+  if (!a || !b) return colorOtro;
+  const distancia = Math.sqrt(a.reduce((suma, v, i) => suma + (v - b[i]) ** 2, 0));
+  if (distancia > 90) return colorOtro;
+  const brillo = (b[0] * 299 + b[1] * 587 + b[2] * 114) / 1000;
+  const factor = brillo > 128 ? 0.55 : 1.7;
+  const ajustado = b.map((v) => Math.max(0, Math.min(255, Math.round(v * factor + (factor > 1 ? 30 : 0)))));
+  return "#" + ajustado.map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+
+function FormaUltimos({ forma }) {
+  if (!forma) return null;
+  const colores = { W: "#2e9e4f", D: "#9ca3af", L: "#e05555" };
+  return (
+    <span style={{ display: "inline-flex", gap: 2 }}>
+      {forma.split("").map((r, i) => (
+        <span key={i} title={r === "W" ? "Ganado" : r === "D" ? "Empatado" : "Perdido"}
+          style={{ width: 7, height: 7, borderRadius: "50%", background: colores[r] || "#9ca3af", display: "inline-block" }} />
+      ))}
+    </span>
+  );
+}
+
+function TablaPosiciones({ tabla, resaltados, tema, compacta }) {
+  const [completa, setCompleta] = useState(false);
+  const filas = tabla.filas;
+  let visibles = filas;
+  if (compacta && !completa && filas.length > 10) {
+    const indices = filas.map((f, i) => (resaltados[f.id] ? i : -1)).filter((i) => i >= 0);
+    if (indices.length > 0) {
+      const desde = Math.max(0, Math.min(...indices) - 2);
+      const hasta = Math.min(filas.length - 1, Math.max(...indices) + 2);
+      if (hasta - desde + 1 < filas.length - 2) visibles = filas.slice(desde, hasta + 1);
+    }
+  }
+  const zonas = [];
+  filas.forEach((f) => { if (f.zona && !zonas.some((z) => z.texto === f.zona.texto)) zonas.push(f.zona); });
+  const celda = { padding: "7px 4px", fontSize: 12, textAlign: "center", whiteSpace: "nowrap" };
+
+  return (
+    <div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 300 }}>
+          <thead>
+            <tr style={{ color: tema.textoSuave, fontSize: 10.5 }}>
+              <th style={{ ...celda, fontSize: 10.5, width: 28 }}>#</th>
+              <th style={{ ...celda, fontSize: 10.5, textAlign: "left" }}>Equipo</th>
+              <th style={{ ...celda, fontSize: 10.5 }} title="Partidos jugados">PJ</th>
+              <th style={{ ...celda, fontSize: 10.5 }} title="Diferencia de gol">DG</th>
+              <th style={{ ...celda, fontSize: 10.5 }} title="Puntos">PTS</th>
+              <th style={{ ...celda, fontSize: 10.5 }} title="Últimos 5 partidos">Forma</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.map((f) => {
+              const color = resaltados[f.id];
+              const zona = f.zona ? COLORES_ZONA_TABLA[f.zona.tipo] || COLORES_ZONA_TABLA.otra : null;
+              return (
+                <tr key={`${f.id}-${f.pos}`} style={{ background: color ? colorTenue(color, 0.22) : "transparent", borderTop: `1px solid ${tema.borde}` }}>
+                  <td style={{ ...celda, fontWeight: "bold", borderLeft: `4px solid ${color || zona || "transparent"}` }} title={f.zona?.texto || ""}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {zona && color && <span style={{ width: 6, height: 6, borderRadius: "50%", background: zona }} />}
+                      {f.pos}
+                    </span>
+                  </td>
+                  <td style={{ ...celda, textAlign: "left", maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                      <img src={corregirEscudo(f.logo)} alt="" width={20} height={20} style={{ objectFit: "contain", flexShrink: 0 }} onError={manejarErrorEscudo} />
+                      <span style={{ fontWeight: color ? "bold" : "normal", color: color ? color : tema.texto }}>{f.nombre}</span>
+                    </span>
+                  </td>
+                  <td style={celda}>{f.pj}</td>
+                  <td style={celda}>{f.dg > 0 ? `+${f.dg}` : f.dg}</td>
+                  <td style={{ ...celda, fontWeight: "bold" }}>{f.pts}</td>
+                  <td style={celda}><FormaUltimos forma={f.forma} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {visibles.length < filas.length && (
+        <button onClick={() => setCompleta(true)} style={{ marginTop: 8, background: "transparent", border: `1px solid ${tema.borde}`, color: tema.textoSuave, borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer", width: "100%" }}>
+          Ver la tabla completa ({filas.length} equipos)
+        </button>
+      )}
+      {zonas.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 10 }}>
+          {zonas.map((z) => (
+            <span key={z.texto} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, color: tema.textoSuave }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: COLORES_ZONA_TABLA[z.tipo] || COLORES_ZONA_TABLA.otra }} /> {z.texto}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Un torneo: encabezado con su logo y, si tiene varias tablas, deslizable
+// con puntos abajo y el titulo claro de la tabla que se esta viendo.
+function CarruselTablas({ torneo, resaltados, tema, compacta }) {
+  const carrusel = useRef(null);
+  const inicial = Math.max(0, torneo.tablas.findIndex((t) => t.filas.some((f) => resaltados[f.id])));
+  const [indice, setIndice] = useState(inicial);
+  const total = torneo.tablas.length;
+
+  useEffect(() => {
+    const el = carrusel.current;
+    if (el && inicial > 0) el.scrollLeft = inicial * el.clientWidth;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [torneo.id, torneo.temporada]);
+
+  function irA(i) {
+    const el = carrusel.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+  }
+
+  return (
+    <div style={{ background: tema.panel, borderRadius: 10, padding: 14, marginBottom: 16, border: `1px solid ${tema.borde}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        {torneo.logo && <img src={torneo.logo} alt="" width={28} height={28} style={{ objectFit: "contain", background: "#fff", borderRadius: 6, padding: 2 }} />}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: "bold", fontSize: 14 }}>{torneo.nombre}</div>
+          <div style={{ fontSize: 11, color: tema.textoSuave }}>
+            {torneo.pais ? `${torneo.pais} · ` : ""}Temporada {torneo.temporada}
+          </div>
+        </div>
+      </div>
+      <div style={{ fontSize: 12.5, fontWeight: "bold", margin: "10px 0 6px", color: DORADO }}>
+        {torneo.tablas[indice]?.titulo}
+        {total > 1 && <span style={{ color: tema.textoSuave, fontWeight: "normal" }}> · Tabla {indice + 1} de {total}</span>}
+      </div>
+      <div
+        ref={carrusel}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+          if (i !== indice) setIndice(i);
+        }}
+        style={{ display: "flex", overflowX: total > 1 ? "auto" : "hidden", scrollSnapType: "x mandatory", scrollbarWidth: "none", gap: 0 }}
+      >
+        {torneo.tablas.map((tabla, i) => (
+          <div key={i} style={{ flex: "0 0 100%", scrollSnapAlign: "start", minWidth: 0 }}>
+            <TablaPosiciones tabla={tabla} resaltados={resaltados} tema={tema} compacta={compacta} />
+          </div>
+        ))}
+      </div>
+      {total > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 7, marginTop: 10 }}>
+          {torneo.tablas.map((t, i) => (
+            <button key={i} onClick={() => irA(i)} aria-label={`Ver ${t.titulo}`} title={t.titulo}
+              style={{ width: i === indice ? 10 : 7, height: i === indice ? 10 : 7, borderRadius: "50%", border: "none", padding: 0, cursor: "pointer", background: i === indice ? DORADO : tema.borde }} />
+          ))}
+          <span style={{ fontSize: 10.5, color: tema.textoSuave, marginLeft: 6 }}>Desliza para ver las demás</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Pagina del equipo: todas las tablas de los torneos que juega (su fila en dorado)
+function SeccionTablasEquipo({ equipoId, tema }) {
+  const [torneos, setTorneos] = useState(null);
+  useEffect(() => {
+    if (!equipoId) return;
+    setTorneos(null);
+    fetch(`/api/posiciones?equipo=${equipoId}`)
+      .then((r) => r.json())
+      .then((d) => setTorneos(Array.isArray(d?.torneos) ? d.torneos : []))
+      .catch(() => setTorneos([]));
+  }, [equipoId]);
+  if (torneos === null) return <p style={{ color: tema.textoSuave, fontSize: 12 }}>Cargando tablas de posiciones...</p>;
+  if (torneos.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 26 }}>
+      <h3 style={{ fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="trofeo" size={16} /> Tablas de posiciones</h3>
+      {torneos.map((t) => (
+        <CarruselTablas key={`${t.id}-${t.temporada}`} torneo={t} resaltados={{ [equipoId]: DORADO }} tema={tema} />
+      ))}
+    </div>
+  );
+}
+
+// Detalle del partido: la tabla del torneo que se juega, con los dos
+// equipos resaltados con su propio color. Si el torneo no tiene tabla
+// (fase por eliminacion), no se muestra nada.
+function TablaDelPartido({ ligaId, temporada, localId, visitanteId, colorLocal, colorVisitante, tema }) {
+  const [torneo, setTorneo] = useState(undefined);
+  useEffect(() => {
+    if (!ligaId || !temporada) { setTorneo(null); return; }
+    fetch(`/api/posiciones?liga=${ligaId}&temporada=${temporada}`)
+      .then((r) => r.json())
+      .then((d) => setTorneo(d?.torneo || null))
+      .catch(() => setTorneo(null));
+  }, [ligaId, temporada]);
+  if (!torneo) return null;
+  const hayEquipos = torneo.tablas.some((t) => t.filas.some((f) => f.id === localId || f.id === visitanteId));
+  if (!hayEquipos) return null;
+  const resaltados = { [localId]: colorLocal, [visitanteId]: colorDistinto(colorLocal, colorVisitante) };
+  return <CarruselTablas torneo={torneo} resaltados={resaltados} tema={tema} compacta />;
+}
+
 function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mostrarToast, onSeleccionarPartido }) {
   const [fixtures, setFixtures] = useState([]);
   const [proximos, setProximos] = useState([]);
@@ -6834,6 +7067,8 @@ function VistaEquipoCompleto({ equipo, tema, sesion, onPedirLogin, onVolver, mos
             <SubPanel titulo={traducir("noLiga")} fixtures={categorias.noLiga} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.noLiga} onSeleccionarPartido={onSeleccionarPartido} />
             <SubPanel titulo={traducir("formaReciente")} fixtures={categorias.forma} teamId={equipo.id} statsMap={{}} tema={tema} acento={ACENTOS_CATEGORIA.forma} onSeleccionarPartido={onSeleccionarPartido} />
           </div>
+
+          <SeccionTablasEquipo equipoId={equipo.id} tema={tema} />
 
           <h3 style={{ fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="calendario" size={16} /> Próximos encuentros</h3>
           {errorProximos && (
@@ -10051,6 +10286,15 @@ function Home() {
           <div>
             {equipoLocal?.team && equipoVisitante?.team && (
               <>
+                <TablaDelPartido
+                  ligaId={partidoCalendario?.league?.id}
+                  temporada={partidoCalendario?.league?.season}
+                  localId={equipoLocal.team.id}
+                  visitanteId={equipoVisitante.team.id}
+                  colorLocal={colorMarcaLocal}
+                  colorVisitante={colorMarcaVisitante}
+                  tema={tema}
+                />
                 <EstadisticasPartidoReal
                   fixtureId={partidoCalendario?.fixture?.id}
                   nombreLocal={equipoLocal.team.name}
