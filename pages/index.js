@@ -6922,7 +6922,13 @@ function CarruselTablas({ torneo, resaltados, tema, compacta }) {
   }
 
   return (
-    <div style={{ background: tema.panel, borderRadius: 10, padding: 14, marginBottom: 16, border: `1px solid ${tema.borde}` }}>
+    <div
+      style={{ background: tema.panel, borderRadius: 10, padding: 14, marginBottom: 16, border: `1px solid ${tema.borde}` }}
+      // Deslizar encima de las tablas es para cambiar de tabla (o mover la
+      // tabla de lado), no para cambiar de pestaña de la pagina.
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
         {torneo.logo && <img src={torneo.logo} alt="" width={28} height={28} style={{ objectFit: "contain", background: "#fff", borderRadius: 6, padding: 2 }} />}
         <div style={{ minWidth: 0 }}>
