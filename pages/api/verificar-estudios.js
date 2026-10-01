@@ -10,6 +10,7 @@
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { verificarEstudio, verificarRegistroPendiente } from "../../lib/verificarServidor";
 import { recalcularAprendizaje } from "../../lib/aprendizaje";
+import { revisarVencidasGooglePlay } from "../../lib/googlePlay";
 
 const TIEMPO_MAXIMO_MS = 8000; // margen para el limite de tiempo de Vercel
 
@@ -61,6 +62,12 @@ export default async function handler(req, res) {
       await recalcularAprendizaje();
     } catch {
       // si falla, se intenta en el proximo cron
+    }
+    // Respaldo de Google Play: planes vencidos sin aviso de renovacion
+    try {
+      await revisarVencidasGooglePlay();
+    } catch {
+      // se intenta de nuevo manana
     }
   }
 
