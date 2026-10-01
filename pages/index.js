@@ -5732,6 +5732,7 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast,
             </div>
             <p style={{ color: tema.textoSuave, margin: "0 0 8px" }}>
               {u.email} — Plan: {u.plan_suscripcion === "anual" ? "Max" : u.plan_suscripcion === "mensual" ? "Pro" : "—"}
+              {u.origen_suscripcion === "google_play" && " (Google Play: si se cancela aquí, recuerda reembolsar o cancelar también en Play Console)"}
               {u.suscripcion_fecha_pago && ` — Último pago: ${new Date(u.suscripcion_fecha_pago).toLocaleDateString()}`}
               {u.suscripcion_proximo_pago && ` — Próximo: ${new Date(u.suscripcion_proximo_pago).toLocaleDateString()}`}
             </p>
@@ -7941,7 +7942,9 @@ function ModalMiPlan({ perfil, tema, acentoMarca, diasRestantesPrueba, onCerrar,
             </div>
 
             <p style={{ fontSize: 10, color: tema.textoSuave, marginTop: 16 }}>
-              Puedes cancelar tu suscripción en cualquier momento desde Wompi.
+              {perfil?.origen_suscripcion === "google_play"
+                ? "Tu plan se paga con Google Play. Para cancelarlo o cambiarlo, entra a Play Store → Pagos y suscripciones."
+                : "Puedes cancelar tu suscripción en cualquier momento desde Wompi."}
             </p>
           </>
         )}
