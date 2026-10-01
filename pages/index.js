@@ -28,6 +28,9 @@ const TEMAS = {
 
 const DORADO = "#D8A93B";
 
+// Lema de JMCS: se cambia solo aqui (y en LEMA_JMCS de la app)
+const LEMA_JMCS = "Probabilidades, no corazonadas.";
+
 // Códigos ISO de los mismos países de arriba, para pedirle la bandera como IMAGEN a flagcdn.com
 // (gratis, sin key, no ocupa espacio en nuestra base). Solo se usa cuando la API no nos manda
 // ya una URL de bandera propia (eso pasa con equipos, no con partidos/ligas).
@@ -4220,7 +4223,8 @@ function AuthModal({ tema, acentoMarca, onCerrar, modoInicial }) {
         </button>
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 18 }}>
-          <img src="/logo.png" alt="JMCS" width={48} height={48} style={{ marginBottom: 8 }} />
+          <img src="/logo.png" alt="JMCS" width={48} height={48} style={{ marginBottom: 6 }} />
+          <p style={{ margin: "0 0 10px", fontSize: 12, color: DORADO, fontStyle: "italic", fontWeight: "bold" }}>{LEMA_JMCS}</p>
           <h3 style={{ margin: 0, fontSize: 17 }}>
             {modo === "registro" ? "Crea tu cuenta en JMCS" : modo === "magico" ? "Enlace mágico" : modo === "recuperar" ? "Recuperar contraseña" : "Bienvenido de nuevo a JMCS"}
           </h3>
@@ -5364,7 +5368,28 @@ function TarjetaBacktestingAutoAdmin({ sesion, tema, acentoMarca, mostrarToast }
   );
 }
 
-function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast }) {
+// Para que el administrador revise los candados del modelo gratis / Pro con
+// su propia cuenta (solo cambia lo que ve el, en este navegador).
+function TarjetaVerComoGratis({ tema, verComoGratis, onCambiar }) {
+  return (
+    <div style={{ background: tema.panel, borderRadius: 8, padding: 16, marginBottom: 24, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <h4 style={{ margin: "0 0 4px", fontSize: 13 }}>🔒 Ver como usuario gratis</h4>
+        <p style={{ margin: 0, fontSize: 11, color: tema.textoSuave }}>
+          Muestra la página como la ve alguien sin plan ni prueba gratis (semáforos verdes bloqueados, calculadora y clima con candado). Solo afecta a tu sesión en este navegador.
+        </p>
+      </div>
+      <button
+        onClick={() => onCambiar(!verComoGratis)}
+        style={{ padding: "8px 16px", borderRadius: 6, border: "none", cursor: "pointer", fontWeight: "bold", fontSize: 12, background: verComoGratis ? "#e0a030" : tema.borde, color: verComoGratis ? "#000" : tema.texto }}
+      >
+        {verComoGratis ? "Activado (tocar para quitar)" : "Desactivado"}
+      </button>
+    </div>
+  );
+}
+
+function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast, verComoGratis, onCambiarVerComoGratis }) {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -5741,6 +5766,8 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast 
           </div>
         ))}
       </div>
+
+      <TarjetaVerComoGratis tema={tema} verComoGratis={verComoGratis} onCambiar={onCambiarVerComoGratis} />
 
       <TarjetaAprendizajeAdmin sesion={sesion} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
 
@@ -7729,6 +7756,7 @@ function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
           <img src="/logo.png" alt="JMCS" width={28} height={28} />
           <strong style={{ color: tema.texto, fontSize: 14 }}>JMCS</strong>
         </div>
+        <p style={{ margin: "-4px 0 16px", fontSize: 12, color: DORADO, fontStyle: "italic", fontWeight: "bold" }}>{LEMA_JMCS}</p>
 
         {contenido.quienes_somos && (
           <p style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 18, textAlign: "left" }}>{contenido.quienes_somos}</p>
@@ -7761,6 +7789,14 @@ function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
           <button onClick={() => setModalLegal("privacidad")} style={{ background: "transparent", border: "none", color: tema.textoSuave, fontSize: 10, textDecoration: "underline", cursor: "pointer" }}>
             Política de Privacidad
           </button>
+        </div>
+
+        {/* Juego responsable: JMCS no es casa de apuestas, pero su publico apuesta */}
+        <div style={{ marginTop: 18, padding: "12px 14px", border: `1px solid ${tema.borde}`, borderRadius: 8, fontSize: 11, lineHeight: 1.6, textAlign: "left" }}>
+          <strong style={{ color: tema.texto }}>+18 · Juego responsable.</strong> JMCS es una herramienta de análisis estadístico, no una casa de apuestas,
+          y ningún pronóstico es seguro. Apuesta solo lo que puedas permitirte perder y nunca para recuperar pérdidas.
+          Si el juego deja de ser entretenimiento, busca ayuda: <strong>Línea 192, opción 4</strong> (Ministerio de Salud, gratuita) o{" "}
+          <a href="https://tomaelcontrol.coljuegos.gov.co/" target="_blank" rel="noopener noreferrer" style={{ color: acentoMarca }}>tomaelcontrol.coljuegos.gov.co</a>.
         </div>
 
         <p style={{ fontSize: 10, opacity: 0.7, marginTop: 16 }}>© {new Date().getFullYear()} JMCS — Juggernaut Match Calculation System</p>
@@ -8994,7 +9030,12 @@ function Home() {
   const enPeriodoPrueba = diasDesdeRegistro <= DIAS_PRUEBA_SUSCRIPCION;
   // Modelo gratis / Pro: todos entran a Estudio; lo de pago se ve bloqueado
   // para quien no tiene plan ni prueba gratis activa (ni cuenta).
-  const esPremium = !!sesion && (esAdmin || enPeriodoPrueba || !!perfil?.suscripcion_activa);
+  // "Ver como usuario gratis" (solo administradores, para revisar los candados)
+  const [verComoGratis, setVerComoGratis] = useState(false);
+  useEffect(() => {
+    try { setVerComoGratis(localStorage.getItem("jmcs_ver_como_gratis") === "1"); } catch {}
+  }, []);
+  const esPremium = !!sesion && !(esAdmin && verComoGratis) && (esAdmin || enPeriodoPrueba || !!perfil?.suscripcion_activa);
   const puedeUsarEstudio = true;
   PLAN_JMCS.premium = esPremium;
   PLAN_JMCS.sesion = !!sesion;
@@ -9417,7 +9458,7 @@ function Home() {
       <Head>
         <title>JMCS — Juggernaut Match Calculation System</title>
         <meta name="google-site-verification" content="NhdbltMwdU5Pm4BzoKGsaQOo2W757doNNNvt-8ObXys" />
-        <meta name="description" content="Métricas y estadísticas reales de fútbol: rendimiento como local/visitante, enfrentamientos directos, y probabilidades por competición. La herramienta te da los datos, tú sacas tus propias conclusiones." />
+        <meta name="description" content="Probabilidades, no corazonadas. JMCS estudia cada partido de fútbol con modelos matemáticos y te da probabilidades claras para cada mercado, con un historial de aciertos público." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#2e6b3e" />
@@ -9429,7 +9470,7 @@ function Home() {
 
         {/* Cómo se ve cuando alguien comparte el link en WhatsApp, Instagram, etc. */}
         <meta property="og:title" content="JMCS — Juggernaut Match Calculation System" />
-        <meta property="og:description" content="Métricas y estadísticas reales de fútbol, con metodología transparente." />
+        <meta property="og:description" content="Probabilidades, no corazonadas. Pronósticos de fútbol calculados con modelos matemáticos y un historial de aciertos público." />
         <meta property="og:image" content="https://juggernaut-match-calculation-system-nine.vercel.app/icon-512.png" />
         <meta property="og:url" content="https://juggernaut-match-calculation-system-nine.vercel.app" />
         <meta property="og:type" content="website" />
@@ -10396,7 +10437,19 @@ function Home() {
 
       {vistaActual === "admin" && esAdmin && (
         <div style={{ margin: "20px auto" }}>
-          <VistaAdmin sesion={sesion} esAdminPrincipal={esAdminPrincipal} tema={tema} acentoMarca={acentoMarca} mostrarToast={mostrarToast} />
+          <VistaAdmin
+            sesion={sesion}
+            esAdminPrincipal={esAdminPrincipal}
+            tema={tema}
+            acentoMarca={acentoMarca}
+            mostrarToast={mostrarToast}
+            verComoGratis={verComoGratis}
+            onCambiarVerComoGratis={(v) => {
+              setVerComoGratis(v);
+              try { localStorage.setItem("jmcs_ver_como_gratis", v ? "1" : "0"); } catch {}
+              mostrarToast(v ? "Ahora ves la página como un usuario gratis" : "Volviste a la vista de administrador");
+            }}
+          />
         </div>
       )}
 
