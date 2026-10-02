@@ -50,9 +50,9 @@ export default function Privacidad() {
           "suscripción" de notificaciones de tu navegador). Se borra apenas las desactivas.
         </p>
         <p style={estiloP}>
-          Si te suscribes a un plan pago, el procesamiento del pago lo hace Wompi directamente — nosotros no
-          almacenamos el número completo de tu tarjeta en ningún momento. Guardamos únicamente una referencia a
-          la suscripción y el estado del pago que Wompi nos confirma.
+          Si te suscribes a un plan pago, el procesamiento del pago lo hace directamente Wompi (en la página web)
+          o Google Play (en la app de Android) — nosotros no almacenamos el número de tu tarjeta en ningún momento.
+          Guardamos únicamente una referencia a la suscripción y el estado del pago que nos confirman.
         </p>
 
         <h2 style={estiloH2}>2. Para qué usamos tu información</h2>
@@ -69,16 +69,20 @@ export default function Privacidad() {
         </p>
         <p style={estiloP}>
           <strong>Supabase</strong> (base de datos, autenticación y almacenamiento de archivos), <strong>Wompi</strong>
-          {" "}(procesamiento de pagos), <strong>Google</strong> (si eliges iniciar sesión con esa opción), y
+          {" "}(pagos en la página web), <strong>Google</strong> (pagos en la app con Google Play, notificaciones, y el
+          inicio de sesión si eliges esa opción), y
           proveedores de datos deportivos (<strong>API-Football</strong> y <strong>PitchAPI</strong>) que reciben
           consultas sobre partidos, pero no reciben tu información personal.
         </p>
 
         <h2 style={estiloH2}>4. Tus derechos</h2>
         <p style={estiloP}>
-          Puedes pedirnos en cualquier momento que te mostremos, corrijamos o borremos tu información. Para
-          eliminar tu cuenta y todos los datos asociados, escríbenos a través del correo de contacto que figura
-          más abajo.
+          Puedes pedirnos en cualquier momento que te mostremos, corrijamos o borremos tu información.
+          Puedes eliminar tu cuenta y todos los datos asociados (perfil, foto, estudios guardados, favoritos,
+          historial y notificaciones) en cualquier momento: desde la app en Perfil → Eliminar mi cuenta, o desde
+          la página <a href="/eliminar-cuenta" style={{ color: "#f5c542" }}>/eliminar-cuenta</a>. El borrado es
+          inmediato y no se puede deshacer. Si tienes un plan pagado con Google Play, cancélalo también en
+          Play Store → Pagos y suscripciones, para que Google no te lo siga cobrando.
         </p>
 
         <h2 style={estiloH2}>5. Menores de edad</h2>

@@ -6226,6 +6226,7 @@ function VistaVerPerfil({ sesion, perfil, tema, acentoMarca, onEditar, esAdmin, 
           { etiqueta: "Editar perfil", onClick: onEditar },
           { etiqueta: "Mi suscripción", onClick: onVerSuscripcion },
           { etiqueta: "Ajustes", onClick: onVerAjustes },
+          { etiqueta: "Eliminar mi cuenta", onClick: () => { window.location.href = "/eliminar-cuenta"; } },
         ].map((b) => (
           <button
             key={b.etiqueta}
@@ -7787,10 +7788,28 @@ function Footer({ contenido, tema, acentoMarca, onIrAAjustesEmpresa }) {
           <button onClick={() => setModalLegal("terminos")} style={{ background: "transparent", border: "none", color: tema.textoSuave, fontSize: 10, textDecoration: "underline", cursor: "pointer" }}>
             Términos y Condiciones
           </button>
+          <a href="/eliminar-cuenta" style={{ color: tema.textoSuave, fontSize: 10 }}>Eliminar mi cuenta</a>
           <button onClick={() => setModalLegal("privacidad")} style={{ background: "transparent", border: "none", color: tema.textoSuave, fontSize: 10, textDecoration: "underline", cursor: "pointer" }}>
             Política de Privacidad
           </button>
         </div>
+
+        {/* Descargar en Google Play: aparece solo cuando en Vercel se crea la
+            variable NEXT_PUBLIC_MOSTRAR_PLAY_STORE=si (despues de que Google apruebe la app) */}
+        {process.env.NEXT_PUBLIC_MOSTRAR_PLAY_STORE === "si" && (
+          <a
+            href="https://play.google.com/store/apps/details?id=com.jmcs.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 14, padding: "8px 16px", background: "#000", color: "#fff", border: "1px solid #555", borderRadius: 8, textDecoration: "none", fontSize: 13 }}
+          >
+            <span style={{ fontSize: 18 }}>▶</span>
+            <span style={{ textAlign: "left", lineHeight: 1.1 }}>
+              <span style={{ fontSize: 9, display: "block", opacity: 0.8 }}>DISPONIBLE EN</span>
+              <strong>Google Play</strong>
+            </span>
+          </a>
+        )}
 
         {/* Juego responsable: JMCS no es casa de apuestas, pero su publico apuesta */}
         <div style={{ marginTop: 18, padding: "12px 14px", border: `1px solid ${tema.borde}`, borderRadius: 8, fontSize: 11, lineHeight: 1.6, textAlign: "left" }}>
