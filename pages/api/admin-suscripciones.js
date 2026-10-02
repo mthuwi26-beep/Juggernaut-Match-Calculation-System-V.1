@@ -34,7 +34,8 @@ async function buscar(termino) {
   const correos = {};
   for (let pagina = 1; pagina <= 5; pagina++) {
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: pagina, perPage: 1000 });
-    if (error || !data?.users?.length) break;
+    if (error) throw new Error(`No se pudieron leer las cuentas: ${error.message}`);
+    if (!data?.users?.length) break;
     data.users.forEach((u) => { correos[u.id] = u.email || ""; });
     if (data.users.length < 1000) break;
   }
@@ -42,7 +43,13 @@ async function buscar(termino) {
   const { data: porNombre } = await supabaseAdmin.from("perfiles").select("user_id").ilike("username", `%${t}%`).limit(20);
   const ids = [...new Set([...porCorreo, ...(porNombre || []).map((p) => p.user_id)])].slice(0, 20);
   const perfiles = await leerPerfiles(ids);
-  return perfiles.map((p) => ({ ...p, email: correos[p.user_id] || "" }));
+  // Tambien las cuentas que aun no tienen perfil (asi se ven igual en la busqueda)
+  return ids.map((id) => {
+    const p = perfiles.find((x) => x.user_id === id);
+    return p
+      ? { ...p, email: correos[id] || "" }
+      : { user_id: id, email: correos[id] || "", username: "(sin perfil todavía)", suscripcion_activa: false, plan_suscripcion: null };
+  });
 }
 
 async function actualizarPerfil(userId, cambios) {
@@ -53,7 +60,12 @@ async function actualizarPerfil(userId, cambios) {
     r = await supabaseAdmin.from("perfiles").update(resto).eq("user_id", userId).select("user_id");
   }
   if (r.error) throw new Error(r.error.message);
-  if (!r.data || r.data.length === 0) throw new Error("Ese usuario no tiene perfil todavía. Pídele que entre una vez a JMCS.");
+  if (!r.data || r.data.length === 0) {
+    // Cuenta sin perfil: se le crea uno con el plan
+    const { origen_suscripcion, wompi_payment_source_id, ...basico } = cambios;
+    const nuevo = await supabaseAdmin.from("perfiles").insert({ user_id: userId, ...basico }).select("user_id");
+    if (nuevo.error) throw new Error("Ese usuario no tiene perfil todavía. Pídele que entre una vez a JMCS y vuelve a intentarlo.");
+  }
 }
 
 export default async function handler(req, res) {
