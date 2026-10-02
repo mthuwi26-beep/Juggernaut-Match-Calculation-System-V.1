@@ -5474,23 +5474,46 @@ function VistaAdmin({ sesion, esAdminPrincipal, tema, acentoMarca, mostrarToast,
   async function buscarSuscripciones() {
     if (!busquedaSuscripcion.trim()) return;
     setBuscandoSuscripcion(true);
-    const { data, error } = await supabase.rpc("admin_buscar_usuario", { termino: busquedaSuscripcion.trim() });
+    try {
+      const r = await fetch(`/api/admin-suscripciones?termino=${encodeURIComponent(busquedaSuscripcion.trim())}`, {
+        headers: { Authorization: `Bearer ${sesion?.access_token}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "No se pudo buscar.");
+      setResultadosSuscripcion(d.usuarios || []);
+      if ((d.usuarios || []).length === 0) mostrarToast && mostrarToast("No se encontró ningún usuario con ese correo o nombre.");
+    } catch (e) {
+      mostrarToast && mostrarToast(e.message || "No se pudo buscar.");
+    }
     setBuscandoSuscripcion(false);
-    if (error) mostrarToast && mostrarToast("No se pudo buscar.");
-    else setResultadosSuscripcion(data || []);
   }
 
   async function cancelarSuscripcion(userId) {
-    const { error } = await supabase.rpc("admin_cancelar_suscripcion", { usuario_id: userId });
-    if (error) mostrarToast && mostrarToast("No se pudo cancelar.");
+    const error = await accionSuscripcionAdmin({ accion: "cancelar", userId });
+    if (error) mostrarToast && mostrarToast(error);
     else { mostrarToast && mostrarToast("Suscripción cancelada."); buscarSuscripciones(); }
   }
 
   async function otorgarSuscripcionGratis(userId) {
     const plan = planGratisElegido[userId] || "mensual";
-    const { error } = await supabase.rpc("admin_otorgar_suscripcion_gratis", { usuario_id: userId, plan });
-    if (error) mostrarToast && mostrarToast(error.message || "No se pudo otorgar.");
+    const error = await accionSuscripcionAdmin({ accion: "otorgar", userId, plan });
+    if (error) mostrarToast && mostrarToast(error);
     else { mostrarToast && mostrarToast("Suscripción otorgada sin pago."); buscarSuscripciones(); }
+  }
+
+  // Regalar o cancelar un plan desde el servidor. Devuelve el error, o null si salio bien.
+  async function accionSuscripcionAdmin(cuerpo) {
+    try {
+      const r = await fetch("/api/admin-suscripciones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesion?.access_token}` },
+        body: JSON.stringify(cuerpo),
+      });
+      const d = await r.json();
+      return r.ok ? null : d.error || "No se pudo completar.";
+    } catch {
+      return "No se pudo completar. Revisa tu conexión.";
+    }
   }
 
   useEffect(() => { cargarTodo(); }, []); // eslint-disable-line
